@@ -10,7 +10,7 @@ export default defineConfig(async () => {
         miniflare: {
           bindings: {
             TEST_MIGRATIONS: migrations,
-            TEACHER_PASSWORD_HASH: 'placeholder',
+            TEACHER_PASSWORD_HASH: 'pbkdf2-sha256$100000$/knLWP0ZF61fbkV9ukJ9OA==$0fPm3yZWNV/s2l++wE67w57aYKw5wIAwoB4tLbmLdDk=', // = "teacher-pass"
             SESSION_SECRET: 'test-secret',
           },
         },
