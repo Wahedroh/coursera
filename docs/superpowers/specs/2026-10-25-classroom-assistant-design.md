@@ -11,7 +11,8 @@
 - นักเรียนเข้าใช้ผ่าน **เว็บแอปอย่างเดียว** (มือถือของนักเรียน, โน้ตบุ๊กครู, จอโปรเจกเตอร์)
 - ตัวตนนักเรียน = **ZipGrade ID** + **PIN 4 หลักที่นักเรียนตั้งเอง**
 - แพลตฟอร์ม: **Cloudflare** (Workers + D1 + R2 + Durable Objects)
-- เฟส 1 = งาน (มอบหมาย/ส่ง/ตรวจ), เช็กชื่อ + แต้ม/EXP, สอบ, ไลฟ์หน้าห้อง
+- เฟส 1 = งาน (มอบหมาย/ส่ง/ตรวจ), เช็กชื่อ + แต้ม/EXP, บันทึกคะแนนสอบ (ครูกรอกเอง), ไลฟ์หน้าห้อง
+- **ไม่มีระบบสอบออนไลน์**: ครูจัดสอบและตรวจเอง (เช่น กระดาษ ZipGrade) แล้วกรอกคะแนนเข้าระบบ
 
 ### ข้อมูลจริงที่ใช้ออกแบบ (จาก CSV ที่ export จาก ZipGrade)
 - 313 คน, 12 ห้อง, 7 โรงเรียน — "ห้อง" = โรงเรียน + ชั้น (คอลัมน์ `Classes` เช่น `<ชื่อโรงเรียน> ชั้น 2`)
@@ -29,7 +30,7 @@
 - ค่าใช้จ่ายอยู่ใน free tier และระบบไม่หยุดเองช่วงปิดเทอม
 
 ### นอกขอบเขตเฟส 1 (YAGNI)
-AI ตรวจงาน, แกลเลอรีแชร์ผลงาน (ไลก์/คอมเมนต์), เชื่อม Google Drive, ข้อสอบอัตนัย, push notification / LINE, ครูหลายคน
+AI ตรวจงาน, แกลเลอรีแชร์ผลงาน (ไลก์/คอมเมนต์), เชื่อม Google Drive, ระบบทำข้อสอบออนไลน์/คุมสอบ/ตรวจจับออกจากหน้าจอ, นำเข้าผลสอบจากไฟล์ ZipGrade อัตโนมัติ, push notification / LINE, ครูหลายคน
 
 ## 2. สถาปัตยกรรม
 
@@ -40,10 +41,10 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
  ├─ หน้าเว็บ: React + Vite + Tailwind (Workers static assets, SPA)
  ├─ API: Hono  ──► D1 (SQLite) ผ่าน Drizzle ORM + migrations
  ├─ รูป: R2 (รูปงาน, รูปที่ครูเขียนทับ, รูปประกอบงาน)
- └─ Durable Object `LiveRoom`: 1 instance ต่อ 1 ไลฟ์ / 1 รอบสอบ (WebSocket hibernation)
+ └─ Durable Object `LiveRoom`: 1 instance ต่อ 1 ไลฟ์ (WebSocket hibernation)
 ```
 
-- โครงไฟล์: `src/client/` (React), `src/server/` (Hono routes แยกตามโดเมน: `auth`, `roster`, `assignments`, `attendance`, `points`, `exams`, `live`), `src/server/do/LiveRoom.ts`, `src/shared/` (types + zod schemas ใช้ร่วม client/server), `migrations/`
+- โครงไฟล์: `src/client/` (React), `src/server/` (Hono routes แยกตามโดเมน: `auth`, `roster`, `assignments`, `attendance`, `points`, `scores`, `live`), `src/server/do/LiveRoom.ts`, `src/shared/` (types + zod schemas ใช้ร่วม client/server), `migrations/`
 - แต่ละโดเมนมี service module ที่ไม่รู้จัก HTTP (รับ db + input คืนผล) เพื่อทดสอบแยกได้; route ทำแค่ auth + validate + เรียก service
 - Free tier ที่พอ: Workers 100k req/วัน, D1 5GB, R2 10GB, Durable Objects (SQLite-backed) บน free plan
 - ประมาณพื้นที่รูป: ~313 คน × 30 งาน × ~200KB ≈ 2GB/ปี
@@ -67,7 +68,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 - ช่องโหว่ที่ยอมรับ: นักเรียนที่ยังไม่ตั้ง PIN อาจถูกคนอื่นตั้งแทน → ครูเห็นได้จาก "เครื่องใหม่" + รีเซ็ตได้; แนะนำให้ทุกคนตั้ง PIN ในคาบแรก
 
 ### สิทธิ์
-- ตรวจทุก API ฝั่งเซิร์ฟเวอร์: route ครูต้องมี teacher session; นักเรียนเข้าถึงได้เฉพาะข้อมูลของตัวเองและงาน/สอบ/ไลฟ์ของห้องตัวเอง
+- ตรวจทุก API ฝั่งเซิร์ฟเวอร์: route ครูต้องมี teacher session; นักเรียนเข้าถึงได้เฉพาะข้อมูลของตัวเองและงาน/คะแนน/ไลฟ์ของห้องตัวเอง (คะแนนสอบเห็นเฉพาะรายการที่ครูเผยแพร่)
 - รูปใน R2 ไม่เปิด public; เสิร์ฟผ่าน Worker หลังตรวจสิทธิ์
 
 ## 4. โมเดลข้อมูล (D1)
@@ -84,11 +85,11 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 | `submissions` | assignment_id, student_id (unique คู่), text, image_keys (json), annotated_keys (json), status (`submitted`/`late`/`graded`/`returned`), submitted_at, score, comment, graded_at, client_request_id |
 | `attendance_days` | class_id, date (YYYY-MM-DD, unique คู่), self_checkin_open |
 | `attendance_records` | day_id, student_id (unique คู่), status (`present`/`late`/`sick`/`leave`/`absent`), source (`teacher`/`self`) |
-| `point_events` | student_id, delta (int), reason, source (`manual`/`assignment`/`attendance`/`live`/`exam`), ref_id, created_by |
+| `point_events` | student_id, delta (int), reason, source (`manual`/`assignment`/`attendance`/`live`), ref_id, created_by |
 | `eggs` | student_id, earned_at_level, opened_at, character_id (nullable จนกว่าเปิด) |
 | `seating` | class_id, layout (json: ตำแหน่งโต๊ะ → student_id) |
-| `exams` | class_id, title, questions (json), duration_sec, shuffle_questions, shuffle_choices, opens_at, closes_at, published |
-| `exam_attempts` | exam_id, student_id (unique คู่), started_at, deadline_at, submitted_at, answers (json), score, focus_events (json: [{left_at, back_at}]) |
+| `score_items` | class_id, title, category (`quiz`/`midterm`/`final`/`other`), max_score (real > 0), taken_on (YYYY-MM-DD), published (bool, ค่าเริ่มต้น false), sort_order |
+| `scores` | item_id, student_id (unique คู่), score (real, nullable = ยังไม่กรอก), absent (bool), note, updated_at |
 | `live_sessions` | class_id, started_at, ended_at, current_activity_id |
 | `live_activities` | live_session_id, order, kind (`checkin`/`poll`/`wordcloud`/`quiz`), config (json), show_results |
 | `live_responses` | activity_id, student_id (unique คู่), answer (json), answered_at, correct (nullable) |
@@ -129,12 +130,18 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 - **เลเวลและไข่**: ทุก 100 EXP = +1 เลเวล = ได้ไข่ 1 ใบ; เปิดไข่ → สุ่มตัวละครตามน้ำหนักความหายาก (ธรรมดา 60%, หายาก 25%, หายากมาก 12%, ตำนาน 3%) ฝั่งเซิร์ฟเวอร์
 - **หน้านักเรียน**: เลเวล, แถบ EXP, คอลเลกชันตัวละคร, ประวัติแต้ม; leaderboard ต่อห้อง (ครูเปิด/ปิดได้, ค่าเริ่มต้นปิด)
 
-### 5.5 สอบ
-- **สร้าง**: คำถามปรนัย (ตัวเลือก 2–6, เฉลย 1 ข้อ) และเติมคำสั้น (คำตอบที่ยอมรับได้หลายแบบ, เทียบแบบตัดช่องว่าง/ไม่สนตัวพิมพ์); เวลา, สลับข้อ/ตัวเลือก, ช่วงเวลาเปิด-ปิด, คะแนนต่อข้อ
-- **ทำสอบ**: เริ่ม → สร้าง attempt พร้อม `deadline_at` (เวลาเซิร์ฟเวอร์); บันทึกคำตอบทุกครั้งที่เปลี่ยน (PUT idempotent) + สำรองใน localStorage; หมดเวลา → ส่งอัตโนมัติ; เซิร์ฟเวอร์ไม่รับคำตอบหลัง `deadline_at` + 30 วิ grace
-- **ตรวจจับออกจากหน้าจอ**: `visibilitychange` + `blur`/`focus` → บันทึก focus event (เวลาออก/กลับ) ส่งเข้า LiveRoom และ D1; **เป็นข้อมูลประกอบ ไม่หักคะแนนอัตโนมัติ**
-- **หน้าคุมสอบ (ครู)**: ผ่าน LiveRoom แบบเรียลไทม์ — รายชื่อสถานะ (ยังไม่เริ่ม/กำลังทำ/ส่งแล้ว), ส่งแล้ว X/Y, จำนวนครั้ง+ระยะเวลาออกจากจอต่อคน (เด้งแจ้งเตือน), นับถอยหลัง; ครูต่อเวลาให้รายคนได้
-- **หลังสอบ**: ตรวจอัตโนมัติ, สถิติรายข้อ (% ถูก, ตัวเลือกที่คนเลือกมากสุด), ส่งออก Excel, EXP ตามที่ตั้ง (ค่าเริ่มต้น: ไม่มี)
+### 5.5 บันทึกคะแนนสอบ (ครูกรอกเอง)
+- ครูสอบและตรวจเองนอกระบบ (เช่น กระดาษคำตอบ ZipGrade) แล้วกรอกคะแนนในระบบ
+- **สร้างรายการคะแนน**: ชื่อ (เช่น "สอบย่อย บทที่ 3"), หมวด (สอบย่อย/กลางภาค/ปลายภาค/อื่น ๆ), คะแนนเต็ม, วันที่สอบ; สร้างให้หลายห้องพร้อมกันได้ (1 รายการต่อห้อง)
+- **หน้ากรอกคะแนน**: ตารางรายชื่อเรียงตามลำดับในห้อง (แสดง ZipGrade ID ให้เทียบกับกระดาษได้ง่าย)
+  - กด Enter/↓ ไปคนถัดไป, บันทึกอัตโนมัติทีละช่อง
+  - วางคะแนนทั้งคอลัมน์จาก Excel/Google Sheets ได้ (paste เรียงตามลำดับรายชื่อ)
+  - ช่องว่าง = ยังไม่กรอก; ปุ่ม "ขาดสอบ" ต่อคน; ช่องหมายเหตุ
+  - ตรวจค่า 0 ≤ คะแนน ≤ คะแนนเต็ม (ทศนิยม 2 ตำแหน่ง); ค่าผิดขึ้นกรอบแดง ไม่บันทึก
+  - แสดงสรุป: กรอกแล้ว X/Y, ค่าเฉลี่ย, สูงสุด, ต่ำสุด
+- **เผยแพร่**: ค่าเริ่มต้นนักเรียนยังไม่เห็น; ครูกด "เผยแพร่" แล้วนักเรียนเห็นคะแนนของตัวเองในแท็บ "คะแนน" (ไม่เห็นของคนอื่น)
+- **ส่งออก Excel**: สมุดคะแนนรวมต่อห้อง = คะแนนงาน + รายการคะแนนสอบ เป็นคอลัมน์ต่อกัน
+- ไม่มี EXP จากคะแนนสอบ (ครูให้แต้มมือได้ตามปกติ)
 
 ### 5.6 ไลฟ์หน้าห้อง
 - ครูเตรียมชุดกิจกรรมล่วงหน้าหรือสร้างสด → กด "เริ่มไลฟ์" → **จอโปรเจกเตอร์** (`/live/:id/screen`) แสดง QR + join code
@@ -144,24 +151,24 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 - สถานะสดอยู่ใน LiveRoom; ทุกคำตอบเขียนลง D1 ทันที (`live_responses`) → +1 EXP ต่อกิจกรรมที่ตอบ, +2 ถ้าควิซถูก
 
 ## 6. Durable Object `LiveRoom`
-- 1 instance ต่อ live session หรือ exam (ชื่อ `live:<id>` / `exam:<id>`)
+- 1 instance ต่อ live session (ชื่อ `live:<id>`)
 - WebSocket hibernation API; ไคลเอนต์ส่ง auth ผ่าน session cookie ตอน upgrade (Worker ตรวจก่อน forward พร้อม role + student_id)
-- ข้อความ (JSON, มี `type`): `state` (snapshot เต็ม), `activity_changed`, `response_count`, `results`, `focus_event`, `attempt_status`, `time_extended`
+- ข้อความ (JSON, มี `type`): `state` (snapshot เต็ม), `activity_changed`, `response_count`, `results`
 - เมื่อเชื่อมต่อใหม่ ไคลเอนต์ได้ `state` snapshot เสมอ → ไม่ต้องพึ่งลำดับข้อความ
 - แหล่งความจริงคือ D1; DO เก็บแค่ state สดและ fan-out — DO รีสตาร์ตก็สร้าง state ใหม่จาก D1 ได้
 
 ## 7. การจัดการข้อผิดพลาด
 - **เน็ตไม่เสถียร**: ส่งงาน/คำตอบทุกอย่างมี `client_request_id` → เซิร์ฟเวอร์ idempotent; UI แสดง "กำลังส่ง…/ส่งไม่สำเร็จ แตะเพื่อลองใหม่" + retry อัตโนมัติแบบ backoff; ร่างงานเก็บใน localStorage
 - **WebSocket**: reconnect อัตโนมัติ (backoff 1→2→4→…≤15 วิ) + รับ snapshot ใหม่
-- **เวลา**: กำหนดส่ง/หมดเวลาสอบตัดสินด้วยเวลาเซิร์ฟเวอร์เท่านั้น; ไคลเอนต์ปรับ offset นาฬิกาจาก response header
+- **เวลา**: กำหนดส่งงานตัดสินด้วยเวลาเซิร์ฟเวอร์เท่านั้น; ไคลเอนต์ปรับ offset นาฬิกาจาก response header
 - **อัปโหลด**: รับเฉพาะ `image/jpeg|png|webp`, ≤ 5MB ต่อรูป, ≤ 10 รูปต่อการส่ง; ตรวจที่เซิร์ฟเวอร์ด้วย
 - **Validation**: zod schema ร่วมกันทั้ง client/server; error ตอบรูปแบบเดียว `{ error: { code, message } }` ข้อความภาษาไทย
-- **สำรองข้อมูล**: D1 Time Travel (ย้อน 30 วัน) + ปุ่ม "ส่งออกทั้งหมด" (Excel หลายชีต: รายชื่อ, คะแนนงาน, เช็กชื่อ, EXP, สอบ)
+- **สำรองข้อมูล**: D1 Time Travel (ย้อน 30 วัน) + ปุ่ม "ส่งออกทั้งหมด" (Excel หลายชีต: รายชื่อ, สมุดคะแนน (งาน + คะแนนสอบ), เช็กชื่อ, EXP)
 
 ## 8. การทดสอบ
-- **Unit** (Vitest): ตัว parse CSV (3 รูปแบบคำนำหน้า, ชื่อซ้ำ, ID ผิดรูปแบบ, regex โรงเรียน/ชั้น), diff การนำเข้า, กฎ EXP/เลเวล, สุ่มไข่ (seeded), ตรวจข้อสอบ, QR token หมุน
-- **Integration** (`@cloudflare/vitest-pool-workers` + D1 migrations จริง): auth ครู/นักเรียน, ตั้ง PIN ครั้งแรก, ล็อก 5 ครั้ง, สิทธิ์ข้ามนักเรียน/ข้ามห้อง, ส่งงานซ้ำ (idempotent), ส่งสาย, deadline สอบ, LiveRoom broadcast/reconnect
-- **E2E** (Playwright): นักเรียนล็อกอิน → ส่งงานรูป → ครูตรวจ+เขียนทับ → นักเรียนเห็นผล; ทำสอบ → สลับแท็บ → ครูเห็นแจ้งเตือน
+- **Unit** (Vitest): ตัว parse CSV (3 รูปแบบคำนำหน้า, ชื่อซ้ำ, ID ผิดรูปแบบ, regex โรงเรียน/ชั้น), diff การนำเข้า, กฎ EXP/เลเวล, สุ่มไข่ (seeded), ตรวจค่าคะแนน/แปลงข้อความที่ paste เป็นคะแนน, QR token หมุน
+- **Integration** (`@cloudflare/vitest-plugin` + D1 migrations จริง): auth ครู/นักเรียน, ตั้ง PIN ครั้งแรก, ล็อก 5 ครั้ง, สิทธิ์ข้ามนักเรียน/ข้ามห้อง, ส่งงานซ้ำ (idempotent), ส่งสาย, คะแนนเกินคะแนนเต็ม, นักเรียนเห็นเฉพาะคะแนนที่เผยแพร่และของตัวเอง, LiveRoom broadcast/reconnect
+- **E2E** (Playwright): นักเรียนล็อกอิน → ส่งงานรูป → ครูตรวจ+เขียนทับ → นักเรียนเห็นผล; ครูกรอกคะแนนสอบ (รวม paste) → เผยแพร่ → นักเรียนเห็นคะแนนตัวเอง
 - ข้อมูลทดสอบเป็น **รายชื่อสมมติทั้งหมด** (`tests/fixtures/roster.sample.csv` รูปแบบเดียวกับ ZipGrade)
 
 ## 9. ลำดับการสร้าง (milestones)
@@ -172,7 +179,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 | M0 | โครงโปรเจกต์, schema + migrations, ล็อกอินครู, นำเข้า CSV + พรีวิว, ล็อกอินนักเรียน (ID + PIN), จัดการ session/รีเซ็ต PIN, deploy | นักเรียนเข้าระบบได้ |
 | M1 | งาน: สร้าง/ส่ง/แดชบอร์ดทวงงาน/ตรวจ + เขียนทับรูป/ส่งออก Excel, EXP จากงาน | เก็บงานผ่านระบบ |
 | M2 | เช็กชื่อ (+ QR หมุน), ส่งออก, ผังที่นั่ง + แจกแต้ม, สุ่ม/แบ่งกลุ่ม, EXP/เลเวล/ไข่, leaderboard | ใช้ในคาบ |
-| M3 | สอบ + LiveRoom (โหมด exam) + หน้าคุมสอบ | สอบย่อย |
+| M3 | บันทึกคะแนนสอบ (สร้างรายการ, กรอก/paste, เผยแพร่, รวมในสมุดคะแนน Excel) + แท็บ "คะแนน" ของนักเรียน | กรอกคะแนนสอบจากกระดาษ |
 | M4 | ไลฟ์หน้าห้อง (LiveRoom โหมด live) + จอโปรเจกเตอร์ | กิจกรรมหน้าห้อง |
 
 ## 10. Deploy และสิ่งที่ครูต้องเตรียม
