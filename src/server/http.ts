@@ -18,3 +18,15 @@ export function onError(err: Error, c: Context): Response {
 export function getClientIp(c: Context): string {
   return c.req.header('cf-connecting-ip') ?? 'unknown'
 }
+
+export async function parseBody<T>(c: Context, schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }): Promise<T> {
+  let json: unknown
+  try {
+    json = await c.req.json()
+  } catch {
+    throw apiError('invalid_request', 'ข้อมูลไม่ถูกต้อง', 400)
+  }
+  const r = schema.safeParse(json)
+  if (!r.success) throw apiError('invalid_request', 'ข้อมูลไม่ถูกต้อง', 400)
+  return r.data
+}

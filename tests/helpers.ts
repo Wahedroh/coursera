@@ -49,3 +49,33 @@ export async function resetDb() {
   await reset()
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS)
 }
+
+export function cookieFrom(res: Response): string {
+  const raw = res.headers.get('set-cookie') ?? ''
+  const m = /(?:^|,\s*)sid=([^;]*)/.exec(raw)
+  if (!m) throw new Error(`no sid cookie in: ${raw}`)
+  return `sid=${m[1]}`
+}
+
+export async function postJson(path: string, body: unknown, init: { cookie?: string; headers?: Record<string, string> } = {}) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(init.cookie ? { cookie: init.cookie } : {}), ...init.headers },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function getJson(path: string, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, { headers: cookie ? { cookie } : {} })
+}
+
+export async function loginTeacher(): Promise<string> {
+  const res = await postJson('/api/teacher/login', { password: 'teacher-pass' })
+  if (res.status !== 200) throw new Error(`teacher login failed: ${res.status}`)
+  return cookieFrom(res)
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const json = (r: Response) => r.json() as Promise<any>

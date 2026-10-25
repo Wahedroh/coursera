@@ -6,4 +6,8 @@ export type Env = {
   SESSION_SECRET: string
 }
 
-export type AppEnv = { Bindings: Env; Variables: { session?: unknown } }
+export type SessionInfo =
+  | { sessionId: string; kind: 'teacher' }
+  | { sessionId: string; kind: 'student'; studentId: string; classId: string }
+
+export type AppEnv = { Bindings: Env; Variables: { session?: SessionInfo } }
