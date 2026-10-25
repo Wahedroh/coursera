@@ -1,0 +1,188 @@
+# ผู้ช่วยครูจัดการชั้นเรียน (เฟส 1) — Design Spec
+
+- วันที่: 2026-10-25
+- สถานะ: รออนุมัติ spec
+- แรงบันดาลใจ: "คุณไก่ทวง V.2" (@khunkai) — แต่ทำเป็นเว็บแอป ไม่ผูกกับ LINE
+
+## 1. เป้าหมายและขอบเขต
+
+### สิ่งที่ผู้ใช้กำหนด
+- ใช้จริงในห้องเรียนของครู **1 คน** (ไม่ทำ multi-tenant / สมัครสมาชิก)
+- นักเรียนเข้าใช้ผ่าน **เว็บแอปอย่างเดียว** (มือถือของนักเรียน, โน้ตบุ๊กครู, จอโปรเจกเตอร์)
+- ตัวตนนักเรียน = **ZipGrade ID** + **PIN 4 หลักที่นักเรียนตั้งเอง**
+- แพลตฟอร์ม: **Cloudflare** (Workers + D1 + R2 + Durable Objects)
+- เฟส 1 = งาน (มอบหมาย/ส่ง/ตรวจ), เช็กชื่อ + แต้ม/EXP, สอบ, ไลฟ์หน้าห้อง
+
+### ข้อมูลจริงที่ใช้ออกแบบ (จาก CSV ที่ export จาก ZipGrade)
+- 313 คน, 12 ห้อง, 7 โรงเรียน — "ห้อง" = โรงเรียน + ชั้น (คอลัมน์ `Classes` เช่น `<ชื่อโรงเรียน> ชั้น 2`)
+- คอลัมน์: `ZipGrade ID, External ID, First Name, Last Name, Classes`
+- ZipGrade ID ไม่ซ้ำทั้งไฟล์, เป็นตัวเลข, ส่วนใหญ่เรียง 1–312 (เดาง่าย → ต้องมี PIN)
+- นักเรียน 1 คนอยู่ 1 ห้อง
+- คำนำหน้าชื่อมี 3 รูปแบบ: ติดกับชื่อ (`เด็กหญิงxxx`), อยู่ลำพังในช่องชื่อแล้วชื่อจริง+นามสกุลอยู่ในช่องนามสกุล (`นางสาว` | `xxx yyy`), ไม่มีคำนำหน้า
+- `External ID` ซ้ำกับชื่อห้องหรือว่าง → ไม่ใช้
+- ไม่มีเลขที่ → เรียงตาม ZipGrade ID ภายในห้อง, ครูแก้ลำดับได้
+
+### เกณฑ์ความสำเร็จ
+- ครูใช้ได้ทุกวันในคาบจริง ทั้ง 12 ห้อง
+- ครูเห็นได้ทันทีว่าใครยังไม่ส่งงาน
+- ส่งออกคะแนน/เช็กชื่อเป็น Excel ได้
+- ค่าใช้จ่ายอยู่ใน free tier และระบบไม่หยุดเองช่วงปิดเทอม
+
+### นอกขอบเขตเฟส 1 (YAGNI)
+AI ตรวจงาน, แกลเลอรีแชร์ผลงาน (ไลก์/คอมเมนต์), เชื่อม Google Drive, ข้อสอบอัตนัย, push notification / LINE, ครูหลายคน
+
+## 2. สถาปัตยกรรม
+
+```
+เบราว์เซอร์ (นักเรียน / ครู / จอโปรเจกเตอร์)
+        │  HTTPS + WebSocket
+Cloudflare Worker (โดเมนเดียว, deploy ครั้งเดียว)
+ ├─ หน้าเว็บ: React + Vite + Tailwind (Workers static assets, SPA)
+ ├─ API: Hono  ──► D1 (SQLite) ผ่าน Drizzle ORM + migrations
+ ├─ รูป: R2 (รูปงาน, รูปที่ครูเขียนทับ, รูปประกอบงาน)
+ └─ Durable Object `LiveRoom`: 1 instance ต่อ 1 ไลฟ์ / 1 รอบสอบ (WebSocket hibernation)
+```
+
+- โครงไฟล์: `src/client/` (React), `src/server/` (Hono routes แยกตามโดเมน: `auth`, `roster`, `assignments`, `attendance`, `points`, `exams`, `live`), `src/server/do/LiveRoom.ts`, `src/shared/` (types + zod schemas ใช้ร่วม client/server), `migrations/`
+- แต่ละโดเมนมี service module ที่ไม่รู้จัก HTTP (รับ db + input คืนผล) เพื่อทดสอบแยกได้; route ทำแค่ auth + validate + เรียก service
+- Free tier ที่พอ: Workers 100k req/วัน, D1 5GB, R2 10GB, Durable Objects (SQLite-backed) บน free plan
+- ประมาณพื้นที่รูป: ~313 คน × 30 งาน × ~200KB ≈ 2GB/ปี
+
+## 3. การยืนยันตัวตนและสิทธิ์
+
+### ครู
+- บัญชีเดียว; รหัสผ่านเก็บเป็น PBKDF2 hash ใน Worker secret `TEACHER_PASSWORD_HASH`
+- ล็อกอินแล้วได้ session cookie (HttpOnly, Secure, SameSite=Lax) อายุ 30 วัน
+- session ลงนามด้วย secret `SESSION_SECRET`; เก็บ session ใน D1 เพื่อเพิกถอนได้
+
+### นักเรียน
+1. เข้าเว็บ (หรือสแกน QR ของห้อง) → พิมพ์ ZipGrade ID
+2. **ครั้งแรก** (ยังไม่มี PIN): ระบบแสดงชื่อ-นามสกุล + ห้องให้ยืนยัน "นี่คือฉัน" → ตั้ง PIN 4 หลัก 2 ครั้ง
+3. **ครั้งต่อไป**: ZipGrade ID + PIN
+4. ได้ session cookie อายุ 90 วัน
+- PIN เก็บเป็น PBKDF2 (WebCrypto) + salt รายคน
+- พิมพ์ PIN ผิด 5 ครั้ง → ID นั้นล็อก 15 นาที; จำกัดต่อ IP แบบหลวม (โรงเรียนใช้ IP ร่วมกัน) เช่น 60 ครั้ง/นาที
+- ทุก session บันทึก user-agent + เวลาแรก/ล่าสุด; ล็อกอินจากเครื่องใหม่ → แสดงในแดชบอร์ดครู ("เครื่องใหม่")
+- ครูทำได้: รีเซ็ต PIN (นักเรียนตั้งใหม่ครั้งถัดไป), ปลดล็อก, ออกจากระบบทุกเครื่องของนักเรียนคนนั้น
+- ช่องโหว่ที่ยอมรับ: นักเรียนที่ยังไม่ตั้ง PIN อาจถูกคนอื่นตั้งแทน → ครูเห็นได้จาก "เครื่องใหม่" + รีเซ็ตได้; แนะนำให้ทุกคนตั้ง PIN ในคาบแรก
+
+### สิทธิ์
+- ตรวจทุก API ฝั่งเซิร์ฟเวอร์: route ครูต้องมี teacher session; นักเรียนเข้าถึงได้เฉพาะข้อมูลของตัวเองและงาน/สอบ/ไลฟ์ของห้องตัวเอง
+- รูปใน R2 ไม่เปิด public; เสิร์ฟผ่าน Worker หลังตรวจสิทธิ์
+
+## 4. โมเดลข้อมูล (D1)
+
+ทุกตารางมี `id` (text, ULID) และ `created_at`; เวลาเก็บเป็น UTC epoch ms, แสดงผลเป็น Asia/Bangkok
+
+| ตาราง | คอลัมน์หลัก |
+|---|---|
+| `schools` | name (unique) |
+| `classes` | school_id, grade (int), name (ข้อความเต็มจาก CSV, unique), join_code (6 ตัว, unique), archived |
+| `students` | zipgrade_id (unique), class_id, title (nullable), first_name, last_name, sort_order, pin_hash (nullable), pin_salt, failed_attempts, locked_until, active |
+| `sessions` | kind (`teacher`/`student`), student_id (nullable), token_hash, user_agent, last_seen_at, revoked_at, flagged_new_device |
+| `assignments` | class_id, title, instructions, attachment_keys (json), due_at, max_score, submit_mode (`text`/`image`/`both`), published |
+| `submissions` | assignment_id, student_id (unique คู่), text, image_keys (json), annotated_keys (json), status (`submitted`/`late`/`graded`/`returned`), submitted_at, score, comment, graded_at, client_request_id |
+| `attendance_days` | class_id, date (YYYY-MM-DD, unique คู่), self_checkin_open |
+| `attendance_records` | day_id, student_id (unique คู่), status (`present`/`late`/`sick`/`leave`/`absent`), source (`teacher`/`self`) |
+| `point_events` | student_id, delta (int), reason, source (`manual`/`assignment`/`attendance`/`live`/`exam`), ref_id, created_by |
+| `eggs` | student_id, earned_at_level, opened_at, character_id (nullable จนกว่าเปิด) |
+| `seating` | class_id, layout (json: ตำแหน่งโต๊ะ → student_id) |
+| `exams` | class_id, title, questions (json), duration_sec, shuffle_questions, shuffle_choices, opens_at, closes_at, published |
+| `exam_attempts` | exam_id, student_id (unique คู่), started_at, deadline_at, submitted_at, answers (json), score, focus_events (json: [{left_at, back_at}]) |
+| `live_sessions` | class_id, started_at, ended_at, current_activity_id |
+| `live_activities` | live_session_id, order, kind (`checkin`/`poll`/`wordcloud`/`quiz`), config (json), show_results |
+| `live_responses` | activity_id, student_id (unique คู่), answer (json), answered_at, correct (nullable) |
+| `settings` | key, value (json) — เช่น กฎ EXP, เปิด/ปิด leaderboard |
+
+- EXP ของนักเรียน = `SUM(point_events.delta)`; เลเวล = `floor(EXP / 100)` (ค่าคงที่ปรับได้ใน `settings`)
+- ตัวละครไข่: ชุดภาพพิกเซลคงที่ในโค้ด (`src/shared/characters.ts`) แบ่ง 4 ระดับความหายาก
+
+## 5. ฟีเจอร์และขั้นตอนการใช้งาน
+
+### 5.1 นำเข้ารายชื่อจาก ZipGrade
+1. ครูอัปโหลด CSV → ระบบ parse ในเบราว์เซอร์และส่งให้เซิร์ฟเวอร์คำนวณ diff
+2. หน้าพรีวิวก่อนยืนยัน: นักเรียนใหม่ / ข้อมูลเปลี่ยน (ชื่อ, ห้อง) / ในระบบแต่ไม่มีในไฟล์ (เสนอให้ตั้งเป็น inactive ไม่ลบ) / **รายการน่าตรวจสอบ**
+3. ยืนยัน → upsert ตาม `zipgrade_id` ในทรานแซกชันเดียว; สร้าง `schools`/`classes` อัตโนมัติ
+- แยกโรงเรียน/ชั้นจาก `Classes` ด้วย regex `^(.*)\s+ชั้น\s*(\d+)$`; ถ้าไม่ match ใช้ทั้งข้อความเป็นชื่อห้อง และ school = ชื่อเดียวกัน
+- แยกคำนำหน้า (`เด็กหญิง`, `เด็กชาย`, `นางสาว`, `นาง`, `นาย`): ถ้า First Name เท่ากับคำนำหน้าพอดี → ชื่อ = คำแรกของ Last Name, นามสกุล = ที่เหลือ; ถ้าขึ้นต้นด้วยคำนำหน้า → ตัดออกเป็น title; ไม่มี → title = null
+- รายการน่าตรวจสอบ: ไม่มีคำนำหน้า, ชื่อ-นามสกุลซ้ำกันในห้องเดียวกัน, ZipGrade ID ไม่ใช่ตัวเลขหรือยาวผิดปกติ (> 4 หลัก), คอลัมน์ขาด
+- **ข้อมูลจริงไม่ถูก commit ลง git**; `.gitignore` กัน `*.csv` ยกเว้นไฟล์ fixture รายชื่อสมมติใน `tests/fixtures/`
+
+### 5.2 งาน: มอบหมาย / ส่ง / ทวง / ตรวจ
+- **ครูสร้างงาน**: ชื่อ, คำสั่ง, รูปประกอบ, เลือกได้หลายห้อง (สร้าง 1 assignment ต่อห้อง), กำหนดส่ง, คะแนนเต็ม, รูปแบบการส่ง
+- **นักเรียน**: หน้า "งานของฉัน" แท็บ ค้างส่ง / ส่งแล้ว / ตรวจแล้ว / ส่งกลับแก้; ส่งข้อความและ/หรือรูปหลายรูป (ย่อในเบราว์เซอร์ด้าน max 1600px, JPEG ~0.8); แก้ไขได้จนกว่าครูตรวจ; ส่งหลัง `due_at` → status `late`
+- **ทวงงาน**: แดชบอร์ดตาราง นักเรียน × งาน ต่อห้อง (สี: ยังไม่ส่ง/ส่งแล้ว/สาย/ตรวจแล้ว/ส่งกลับแก้); ปุ่ม "คัดลอกรายชื่อคนยังไม่ส่ง" (ข้อความพร้อมวางในกลุ่ม LINE); ฝั่งนักเรียนมีแถบเตือนเมื่อมีงานเหลือ < 24 ชม. หรือเลยกำหนด
+- **ตรวจงาน**: โหมดตรวจทีละคน (ถัดไป/ก่อนหน้า, ข้ามคนที่ยังไม่ส่ง); เขียนทับรูปด้วย Canvas (ปากกา, ไฮไลต์, ข้อความ, ยางลบ, 5 สี, ปรับขนาด) → บันทึกเป็นรูปใหม่ใน R2 (`annotated_keys`) เก็บต้นฉบับไว้; ให้คะแนน + คอมเมนต์ หรือ "ส่งกลับแก้"
+- **EXP อัตโนมัติ**: เมื่อสถานะเป็น `graded` ครั้งแรก → +10 (ตรงเวลา) หรือ +5 (สาย); ไม่ให้ซ้ำ (อ้างอิง `ref_id`)
+- **ส่งออก Excel** (SheetJS ฝั่ง client): ต่อห้อง แถว = นักเรียน (ลำดับ, ZipGrade ID, ชื่อ), คอลัมน์ = งาน, ช่องว่าง = ยังไม่ส่ง
+
+### 5.3 เช็กชื่อ
+- เลือกโรงเรียน → ห้อง → วันที่ (ค่าเริ่มต้นวันนี้); ทุกคนเริ่มเป็น `present`; แตะเพื่อเปลี่ยนสถานะ; บันทึกอัตโนมัติ
+- **เช็กอินเอง** (เปิด/ปิดต่อวัน): จอหน้าห้องแสดง QR ที่มี token หมุนทุก 30 วินาที (HMAC ของ day_id + ช่วงเวลา); นักเรียนที่ล็อกอินแล้วสแกน → `present` (source `self`); ครูแก้ทับได้เสมอ
+- `present`/`late` → +2 EXP ครั้งเดียวต่อวัน
+- ส่งออก Excel รายเดือน/ช่วงวันที่ พร้อมสรุปจำนวนแต่ละสถานะ
+
+### 5.4 แต้ม / EXP / เกม
+- **ผังที่นั่ง**: ตารางโต๊ะลากวางได้ต่อห้อง; แตะชื่อ → +1 / +5 / −1 + เหตุผลสั้น (มีเหตุผลสำเร็จรูปให้เลือก); โหมดฉายจอ
+- **สุ่มชื่อ**: ไม่ซ้ำจนครบห้อง (state ในเบราว์เซอร์ต่อคาบ), **แบ่งกลุ่ม**: ตามจำนวนกลุ่มหรือคนต่อกลุ่ม, คัดลอก/ฉายผลได้
+- **กฎ EXP เริ่มต้น** (ครูแก้ได้ใน settings): งานตรงเวลา +10, งานสาย +5, มาเรียน +2, ตอบในไลฟ์ +1, ควิซไลฟ์ตอบถูก +2, แต้มมือ ตามที่ครูให้
+- **เลเวลและไข่**: ทุก 100 EXP = +1 เลเวล = ได้ไข่ 1 ใบ; เปิดไข่ → สุ่มตัวละครตามน้ำหนักความหายาก (ธรรมดา 60%, หายาก 25%, หายากมาก 12%, ตำนาน 3%) ฝั่งเซิร์ฟเวอร์
+- **หน้านักเรียน**: เลเวล, แถบ EXP, คอลเลกชันตัวละคร, ประวัติแต้ม; leaderboard ต่อห้อง (ครูเปิด/ปิดได้, ค่าเริ่มต้นปิด)
+
+### 5.5 สอบ
+- **สร้าง**: คำถามปรนัย (ตัวเลือก 2–6, เฉลย 1 ข้อ) และเติมคำสั้น (คำตอบที่ยอมรับได้หลายแบบ, เทียบแบบตัดช่องว่าง/ไม่สนตัวพิมพ์); เวลา, สลับข้อ/ตัวเลือก, ช่วงเวลาเปิด-ปิด, คะแนนต่อข้อ
+- **ทำสอบ**: เริ่ม → สร้าง attempt พร้อม `deadline_at` (เวลาเซิร์ฟเวอร์); บันทึกคำตอบทุกครั้งที่เปลี่ยน (PUT idempotent) + สำรองใน localStorage; หมดเวลา → ส่งอัตโนมัติ; เซิร์ฟเวอร์ไม่รับคำตอบหลัง `deadline_at` + 30 วิ grace
+- **ตรวจจับออกจากหน้าจอ**: `visibilitychange` + `blur`/`focus` → บันทึก focus event (เวลาออก/กลับ) ส่งเข้า LiveRoom และ D1; **เป็นข้อมูลประกอบ ไม่หักคะแนนอัตโนมัติ**
+- **หน้าคุมสอบ (ครู)**: ผ่าน LiveRoom แบบเรียลไทม์ — รายชื่อสถานะ (ยังไม่เริ่ม/กำลังทำ/ส่งแล้ว), ส่งแล้ว X/Y, จำนวนครั้ง+ระยะเวลาออกจากจอต่อคน (เด้งแจ้งเตือน), นับถอยหลัง; ครูต่อเวลาให้รายคนได้
+- **หลังสอบ**: ตรวจอัตโนมัติ, สถิติรายข้อ (% ถูก, ตัวเลือกที่คนเลือกมากสุด), ส่งออก Excel, EXP ตามที่ตั้ง (ค่าเริ่มต้น: ไม่มี)
+
+### 5.6 ไลฟ์หน้าห้อง
+- ครูเตรียมชุดกิจกรรมล่วงหน้าหรือสร้างสด → กด "เริ่มไลฟ์" → **จอโปรเจกเตอร์** (`/live/:id/screen`) แสดง QR + join code
+- นักเรียนที่ล็อกอินและอยู่ห้องนั้น เห็นแบนเนอร์ "มีไลฟ์" → เข้า → กิจกรรมปัจจุบันเด้งขึ้นเอง
+- กิจกรรม: **เช็กอิน** (คำถามสั้น ตอบข้อความ), **โพล** (ตัวเลือก + สัญลักษณ์/สี), **WordCloud** (คำสั้น ≤ 30 ตัวอักษร, รวมคำซ้ำ), **ควิซ** (จับเวลา, จัดอันดับตามถูก+เร็ว)
+- ครูควบคุม: ถัดไป/ก่อนหน้า, เปิด/ปิดแสดงผลบนจอ, ปิดรับคำตอบ, จบไลฟ์
+- สถานะสดอยู่ใน LiveRoom; ทุกคำตอบเขียนลง D1 ทันที (`live_responses`) → +1 EXP ต่อกิจกรรมที่ตอบ, +2 ถ้าควิซถูก
+
+## 6. Durable Object `LiveRoom`
+- 1 instance ต่อ live session หรือ exam (ชื่อ `live:<id>` / `exam:<id>`)
+- WebSocket hibernation API; ไคลเอนต์ส่ง auth ผ่าน session cookie ตอน upgrade (Worker ตรวจก่อน forward พร้อม role + student_id)
+- ข้อความ (JSON, มี `type`): `state` (snapshot เต็ม), `activity_changed`, `response_count`, `results`, `focus_event`, `attempt_status`, `time_extended`
+- เมื่อเชื่อมต่อใหม่ ไคลเอนต์ได้ `state` snapshot เสมอ → ไม่ต้องพึ่งลำดับข้อความ
+- แหล่งความจริงคือ D1; DO เก็บแค่ state สดและ fan-out — DO รีสตาร์ตก็สร้าง state ใหม่จาก D1 ได้
+
+## 7. การจัดการข้อผิดพลาด
+- **เน็ตไม่เสถียร**: ส่งงาน/คำตอบทุกอย่างมี `client_request_id` → เซิร์ฟเวอร์ idempotent; UI แสดง "กำลังส่ง…/ส่งไม่สำเร็จ แตะเพื่อลองใหม่" + retry อัตโนมัติแบบ backoff; ร่างงานเก็บใน localStorage
+- **WebSocket**: reconnect อัตโนมัติ (backoff 1→2→4→…≤15 วิ) + รับ snapshot ใหม่
+- **เวลา**: กำหนดส่ง/หมดเวลาสอบตัดสินด้วยเวลาเซิร์ฟเวอร์เท่านั้น; ไคลเอนต์ปรับ offset นาฬิกาจาก response header
+- **อัปโหลด**: รับเฉพาะ `image/jpeg|png|webp`, ≤ 5MB ต่อรูป, ≤ 10 รูปต่อการส่ง; ตรวจที่เซิร์ฟเวอร์ด้วย
+- **Validation**: zod schema ร่วมกันทั้ง client/server; error ตอบรูปแบบเดียว `{ error: { code, message } }` ข้อความภาษาไทย
+- **สำรองข้อมูล**: D1 Time Travel (ย้อน 30 วัน) + ปุ่ม "ส่งออกทั้งหมด" (Excel หลายชีต: รายชื่อ, คะแนนงาน, เช็กชื่อ, EXP, สอบ)
+
+## 8. การทดสอบ
+- **Unit** (Vitest): ตัว parse CSV (3 รูปแบบคำนำหน้า, ชื่อซ้ำ, ID ผิดรูปแบบ, regex โรงเรียน/ชั้น), diff การนำเข้า, กฎ EXP/เลเวล, สุ่มไข่ (seeded), ตรวจข้อสอบ, QR token หมุน
+- **Integration** (`@cloudflare/vitest-pool-workers` + D1 migrations จริง): auth ครู/นักเรียน, ตั้ง PIN ครั้งแรก, ล็อก 5 ครั้ง, สิทธิ์ข้ามนักเรียน/ข้ามห้อง, ส่งงานซ้ำ (idempotent), ส่งสาย, deadline สอบ, LiveRoom broadcast/reconnect
+- **E2E** (Playwright): นักเรียนล็อกอิน → ส่งงานรูป → ครูตรวจ+เขียนทับ → นักเรียนเห็นผล; ทำสอบ → สลับแท็บ → ครูเห็นแจ้งเตือน
+- ข้อมูลทดสอบเป็น **รายชื่อสมมติทั้งหมด** (`tests/fixtures/roster.sample.csv` รูปแบบเดียวกับ ZipGrade)
+
+## 9. ลำดับการสร้าง (milestones)
+แต่ละ milestone มีแผนการพัฒนาของตัวเองและใช้งานจริงได้เมื่อจบ
+
+| # | ขอบเขต | ใช้จริงได้ |
+|---|---|---|
+| M0 | โครงโปรเจกต์, schema + migrations, ล็อกอินครู, นำเข้า CSV + พรีวิว, ล็อกอินนักเรียน (ID + PIN), จัดการ session/รีเซ็ต PIN, deploy | นักเรียนเข้าระบบได้ |
+| M1 | งาน: สร้าง/ส่ง/แดชบอร์ดทวงงาน/ตรวจ + เขียนทับรูป/ส่งออก Excel, EXP จากงาน | เก็บงานผ่านระบบ |
+| M2 | เช็กชื่อ (+ QR หมุน), ส่งออก, ผังที่นั่ง + แจกแต้ม, สุ่ม/แบ่งกลุ่ม, EXP/เลเวล/ไข่, leaderboard | ใช้ในคาบ |
+| M3 | สอบ + LiveRoom (โหมด exam) + หน้าคุมสอบ | สอบย่อย |
+| M4 | ไลฟ์หน้าห้อง (LiveRoom โหมด live) + จอโปรเจกเตอร์ | กิจกรรมหน้าห้อง |
+
+## 10. Deploy และสิ่งที่ครูต้องเตรียม
+- บัญชี Cloudflare (ฟรี) + API token (สิทธิ์ Workers, D1, R2) สำหรับ deploy
+- Secrets: `TEACHER_PASSWORD_HASH`, `SESSION_SECRET` (มีสคริปต์ช่วยสร้าง hash)
+- เริ่มที่โดเมน `*.workers.dev`; โดเมนตัวเองเพิ่มทีหลังได้
+- deploy ด้วย `wrangler deploy`; ตัวเลือก: GitHub Actions deploy เมื่อ push เข้า `main` (ใช้ token จาก GitHub secret)
+- หลัง deploy ครั้งแรก: ครูล็อกอิน → นำเข้า CSV จริงผ่านหน้าเว็บ
+
+## 11. UI
+- ภาษาไทยทั้งหมด, mobile-first สำหรับนักเรียน, หน้าครูรองรับโน้ตบุ๊ก/แท็บเล็ต, โหมดจอโปรเจกเตอร์ตัวใหญ่
+- ฟอนต์ Noto Sans Thai (หรือ Sarabun); หน้าทำงานเรียบ เร็ว
+- ลูกเล่นพิกเซล (ตัวละคร, ไข่, เลเวล) เฉพาะส่วนเกม
