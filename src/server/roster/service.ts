@@ -1,8 +1,8 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { RosterRow } from '../../shared/roster/parse'
 import { newId, now, type Db } from '../db/client'
-import { classes, schools, students } from '../db/schema'
+import { classes, schools, sessions, students } from '../db/schema'
 
 export type ImportPreview = {
   newStudents: RosterRow[]
@@ -185,4 +185,47 @@ export async function listClasses(db: Db): Promise<SchoolSummary[]> {
   const out = [...bySchool.values()].sort((a, b) => (a.schoolName < b.schoolName ? -1 : a.schoolName > b.schoolName ? 1 : 0))
   for (const s of out) s.classes.sort((a, b) => (a.grade ?? 99) - (b.grade ?? 99) || (a.name < b.name ? -1 : 1))
   return out
+}
+
+export type StudentAdminRow = {
+  id: string
+  zipgradeId: string
+  title: string | null
+  firstName: string
+  lastName: string
+  sortOrder: number
+  active: boolean
+  pinSet: boolean
+  locked: boolean
+  activeSessions: number
+  newDeviceSessionIds: string[]
+  lastSeenAt: number | null
+}
+
+export async function listStudents(db: Db, classId: string): Promise<StudentAdminRow[]> {
+  const t = now()
+  const rows = await db.select().from(students).where(eq(students.classId, classId)).orderBy(students.sortOrder, students.zipgradeId)
+  if (rows.length === 0) return []
+  const live = await db
+    .select({ id: sessions.id, studentId: sessions.studentId, flagged: sessions.flaggedNewDevice, lastSeenAt: sessions.lastSeenAt })
+    .from(sessions)
+    .innerJoin(students, eq(sessions.studentId, students.id))
+    .where(and(eq(students.classId, classId), isNull(sessions.revokedAt), gt(sessions.expiresAt, t)))
+  return rows.map((s) => {
+    const mine = live.filter((x) => x.studentId === s.id)
+    return {
+      id: s.id,
+      zipgradeId: s.zipgradeId,
+      title: s.title,
+      firstName: s.firstName,
+      lastName: s.lastName,
+      sortOrder: s.sortOrder,
+      active: s.active,
+      pinSet: s.pinHash !== null,
+      locked: s.lockedUntil !== null && s.lockedUntil > t,
+      activeSessions: mine.length,
+      newDeviceSessionIds: mine.filter((x) => x.flagged).map((x) => x.id),
+      lastSeenAt: mine.length ? Math.max(...mine.map((x) => x.lastSeenAt)) : null,
+    }
+  })
 }

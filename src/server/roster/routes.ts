@@ -1,11 +1,14 @@
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { parseZipgradeCsv } from '../../shared/roster/parse'
 import { MAX_CSV_CHARS, rosterApplySchema, rosterPreviewSchema } from '../../shared/schemas'
 import { requireTeacher } from '../auth/middleware'
-import { getDb } from '../db/client'
+import { revokeStudentSessions } from '../auth/sessions'
+import { getDb, now, type Db } from '../db/client'
+import { classes, sessions, students } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
-import { applyImport, listClasses, previewImport } from './service'
+import { applyImport, listClasses, listStudents, previewImport } from './service'
 
 export const rosterRoutes = new Hono<AppEnv>()
 rosterRoutes.use('*', requireTeacher)
@@ -32,3 +35,46 @@ rosterRoutes.post('/roster/apply', async (c) => {
 })
 
 rosterRoutes.get('/classes', async (c) => c.json(await listClasses(getDb(c.env))))
+
+rosterRoutes.get('/classes/:classId/students', async (c) => {
+  const db = getDb(c.env)
+  const [cls] = await db
+    .select({ id: classes.id, name: classes.name, joinCode: classes.joinCode })
+    .from(classes)
+    .where(eq(classes.id, c.req.param('classId')))
+  if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
+  return c.json({ class: cls, students: await listStudents(db, cls.id) })
+})
+
+async function requireStudentRow(db: Db, id: string) {
+  const [s] = await db.select({ id: students.id }).from(students).where(eq(students.id, id))
+  if (!s) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
+  return s
+}
+
+rosterRoutes.post('/students/:id/reset-pin', async (c) => {
+  const db = getDb(c.env)
+  const s = await requireStudentRow(db, c.req.param('id'))
+  await db.update(students).set({ pinHash: null, failedAttempts: 0, lockedUntil: null, updatedAt: now() }).where(eq(students.id, s.id))
+  await revokeStudentSessions(db, s.id)
+  return c.json({ ok: true })
+})
+
+rosterRoutes.post('/students/:id/unlock', async (c) => {
+  const db = getDb(c.env)
+  const s = await requireStudentRow(db, c.req.param('id'))
+  await db.update(students).set({ failedAttempts: 0, lockedUntil: null, updatedAt: now() }).where(eq(students.id, s.id))
+  return c.json({ ok: true })
+})
+
+rosterRoutes.post('/students/:id/logout-all', async (c) => {
+  const db = getDb(c.env)
+  const s = await requireStudentRow(db, c.req.param('id'))
+  await revokeStudentSessions(db, s.id)
+  return c.json({ ok: true })
+})
+
+rosterRoutes.post('/sessions/:id/ack', async (c) => {
+  await getDb(c.env).update(sessions).set({ flaggedNewDevice: false }).where(eq(sessions.id, c.req.param('id')))
+  return c.json({ ok: true })
+})
