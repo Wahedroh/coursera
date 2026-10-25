@@ -5,6 +5,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   root: 'src/client',
-  plugins: [cloudflare({ configPath: '../../wrangler.jsonc' }), react(), tailwindcss()],
+  plugins: [cloudflare({
+      configPath: '../../wrangler.jsonc',
+      // E2E ใช้ฐานข้อมูล local แยก ไม่ทับข้อมูลที่ใช้ทดลองเอง
+      ...(process.env.E2E ? { persistState: { path: '../../.wrangler/e2e' } } : {}),
+    }), react(), tailwindcss()],
   build: { outDir: '../../dist', emptyOutDir: true },
 })
