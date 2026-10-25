@@ -19,8 +19,8 @@ async function setup() {
 
 it('รายชื่อห้องแสดง pinSet, locked, newDeviceSessionIds', async () => {
   const { classId, joinCode, a, cookie } = await setup()
-  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-A')
-  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-B')
+  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-A', env.SESSION_SECRET)
+  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-B', env.SESSION_SECRET)
   const res = await json(await getJson(`/api/teacher/classes/${classId}/students`, cookie))
   expect(res.class).toEqual({ id: classId, name: 'โรงเรียนทดสอบ ชั้น 2', joinCode })
   expect(res.students.map((s: { zipgradeId: string }) => s.zipgradeId)).toEqual(['2', '1'])
@@ -65,8 +65,8 @@ it('logout-all แล้ว session ของนักเรียนใช้�
 
 it('ack แล้ว newDeviceSessionIds ว่าง', async () => {
   const { classId, a, cookie } = await setup()
-  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-A')
-  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-B')
+  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-A', env.SESSION_SECRET)
+  await createSession(db(), { kind: 'student', studentId: a.id }, 'phone-B', env.SESSION_SECRET)
   const list = async () => (await json(await getJson(`/api/teacher/classes/${classId}/students`, cookie))).students[1]
   const [sid] = (await list()).newDeviceSessionIds
   expect((await postJson(`/api/teacher/sessions/${sid}/ack`, {}, { cookie })).status).toBe(200)

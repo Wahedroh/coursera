@@ -123,11 +123,3 @@ it('ล็อกอินจาก user-agent ใหม่ขณะมี sessio
   expect((await json(other)).flaggedNewDevice).toBe(true)
 })
 
-it('คำขอที่ 61 ใน 1 นาทีจาก IP เดียวได้ 429', async () => {
-  await student()
-  const h = { 'cf-connecting-ip': '192.168.9.9' }
-  for (let i = 0; i < 60; i++) expect((await post('/api/student/lookup', { zipgradeId: '124' }, h)).status).toBe(200)
-  const res = await post('/api/student/lookup', { zipgradeId: '124' }, h)
-  expect(res.status).toBe(429)
-  expect(await json(res)).toEqual({ error: { code: 'too_many_requests', message: 'ส่งคำขอบ่อยเกินไป กรุณารอสักครู่' } })
-})

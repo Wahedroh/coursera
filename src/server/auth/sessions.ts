@@ -4,7 +4,7 @@ import { deleteCookie, setCookie } from 'hono/cookie'
 import { newId, now, type Db } from '../db/client'
 import { sessions, students } from '../db/schema'
 import type { SessionInfo } from '../env'
-import { randomToken, sha256Hex } from './crypto'
+import { hmacSha256Hex, randomToken } from './crypto'
 
 const DAY = 24 * 60 * 60 * 1000
 export const SESSION_TTL = { teacher: 30 * DAY, student: 90 * DAY } as const
@@ -14,6 +14,7 @@ export async function createSession(
   db: Db,
   input: { kind: 'teacher' } | { kind: 'student'; studentId: string },
   userAgent: string,
+  secret: string,
 ): Promise<{ token: string; flaggedNewDevice: boolean }> {
   const t = now()
   let flaggedNewDevice = false
@@ -37,7 +38,7 @@ export async function createSession(
     id: newId(),
     kind: input.kind,
     studentId: input.kind === 'student' ? input.studentId : null,
-    tokenHash: await sha256Hex(token),
+    tokenHash: await hmacSha256Hex(secret, token),
     userAgent,
     createdAt: t,
     lastSeenAt: t,
@@ -47,7 +48,8 @@ export async function createSession(
   return { token, flaggedNewDevice }
 }
 
-export async function readSession(db: Db, token: string): Promise<SessionInfo | null> {
+/** token เก็บเป็น HMAC ด้วย SESSION_SECRET — เปลี่ยน secret = ยกเลิกทุก session */
+export async function readSession(db: Db, token: string, secret: string): Promise<SessionInfo | null> {
   const t = now()
   const [row] = await db
     .select({
@@ -60,7 +62,7 @@ export async function readSession(db: Db, token: string): Promise<SessionInfo | 
     })
     .from(sessions)
     .leftJoin(students, eq(sessions.studentId, students.id))
-    .where(and(eq(sessions.tokenHash, await sha256Hex(token)), isNull(sessions.revokedAt), gt(sessions.expiresAt, t)))
+    .where(and(eq(sessions.tokenHash, await hmacSha256Hex(secret, token)), isNull(sessions.revokedAt), gt(sessions.expiresAt, t)))
   if (!row) return null
   if (row.kind === 'student' && (!row.studentId || !row.classId || !row.active)) return null
   if (t - row.lastSeenAt > 5 * 60 * 1000) await db.update(sessions).set({ lastSeenAt: t }).where(eq(sessions.id, row.id))

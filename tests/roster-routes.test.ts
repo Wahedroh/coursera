@@ -47,6 +47,6 @@ it('นักเรียนเรียก API ครูได้ 401', async (
   const db = getDb(env)
   const { classId } = await seedClass(db)
   const { id } = await seedStudent(db, classId)
-  const { token } = await createSession(db, { kind: 'student', studentId: id }, 'ua')
+  const { token } = await createSession(db, { kind: 'student', studentId: id }, 'ua', env.SESSION_SECRET)
   expect((await getJson('/api/teacher/classes', `sid=${token}`)).status).toBe(401)
 })

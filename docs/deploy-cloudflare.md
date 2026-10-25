@@ -104,8 +104,10 @@ https://classroom.<ชื่อบัญชี>.workers.dev
 |---|---|
 | อัปเดตเว็บหลังได้โค้ดใหม่ | `git pull && npm ci && npm run db:migrate:remote && npm run deploy` |
 | ดู log สด (เวลามีปัญหา) | `npx wrangler tail` |
-| กู้ฐานข้อมูลย้อนหลัง (ไม่เกิน 30 วัน) | `npx wrangler d1 time-travel restore classroom --timestamp=2026-10-25T08:00:00+07:00` |
+| กู้ฐานข้อมูลย้อนหลัง (แพ็กเกจฟรีย้อนได้ 7 วัน) | `npx wrangler d1 time-travel restore classroom --timestamp=2026-10-25T08:00:00+07:00` |
 | ดูข้อมูลการใช้งาน/โควตา | แดชบอร์ด → Workers & Pages → classroom |
+
+> **สำรองข้อมูล:** Time Travel ของแพ็กเกจฟรีย้อนได้แค่ 7 วัน ควรกด "ส่งออกทั้งหมด" เก็บไฟล์ Excel ไว้เองทุกสัปดาห์ (ปุ่มนี้มาใน M1)
 
 > **ข้อมูลนักเรียนเป็นข้อมูลส่วนบุคคล (PDPA)** — อย่า commit ไฟล์ CSV ลง git (โปรเจกต์ตั้ง `.gitignore` กันไว้แล้ว) และอย่าแชร์รหัสผ่านครู
 

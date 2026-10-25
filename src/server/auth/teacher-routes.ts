@@ -4,29 +4,36 @@ import { teacherLoginSchema } from '../../shared/schemas'
 import { getDb } from '../db/client'
 import { classes, students } from '../db/schema'
 import type { AppEnv } from '../env'
-import { apiError, parseBody } from '../http'
+import { apiError, getClientIp, parseBody } from '../http'
 import { verifySecret } from './crypto'
 import { requireSession } from './middleware'
 import { hitRateLimit, isRateLimited } from './rate-limit'
 import { clearSessionCookie, createSession, revokeSession, setSessionCookie } from './sessions'
 
-const TEACHER_KEY = 'teacher-login'
-const TEACHER_LIMIT = 10
-const WINDOW = 15 * 60 * 1000
+// ต่อ IP: กันเดารหัสจากเครื่องเดียว / รวมทุก IP: กันการเดาแบบกระจาย โดยนักเรียนเครื่องเดียวล็อกครูไม่ได้
+const LIMITS = {
+  ip: { limit: 10, windowMs: 15 * 60 * 1000 },
+  global: { limit: 50, windowMs: 60 * 60 * 1000 },
+}
 
 export const teacherAuthRoutes = new Hono<AppEnv>()
 
 teacherAuthRoutes.post('/teacher/login', async (c) => {
   const { password } = await parseBody(c, teacherLoginSchema)
   const db = getDb(c.env)
-  if (await isRateLimited(db, TEACHER_KEY, TEACHER_LIMIT, WINDOW)) {
-    throw apiError('too_many_attempts', 'ลองหลายครั้งเกินไป กรุณารอ 15 นาที', 429)
+  const ipKey = `teacher-login:ip:${getClientIp(c)}`
+  if (
+    (await isRateLimited(db, ipKey, LIMITS.ip.limit, LIMITS.ip.windowMs)) ||
+    (await isRateLimited(db, 'teacher-login', LIMITS.global.limit, LIMITS.global.windowMs))
+  ) {
+    throw apiError('too_many_attempts', 'ลองหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่', 429)
   }
   if (!(await verifySecret(password, c.env.TEACHER_PASSWORD_HASH))) {
-    await hitRateLimit(db, TEACHER_KEY, TEACHER_LIMIT, WINDOW)
+    await hitRateLimit(db, ipKey, LIMITS.ip.limit, LIMITS.ip.windowMs)
+    await hitRateLimit(db, 'teacher-login', LIMITS.global.limit, LIMITS.global.windowMs)
     throw apiError('invalid_password', 'รหัสผ่านไม่ถูกต้อง', 401)
   }
-  const { token } = await createSession(db, { kind: 'teacher' }, c.req.header('user-agent') ?? '')
+  const { token } = await createSession(db, { kind: 'teacher' }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
   setSessionCookie(c, token, 'teacher')
   return c.json({ ok: true })
 })

@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { PIN_RE, studentLookupSchema, studentPinSchema } from '../../shared/schemas'
 import { canonicalZipgradeId } from '../../shared/zipgrade'
@@ -6,7 +6,8 @@ import { getDb, now, type Db } from '../db/client'
 import { classes, students } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError, getClientIp, parseBody } from '../http'
-import { hashSecret, verifySecret } from './crypto'
+import { hashSecret, PIN_ITERATIONS, verifySecret } from './crypto'
+import { clearLoginAttempts, lockStudent, reserveLoginAttempt } from './pin-attempts'
 import { hitRateLimit } from './rate-limit'
 import { createSession, setSessionCookie } from './sessions'
 
@@ -16,7 +17,8 @@ const LOCK_MS = 15 * 60 * 1000
 export const studentAuthRoutes = new Hono<AppEnv>()
 
 studentAuthRoutes.use('*', async (c, next) => {
-  if (await hitRateLimit(getDb(c.env), `ip:${getClientIp(c)}`, 60, 60 * 1000)) {
+  // หลวมพอให้ทั้งห้อง (~30 คน หลัง NAT เดียว) ตั้ง PIN พร้อมกันได้
+  if (await hitRateLimit(getDb(c.env), `ip:${getClientIp(c)}`, 300, 60 * 1000)) {
     throw apiError('too_many_requests', 'ส่งคำขอบ่อยเกินไป กรุณารอสักครู่', 429)
   }
   await next()
@@ -62,14 +64,14 @@ studentAuthRoutes.post('/set-pin', async (c) => {
   const alreadySet = () =>
     apiError('pin_already_set', 'รหัสนี้ตั้ง PIN แล้ว กรุณาเข้าสู่ระบบด้วย PIN หรือแจ้งครูให้รีเซ็ต', 409)
   if (s.pinHash) throw alreadySet()
-  const pinHash = await hashSecret(pin)
+  const pinHash = await hashSecret(pin, PIN_ITERATIONS)
   const updated = await db
     .update(students)
     .set({ pinHash, failedAttempts: 0, lockedUntil: null, updatedAt: now() })
     .where(and(eq(students.id, s.id), isNull(students.pinHash)))
     .returning({ id: students.id })
   if (updated.length === 0) throw alreadySet()
-  const { token } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '')
+  const { token } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
   setSessionCookie(c, token, 'student')
   return c.json({ ok: true })
 })
@@ -82,22 +84,24 @@ studentAuthRoutes.post('/login', async (c) => {
   if (s.lockedUntil && s.lockedUntil > now()) throw lockedError(s.lockedUntil)
   if (!s.pinHash) throw apiError('pin_not_set', 'ยังไม่ได้ตั้ง PIN กรุณาตั้ง PIN ก่อน', 409)
 
-  if (!(await verifySecret(pin, s.pinHash))) {
-    const [{ failedAttempts }] = await db
-      .update(students)
-      .set({ failedAttempts: sql`${students.failedAttempts} + 1` })
-      .where(eq(students.id, s.id))
-      .returning({ failedAttempts: students.failedAttempts })
-    if (failedAttempts >= MAX_FAILS) {
-      const until = now() + LOCK_MS
-      await db.update(students).set({ failedAttempts: 0, lockedUntil: until }).where(eq(students.id, s.id))
-      throw lockedError(until)
-    }
-    throw apiError('invalid_pin', `PIN ไม่ถูกต้อง (เหลืออีก ${MAX_FAILS - failedAttempts} ครั้ง)`, 401)
+  // จองสิทธิ์ก่อนตรวจ PIN: คำขอพร้อมกันหลายคำขอลอดการล็อกไม่ได้
+  const t = now()
+  const attempt = await reserveLoginAttempt(db, s.id, t)
+  if (attempt === null) throw lockedError(t + LOCK_MS)
+  if (attempt > MAX_FAILS) {
+    await lockStudent(db, s.id, t + LOCK_MS)
+    throw lockedError(t + LOCK_MS)
   }
+  if (!(await verifySecret(pin, s.pinHash))) {
+    if (attempt >= MAX_FAILS) {
+      await lockStudent(db, s.id, t + LOCK_MS)
+      throw lockedError(t + LOCK_MS)
+    }
+    throw apiError('invalid_pin', `PIN ไม่ถูกต้อง (เหลืออีก ${MAX_FAILS - attempt} ครั้ง)`, 401)
+  }
+  if (!(await clearLoginAttempts(db, s.id, t))) throw lockedError(t + LOCK_MS)
 
-  await db.update(students).set({ failedAttempts: 0, lockedUntil: null }).where(eq(students.id, s.id))
-  const { token, flaggedNewDevice } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '')
+  const { token, flaggedNewDevice } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
   setSessionCookie(c, token, 'student')
   return c.json({ ok: true, flaggedNewDevice })
 })

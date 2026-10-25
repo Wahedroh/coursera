@@ -40,6 +40,10 @@ export function parseClassName(name: string): { schoolName: string; grade: numbe
 }
 
 export function parseZipgradeCsv(text: string): ParseResult {
+  // Excel ภาษาไทยบันทึก CSV เป็น cp874 โดยปริยาย อ่านเป็น UTF-8 แล้วได้ U+FFFD — ห้ามนำเข้า ไม่งั้นชื่อถูกเขียนทับด้วยตัวอักษรเสีย
+  if (text.includes('\uFFFD')) {
+    return { rows: [], errors: [{ line: 1, message: 'ไฟล์ไม่ได้บันทึกเป็น UTF-8 (ชื่อภาษาไทยจะเพี้ยน) กรุณาบันทึกใหม่เป็น "CSV UTF-8" แล้วลองอีกครั้ง' }] }
+  }
   const parsed = Papa.parse<Record<string, string>>(text.replace(/^﻿/, ''), {
     header: true,
     skipEmptyLines: true,

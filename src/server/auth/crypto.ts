@@ -1,4 +1,6 @@
-const ITERATIONS = 100_000 // เพดานของ PBKDF2 บน Workers
+const ITERATIONS = 100_000 // เพดานของ PBKDF2 บน Workers (ใช้กับรหัสผ่านครู)
+/** PIN มีแค่ 10^4 ค่า iteration สูงไม่ช่วยถ้า hash หลุด การล็อกคือการป้องกันจริง — ต่ำไว้ให้ไม่เกิน CPU 10ms ของแพ็กเกจฟรี */
+export const PIN_ITERATIONS = 10_000
 const PREFIX = 'pbkdf2-sha256'
 
 const enc = new TextEncoder()
@@ -22,10 +24,10 @@ async function derive(secret: string, salt: Uint8Array<ArrayBuffer>, iterations:
   return new Uint8Array(bits)
 }
 
-export async function hashSecret(secret: string): Promise<string> {
+export async function hashSecret(secret: string, iterations: number = ITERATIONS): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16))
-  const hash = await derive(secret, salt, ITERATIONS)
-  return `${PREFIX}$${ITERATIONS}$${toB64(salt)}$${toB64(hash)}`
+  const hash = await derive(secret, salt, iterations)
+  return `${PREFIX}$${iterations}$${toB64(salt)}$${toB64(hash)}`
 }
 
 export async function verifySecret(secret: string, stored: string): Promise<boolean> {
@@ -52,6 +54,12 @@ export function randomToken(): string {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
+}
+
+export async function hmacSha256Hex(secret: string, input: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(input))
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 export async function sha256Hex(input: string): Promise<string> {

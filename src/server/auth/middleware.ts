@@ -8,7 +8,7 @@ import { readSession } from './sessions'
 export const sessionMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const token = getCookie(c, 'sid')
   if (token) {
-    const session = await readSession(getDb(c.env), token)
+    const session = await readSession(getDb(c.env), token, c.env.SESSION_SECRET)
     if (session) c.set('session', session)
   }
   await next()
