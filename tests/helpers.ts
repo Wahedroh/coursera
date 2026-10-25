@@ -42,3 +42,10 @@ export async function seedStudent(
   })
   return { id, zipgradeId }
 }
+
+/** ล้างข้อมูลทุก binding แล้ว apply migrations ใหม่ (storage ของ plugin แยกต่อไฟล์ ไม่ใช่ต่อเทสต์) */
+export async function resetDb() {
+  const { reset, applyD1Migrations, env } = await import('cloudflare:test')
+  await reset()
+  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS)
+}
