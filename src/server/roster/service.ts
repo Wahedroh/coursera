@@ -1,4 +1,4 @@
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { RosterRow } from '../../shared/roster/parse'
 import { newId, now, type Db } from '../db/client'
@@ -154,4 +154,35 @@ export async function applyImport(
 
   if (stmts.length > 0) await db.batch(stmts as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]])
   return { created: created.length, updated: changed.length, deactivated: opts.deactivateMissing ? missing.length : 0 }
+}
+
+export type ClassSummary = { id: string; name: string; grade: number | null; joinCode: string; studentCount: number; pinSetCount: number }
+export type SchoolSummary = { schoolId: string; schoolName: string; classes: ClassSummary[] }
+
+export async function listClasses(db: Db): Promise<SchoolSummary[]> {
+  const rows = await db
+    .select({
+      schoolId: schools.id,
+      schoolName: schools.name,
+      id: classes.id,
+      name: classes.name,
+      grade: classes.grade,
+      joinCode: classes.joinCode,
+      studentCount: sql<number>`count(${students.id})`,
+      pinSetCount: sql<number>`count(${students.pinHash})`,
+    })
+    .from(classes)
+    .innerJoin(schools, eq(classes.schoolId, schools.id))
+    .leftJoin(students, and(eq(students.classId, classes.id), eq(students.active, true)))
+    .where(eq(classes.archived, false))
+    .groupBy(classes.id)
+  const bySchool = new Map<string, SchoolSummary>()
+  for (const r of rows) {
+    const s = bySchool.get(r.schoolId) ?? { schoolId: r.schoolId, schoolName: r.schoolName, classes: [] }
+    s.classes.push({ id: r.id, name: r.name, grade: r.grade, joinCode: r.joinCode, studentCount: r.studentCount, pinSetCount: r.pinSetCount })
+    bySchool.set(r.schoolId, s)
+  }
+  const out = [...bySchool.values()].sort((a, b) => (a.schoolName < b.schoolName ? -1 : a.schoolName > b.schoolName ? 1 : 0))
+  for (const s of out) s.classes.sort((a, b) => (a.grade ?? 99) - (b.grade ?? 99) || (a.name < b.name ? -1 : 1))
+  return out
 }
