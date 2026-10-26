@@ -88,6 +88,9 @@ export default function StudentHome() {
           <Link to="/me/videos" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             🎬 คลิปย้อนหลัง
           </Link>
+          <Link to="/me/materials" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+            📄 เอกสารเรียน
+          </Link>
           <Link to="/me/fees" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             🧾 ค่าเอกสาร
           </Link>

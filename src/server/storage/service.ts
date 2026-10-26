@@ -40,7 +40,7 @@ export async function recordFile(db: Db, key: string, size: number, t: number): 
 }
 
 /** ลบไฟล์ทั้งใน R2 และในบัญชีพื้นที่ คืนจำนวนไบต์ที่คืนได้ (เท่าที่รู้ขนาด) */
-async function removeFiles(db: Db, bucket: R2Bucket, keys: string[]): Promise<number> {
+export async function removeFiles(db: Db, bucket: R2Bucket, keys: string[]): Promise<number> {
   const unique = [...new Set(keys)]
   for (let i = 0; i < unique.length; i += 1000) await bucket.delete(unique.slice(i, i + 1000))
   let bytes = 0
@@ -139,7 +139,8 @@ export async function purgeOrphans(db: Db, bucket: R2Bucket, t: number): Promise
   const refs = await db.all<{ k: string }>(sql`
     SELECT j.value AS k FROM submissions s, json_each(s.image_keys) j
     UNION SELECT j.value FROM submissions s, json_each(s.annotated_keys) j
-    UNION SELECT j.value FROM assignments a, json_each(a.attachment_keys) j`)
+    UNION SELECT j.value FROM assignments a, json_each(a.attachment_keys) j
+    UNION SELECT m.file_key FROM materials m`)
   const used = new Set(refs.map((r) => r.k))
   const orphans: { key: string; size: number }[] = []
   let cursor: string | undefined

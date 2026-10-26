@@ -21,13 +21,14 @@ export async function putImage(bucket: R2Bucket, key: string, body: ArrayBuffer,
   await bucket.put(key, body, { httpMetadata: { contentType } })
 }
 
-/** ครูอ่านได้ทุกไฟล์; นักเรียนอ่านได้เฉพาะรูปที่ตัวเองส่ง รูปประกอบงานในห้องตัวเอง และรูปที่ครูเขียนทับงานของตัวเอง */
+/** ครูอ่านได้ทุกไฟล์; นักเรียนอ่านได้เฉพาะรูปที่ตัวเองส่ง รูปประกอบงานในห้องตัวเอง รูปที่ครูเขียนทับงานของตัวเอง และเอกสารเรียนที่แสดงในห้องตัวเอง */
 export async function canRead(db: Db, session: SessionInfo, key: string): Promise<boolean> {
   if (session.kind === 'teacher') return true
   if (key.startsWith(`sub/${session.studentId}/`)) return true
   const row = await db.get<{ ok: number }>(sql`
     SELECT 1 AS ok WHERE
       EXISTS (SELECT 1 FROM assignments a, json_each(a.attachment_keys) j WHERE a.class_id = ${session.classId} AND j.value = ${key})
-      OR EXISTS (SELECT 1 FROM submissions s, json_each(s.annotated_keys) j WHERE s.student_id = ${session.studentId} AND j.value = ${key})`)
+      OR EXISTS (SELECT 1 FROM submissions s, json_each(s.annotated_keys) j WHERE s.student_id = ${session.studentId} AND j.value = ${key})
+      OR EXISTS (SELECT 1 FROM materials m WHERE m.class_id = ${session.classId} AND m.published = 1 AND m.file_key = ${key})`)
   return !!row
 }
