@@ -27,7 +27,8 @@ export default function TeacherLogin() {
     <main className="min-h-screen flex items-center justify-center px-5">
       <Card className="p-6 w-full max-w-sm">
         <form onSubmit={submit} className="flex flex-col gap-3">
-          <h1 className="text-xl font-extrabold">🦉 เข้าสู่ระบบครู</h1>
+          <img src="/logo.png" alt="Change Classroom" className="w-24 h-auto self-center" />
+          <h1 className="text-xl font-extrabold text-center">เข้าสู่ระบบครู</h1>
           <label htmlFor="pw" className="text-sm font-semibold text-stone-500">
             รหัสผ่านครู
           </label>

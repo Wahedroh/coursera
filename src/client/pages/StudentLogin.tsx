@@ -111,9 +111,7 @@ export default function StudentLogin() {
   return (
     <main className="min-h-screen max-w-md mx-auto px-5 py-8 flex flex-col gap-5">
       <header className="text-center flex flex-col items-center gap-2 pt-4">
-        <div className="text-5xl" aria-hidden>
-          🦉
-        </div>
+        <img src="/logo.png" alt="Change Classroom" className="w-32 h-auto" />
         <h1 className="text-2xl font-extrabold">ผู้ช่วยครู</h1>
         <p className="text-stone-500 text-sm">ส่งงาน · ดูคะแนน · สะสม EXP</p>
       </header>
