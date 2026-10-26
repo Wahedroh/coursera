@@ -4,6 +4,10 @@ import StudentCheckin from './pages/StudentCheckin'
 import StudentLogin from './pages/StudentLogin'
 import StudentProgress from './pages/StudentProgress'
 import StudentScores from './pages/StudentScores'
+import StudentLive from './pages/StudentLive'
+import LiveScreen from './pages/LiveScreen'
+import TeacherLive from './pages/TeacherLive'
+import TeacherLiveList from './pages/TeacherLiveList'
 import StudentSubmit from './pages/StudentSubmit'
 import TeacherAssignmentForm from './pages/TeacherAssignmentForm'
 import TeacherAttendance from './pages/TeacherAttendance'
@@ -28,6 +32,8 @@ export default function App() {
         <Route path="/me/progress" element={<StudentProgress />} />
         <Route path="/me/scores" element={<StudentScores />} />
         <Route path="/checkin" element={<StudentCheckin />} />
+        <Route path="/live/:id" element={<StudentLive />} />
+        <Route path="/live/:id/screen" element={<LiveScreen />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />
         <Route path="/teacher/import" element={<TeacherImport />} />
@@ -37,6 +43,8 @@ export default function App() {
         <Route path="/teacher/classes/:id/seating" element={<TeacherSeating />} />
         <Route path="/teacher/classes/:id/scores" element={<TeacherScores />} />
         <Route path="/teacher/score-items/:id" element={<TeacherScoreEntry />} />
+        <Route path="/teacher/classes/:id/live" element={<TeacherLiveList />} />
+        <Route path="/teacher/live/:id" element={<TeacherLive />} />
         <Route path="/teacher/attendance/:dayId/qr" element={<TeacherCheckinScreen />} />
         <Route path="/teacher/assignments/new" element={<TeacherAssignmentForm />} />
         <Route path="/teacher/assignments/:id/edit" element={<TeacherAssignmentForm />} />

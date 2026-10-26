@@ -21,6 +21,7 @@ export default function StudentHome() {
   const [me, setMe] = useState<StudentMe | null>(null)
   const [items, setItems] = useState<StudentAssignment[] | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
+  const [live, setLive] = useState<{ id: string; title: string } | null>(null)
 
   useEffect(() => {
     api<Me>('/api/me')
@@ -30,6 +31,14 @@ export default function StudentHome() {
       .then(setItems)
       .catch(() => setItems([]))
   }, [navigate])
+
+  // แบนเนอร์ "มีไลฟ์": เช็กทุก 15 วินาที
+  useEffect(() => {
+    const check = () => api<{ live: { id: string; title: string } | null }>('/api/student/live/current').then((r) => setLive(r.live)).catch(() => {})
+    check()
+    const t = setInterval(check, 15_000)
+    return () => clearInterval(t)
+  }, [])
 
   async function logout() {
     await api('/api/logout', { body: {} }).catch(() => {})
@@ -59,6 +68,11 @@ export default function StudentHome() {
         </div>
       </header>
       <section className="p-5 flex flex-col gap-3">
+        {live && (
+          <Link to={`/live/${live.id}`} className="block rounded-2xl bg-red-600 text-white p-4 font-bold shadow-[0_3px_0_#991b1b]">
+            🔴 มีไลฟ์: {live.title} · แตะเพื่อเข้าร่วม
+          </Link>
+        )}
         {pending.length > 0 && (
           <Card className={`p-3 flex gap-2 items-center ${urgent.length ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
             <span className="text-xl" aria-hidden>
