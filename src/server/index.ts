@@ -12,6 +12,10 @@ import { teacherPointsRoutes } from './points/teacher-routes'
 import { fileRoutes } from './files/routes'
 import { rosterRoutes } from './roster/routes'
 import { studentScoreRoutes } from './scores/student-routes'
+import { studentVideoRoutes } from './videos/student-routes'
+import { teacherVideoRoutes } from './videos/teacher-routes'
+import { studentFeeRoutes } from './fees/student-routes'
+import { teacherFeeRoutes } from './fees/teacher-routes'
 import { teacherScoreRoutes } from './scores/teacher-routes'
 import { apiError, onError } from './http'
 
@@ -26,9 +30,13 @@ app.route('/api/teacher', teacherAssignmentRoutes)
 app.route('/api/teacher', teacherAttendanceRoutes)
 app.route('/api/teacher', teacherPointsRoutes)
 app.route('/api/teacher', teacherScoreRoutes)
+app.route('/api/teacher', teacherVideoRoutes)
+app.route('/api/teacher', teacherFeeRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)
+app.route('/api/student/videos', studentVideoRoutes)
+app.route('/api/student/fees', studentFeeRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)

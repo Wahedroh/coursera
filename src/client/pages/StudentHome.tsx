@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, type Me } from '../api'
 import type { StudentAssignment, StudentStatus } from '../../shared/assignments'
+import { baht, type StudentFee } from '../../shared/fees'
 import { formatDue, timeLeft } from '../lib/format'
 import { Button, Card, Chip, Loading } from '../ui'
 
@@ -21,6 +22,7 @@ export default function StudentHome() {
   const [me, setMe] = useState<StudentMe | null>(null)
   const [items, setItems] = useState<StudentAssignment[] | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
+  const [feeOwed, setFeeOwed] = useState(0)
 
   useEffect(() => {
     api<Me>('/api/me')
@@ -29,6 +31,9 @@ export default function StudentHome() {
     api<StudentAssignment[]>('/api/student/assignments')
       .then(setItems)
       .catch(() => setItems([]))
+    api<StudentFee[]>('/api/student/fees')
+      .then((fs) => setFeeOwed(fs.reduce((n, f) => n + f.outstanding, 0)))
+      .catch(() => {})
   }, [navigate])
 
   async function logout() {
@@ -56,9 +61,27 @@ export default function StudentHome() {
           <Link to="/me/scores" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             📊 คะแนนสอบ
           </Link>
+          <Link to="/me/videos" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+            🎬 คลิปย้อนหลัง
+          </Link>
+          <Link to="/me/fees" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+            🧾 ค่าเอกสาร
+          </Link>
         </div>
       </header>
       <section className="p-5 flex flex-col gap-3">
+        {feeOwed > 0 && (
+          <Link to="/me/fees" className="block">
+            <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">
+              <span className="text-xl" aria-hidden>
+                🧾
+              </span>
+              <p className="text-sm">
+                <b>ค้างค่าเอกสาร {baht(feeOwed)}</b> · แตะเพื่อดูรายละเอียด
+              </p>
+            </Card>
+          </Link>
+        )}
         {pending.length > 0 && (
           <Card className={`p-3 flex gap-2 items-center ${urgent.length ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
             <span className="text-xl" aria-hidden>

@@ -1,6 +1,7 @@
 import writeXlsxFile, { type SheetData } from 'write-excel-file/browser'
 import type { Gradebook } from '../../shared/assignments'
 import type { ScoreBook } from '../../shared/scores'
+import { outstanding, type FeeSheet } from '../../shared/fees'
 import { ATTENDANCE_STATUSES, STATUS_LABEL, type AttendanceRange } from '../../shared/attendance'
 
 /** สมุดคะแนนรวม: คอลัมน์งาน แล้วต่อด้วยคอลัมน์คะแนนสอบ */
@@ -50,4 +51,22 @@ export async function exportAttendance(r: AttendanceRange, className: string, fr
   ])
   const data: SheetData = [header, ...rows]
   await writeXlsxFile(data, { sheet: 'เช็กชื่อ' }).toFile(`เช็กชื่อ-${className}-${from}-ถึง-${to}.xlsx`)
+}
+
+/** ค่าเอกสาร: เฉพาะคนที่ต้องจ่าย */
+export async function exportFees(sheet: FeeSheet): Promise<void> {
+  const header = ['ลำดับ', 'ZipGrade ID', 'ชื่อ-นามสกุล', 'ยอด', 'จ่ายแล้ว', 'ค้าง', 'หมายเหตุ'].map((value) => ({ value, fontWeight: 'bold' as const }))
+  const rows = sheet.students
+    .filter((s) => s.charge)
+    .map((s, i) => [
+      { value: i + 1 },
+      { value: s.zipgradeId },
+      { value: `${s.title ?? ''}${s.firstName} ${s.lastName}`.trim() },
+      { value: s.charge!.amount },
+      { value: s.charge!.paid },
+      { value: outstanding(s.charge!) },
+      { value: s.charge!.note },
+    ])
+  const data: SheetData = [header, ...rows]
+  await writeXlsxFile(data, { sheet: 'ค่าเอกสาร' }).toFile(`ค่าเอกสาร-${sheet.item.title}-${sheet.class.name}.xlsx`)
 }

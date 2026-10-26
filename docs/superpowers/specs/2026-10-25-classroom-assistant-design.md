@@ -10,8 +10,8 @@
 - ใช้จริงในห้องเรียนของครู **1 คน** (ไม่ทำ multi-tenant / สมัครสมาชิก)
 - นักเรียนเข้าใช้ผ่าน **เว็บแอปอย่างเดียว** (มือถือของนักเรียน, โน้ตบุ๊กครู, จอโปรเจกเตอร์)
 - ตัวตนนักเรียน = **ZipGrade ID** + **PIN 4 หลักที่นักเรียนตั้งเอง**
-- แพลตฟอร์ม: **Cloudflare** (Workers + D1 + R2 + Durable Objects)
-- เฟส 1 = งาน (มอบหมาย/ส่ง/ตรวจ), เช็กชื่อ + แต้ม/EXP, บันทึกคะแนนสอบ (ครูกรอกเอง), ไลฟ์หน้าห้อง
+- แพลตฟอร์ม: **Cloudflare** (Workers + D1 + R2)
+- เฟส 1 = งาน (มอบหมาย/ส่ง/ตรวจ), เช็กชื่อ + แต้ม/EXP, บันทึกคะแนนสอบ (ครูกรอกเอง), คลิปย้อนหลัง YouTube, ค่าเอกสารเรียน
 - **ไม่มีระบบสอบออนไลน์**: ครูจัดสอบและตรวจเอง (เช่น กระดาษ ZipGrade) แล้วกรอกคะแนนเข้าระบบ
 
 ### ข้อมูลจริงที่ใช้ออกแบบ (จาก CSV ที่ export จาก ZipGrade)
@@ -41,12 +41,11 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
  ├─ หน้าเว็บ: React + Vite + Tailwind (Workers static assets, SPA)
  ├─ API: Hono  ──► D1 (SQLite) ผ่าน Drizzle ORM + migrations
  ├─ รูป: R2 (รูปงาน, รูปที่ครูเขียนทับ, รูปประกอบงาน)
- └─ Durable Object `LiveRoom`: 1 instance ต่อ 1 ไลฟ์ (WebSocket hibernation)
 ```
 
-- โครงไฟล์: `src/client/` (React), `src/server/` (Hono routes แยกตามโดเมน: `auth`, `roster`, `assignments`, `attendance`, `points`, `scores`, `live`), `src/server/do/LiveRoom.ts`, `src/shared/` (types + zod schemas ใช้ร่วม client/server), `migrations/`
+- โครงไฟล์: `src/client/` (React), `src/server/` (Hono routes แยกตามโดเมน: `auth`, `roster`, `assignments`, `attendance`, `points`, `scores`, `videos`, `fees`), `src/shared/` (types + zod schemas ใช้ร่วม client/server), `migrations/`
 - แต่ละโดเมนมี service module ที่ไม่รู้จัก HTTP (รับ db + input คืนผล) เพื่อทดสอบแยกได้; route ทำแค่ auth + validate + เรียก service
-- Free tier ที่พอ: Workers 100k req/วัน, D1 5GB, R2 10GB, Durable Objects (SQLite-backed) บน free plan
+- Free tier ที่พอ: Workers 100k req/วัน, D1 5GB, R2 10GB
 - ประมาณพื้นที่รูป: ~313 คน × 30 งาน × ~200KB ≈ 2GB/ปี
 
 ## 3. การยืนยันตัวตนและสิทธิ์
@@ -68,7 +67,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 - ช่องโหว่ที่ยอมรับ: นักเรียนที่ยังไม่ตั้ง PIN อาจถูกคนอื่นตั้งแทน → ครูเห็นได้จาก "เครื่องใหม่" + รีเซ็ตได้; แนะนำให้ทุกคนตั้ง PIN ในคาบแรก
 
 ### สิทธิ์
-- ตรวจทุก API ฝั่งเซิร์ฟเวอร์: route ครูต้องมี teacher session; นักเรียนเข้าถึงได้เฉพาะข้อมูลของตัวเองและงาน/คะแนน/ไลฟ์ของห้องตัวเอง (คะแนนสอบเห็นเฉพาะรายการที่ครูเผยแพร่)
+- ตรวจทุก API ฝั่งเซิร์ฟเวอร์: route ครูต้องมี teacher session; นักเรียนเข้าถึงได้เฉพาะข้อมูลของตัวเองและงาน/คะแนน/คลิป/ค่าเอกสารของห้องตัวเอง (คะแนนสอบเห็นเฉพาะรายการที่ครูเผยแพร่)
 - รูปใน R2 ไม่เปิด public; เสิร์ฟผ่าน Worker หลังตรวจสิทธิ์
 
 ## 4. โมเดลข้อมูล (D1)
@@ -85,14 +84,14 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 | `submissions` | assignment_id, student_id (unique คู่), text, image_keys (json), annotated_keys (json), status (`submitted`/`late`/`graded`/`returned`), submitted_at, score, comment, graded_at, client_request_id |
 | `attendance_days` | class_id, date (YYYY-MM-DD, unique คู่), self_checkin_open |
 | `attendance_records` | day_id, student_id (unique คู่), status (`present`/`late`/`sick`/`leave`/`absent`), source (`teacher`/`self`) |
-| `point_events` | student_id, delta (int), reason, source (`manual`/`assignment`/`attendance`/`live`), ref_id, created_by |
+| `point_events` | student_id, delta (int), reason, source (`manual`/`assignment`/`attendance`), ref_id, created_by |
 | `eggs` | student_id, earned_at_level, opened_at, character_id (nullable จนกว่าเปิด) |
 | `seating` | class_id, layout (json: ตำแหน่งโต๊ะ → student_id) |
 | `score_items` | class_id, title, category (`quiz`/`midterm`/`final`/`other`), max_score (real > 0), taken_on (YYYY-MM-DD), published (bool, ค่าเริ่มต้น false), sort_order |
 | `scores` | item_id, student_id (unique คู่), score (real, nullable = ยังไม่กรอก), absent (bool), note, updated_at |
-| `live_sessions` | class_id, started_at, ended_at, current_activity_id |
-| `live_activities` | live_session_id, order, kind (`checkin`/`poll`/`wordcloud`/`quiz`), config (json), show_results |
-| `live_responses` | activity_id, student_id (unique คู่), answer (json), answered_at, correct (nullable) |
+| `videos` | class_id, title, description, youtube_id (11 ตัวอักษร), published (bool, ค่าเริ่มต้น true), created_at |
+| `fee_items` | class_id, title, amount (บาท, ทศนิยม ≤ 2), created_at |
+| `fee_charges` | item_id, student_id (unique คู่), amount (ยอดที่ต้องจ่าย), paid (ยอดที่จ่ายแล้ว ≤ amount), note, updated_at |
 | `settings` | key, value (json) — เช่น กฎ EXP, เปิด/ปิด leaderboard |
 
 - EXP ของนักเรียน = `SUM(point_events.delta)`; เลเวล = `floor(EXP / 100)` (ค่าคงที่ปรับได้ใน `settings`)
@@ -126,7 +125,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 ### 5.4 แต้ม / EXP / เกม
 - **ผังที่นั่ง**: ตารางโต๊ะลากวางได้ต่อห้อง; แตะชื่อ → +1 / +5 / −1 + เหตุผลสั้น (มีเหตุผลสำเร็จรูปให้เลือก); โหมดฉายจอ
 - **สุ่มชื่อ**: ไม่ซ้ำจนครบห้อง (state ในเบราว์เซอร์ต่อคาบ), **แบ่งกลุ่ม**: ตามจำนวนกลุ่มหรือคนต่อกลุ่ม, คัดลอก/ฉายผลได้
-- **กฎ EXP เริ่มต้น** (ครูแก้ได้ใน settings): งานตรงเวลา +10, งานสาย +5, มาเรียน +2, ตอบในไลฟ์ +1, ควิซไลฟ์ตอบถูก +2, แต้มมือ ตามที่ครูให้
+- **กฎ EXP เริ่มต้น** (ครูแก้ได้ใน settings): งานตรงเวลา +10, งานสาย +5, มาเรียน +2, แต้มมือ ตามที่ครูให้
 - **เลเวลและไข่**: ทุก 100 EXP = +1 เลเวล = ได้ไข่ 1 ใบ; เปิดไข่ → สุ่มตัวละครตามน้ำหนักความหายาก (ธรรมดา 60%, หายาก 25%, หายากมาก 12%, ตำนาน 3%) ฝั่งเซิร์ฟเวอร์
 - **หน้านักเรียน**: เลเวล, แถบ EXP, คอลเลกชันตัวละคร, ประวัติแต้ม; leaderboard ต่อห้อง (ครูเปิด/ปิดได้, ค่าเริ่มต้นปิด)
 
@@ -143,19 +142,17 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 - **ส่งออก Excel**: สมุดคะแนนรวมต่อห้อง = คะแนนงาน + รายการคะแนนสอบ เป็นคอลัมน์ต่อกัน
 - ไม่มี EXP จากคะแนนสอบ (ครูให้แต้มมือได้ตามปกติ)
 
-### 5.6 ไลฟ์หน้าห้อง
-- ครูเตรียมชุดกิจกรรมล่วงหน้าหรือสร้างสด → กด "เริ่มไลฟ์" → **จอโปรเจกเตอร์** (`/live/:id/screen`) แสดง QR + join code
-- นักเรียนที่ล็อกอินและอยู่ห้องนั้น เห็นแบนเนอร์ "มีไลฟ์" → เข้า → กิจกรรมปัจจุบันเด้งขึ้นเอง
-- กิจกรรม: **เช็กอิน** (คำถามสั้น ตอบข้อความ), **โพล** (ตัวเลือก + สัญลักษณ์/สี), **WordCloud** (คำสั้น ≤ 30 ตัวอักษร, รวมคำซ้ำ), **ควิซ** (จับเวลา, จัดอันดับตามถูก+เร็ว)
-- ครูควบคุม: ถัดไป/ก่อนหน้า, เปิด/ปิดแสดงผลบนจอ, ปิดรับคำตอบ, จบไลฟ์
-- สถานะสดอยู่ใน LiveRoom; ทุกคำตอบเขียนลง D1 ทันที (`live_responses`) → +1 EXP ต่อกิจกรรมที่ตอบ, +2 ถ้าควิซถูก
+### 5.6 คลิปย้อนหลัง (YouTube)
+- ครูวางลิงก์ YouTube (รับ `youtu.be/…`, `youtube.com/watch?v=…`, `/shorts/…`, `/embed/…`, `/live/…` หรือรหัส 11 ตัว) + ชื่อ + คำอธิบาย; เลือกได้หลายห้องพร้อมกัน; ซ่อน/แสดง และลบได้
+- นักเรียนเห็นเฉพาะคลิปที่แสดงของห้องตัวเอง ดูในหน้าเว็บนี้เท่านั้น (`/me/videos/:id`)
+- **ป้องกันการแชร์/ออกไป YouTube**: ใช้ YouTube IFrame API แบบไม่มีปุ่มของ YouTube (`controls=0`, youtube-nocookie) แล้ววางชั้นโปร่งใสทับทั้งคลิป → คลิกชื่อคลิป/โลโก้/ปุ่มแชร์/"ดูบน YouTube" ไม่ได้; ใช้ปุ่มควบคุมของเราเอง (เล่น/หยุด, เลื่อนเวลา, เสียง, ความเร็ว, เต็มจอแบบกรอบของเรา); ปิดคลิกขวา; ตอนหยุด/จบมีฉากบังคลิปแนะนำของ YouTube
+- ข้อจำกัด (แจ้งครู): กันการคลิกออก/แชร์จากหน้าเว็บได้ แต่กันคนที่ตั้งใจแกะรหัสคลิปจากโค้ดหน้าเว็บไม่ได้ 100% → แนะนำตั้งคลิปบน YouTube เป็น "ไม่เป็นสาธารณะ (Unlisted)" และเปิดให้ฝัง (embed) ได้
 
-## 6. Durable Object `LiveRoom`
-- 1 instance ต่อ live session (ชื่อ `live:<id>`)
-- WebSocket hibernation API; ไคลเอนต์ส่ง auth ผ่าน session cookie ตอน upgrade (Worker ตรวจก่อน forward พร้อม role + student_id)
-- ข้อความ (JSON, มี `type`): `state` (snapshot เต็ม), `activity_changed`, `response_count`, `results`
-- เมื่อเชื่อมต่อใหม่ ไคลเอนต์ได้ `state` snapshot เสมอ → ไม่ต้องพึ่งลำดับข้อความ
-- แหล่งความจริงคือ D1; DO เก็บแค่ state สดและ fan-out — DO รีสตาร์ตก็สร้าง state ใหม่จาก D1 ได้
+### 5.7 ค่าเอกสารเรียน
+- ครูสร้างรายการค่าเอกสาร (ชื่อ + ราคาเริ่มต้น) ต่อห้อง (สร้างหลายห้องพร้อมกันได้)
+- เลือกนักเรียน **บางคน** ที่ต้องจ่าย (หรือ "เลือกทั้งห้อง"); แก้ยอดรายคนได้; บันทึกยอดที่จ่ายแล้ว (จ่ายบางส่วนได้) + ปุ่ม "จ่ายครบ"; หมายเหตุ (ครูเห็นคนเดียว)
+- สรุปต่อรายการ: ต้องจ่ายกี่คน, จ่ายครบกี่คน, ยอดค้างรวม; ส่งออก Excel
+- นักเรียนเห็นยอดค้างของตัวเองที่หน้าแรก + หน้า "ค่าเอกสาร" (ไม่เห็นของคนอื่น)
 
 ## 7. การจัดการข้อผิดพลาด
 - **เน็ตไม่เสถียร**: ส่งงาน/คำตอบทุกอย่างมี `client_request_id` → เซิร์ฟเวอร์ idempotent; UI แสดง "กำลังส่ง…/ส่งไม่สำเร็จ แตะเพื่อลองใหม่" + retry อัตโนมัติแบบ backoff; ร่างงานเก็บใน localStorage
@@ -167,7 +164,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 
 ## 8. การทดสอบ
 - **Unit** (Vitest): ตัว parse CSV (3 รูปแบบคำนำหน้า, ชื่อซ้ำ, ID ผิดรูปแบบ, regex โรงเรียน/ชั้น), diff การนำเข้า, กฎ EXP/เลเวล, สุ่มไข่ (seeded), ตรวจค่าคะแนน/แปลงข้อความที่ paste เป็นคะแนน, QR token หมุน
-- **Integration** (`@cloudflare/vitest-plugin` + D1 migrations จริง): auth ครู/นักเรียน, ตั้ง PIN ครั้งแรก, ล็อก 5 ครั้ง, สิทธิ์ข้ามนักเรียน/ข้ามห้อง, ส่งงานซ้ำ (idempotent), ส่งสาย, คะแนนเกินคะแนนเต็ม, นักเรียนเห็นเฉพาะคะแนนที่เผยแพร่และของตัวเอง, LiveRoom broadcast/reconnect
+- **Integration** (`@cloudflare/vitest-plugin` + D1 migrations จริง): auth ครู/นักเรียน, ตั้ง PIN ครั้งแรก, ล็อก 5 ครั้ง, สิทธิ์ข้ามนักเรียน/ข้ามห้อง, ส่งงานซ้ำ (idempotent), ส่งสาย, คะแนนเกินคะแนนเต็ม, นักเรียนเห็นเฉพาะคะแนนที่เผยแพร่และของตัวเอง, นักเรียนเห็นเฉพาะคลิป/ค่าเอกสารของห้อง/ตัวเอง
 - **E2E** (Playwright): นักเรียนล็อกอิน → ส่งงานรูป → ครูตรวจ+เขียนทับ → นักเรียนเห็นผล; ครูกรอกคะแนนสอบ (รวม paste) → เผยแพร่ → นักเรียนเห็นคะแนนตัวเอง
 - ข้อมูลทดสอบเป็น **รายชื่อสมมติทั้งหมด** (`tests/fixtures/roster.sample.csv` รูปแบบเดียวกับ ZipGrade)
 
@@ -180,7 +177,7 @@ Cloudflare Worker (โดเมนเดียว, deploy ครั้งเด�
 | M1 | งาน: สร้าง/ส่ง/แดชบอร์ดทวงงาน/ตรวจ + เขียนทับรูป/ส่งออก Excel, EXP จากงาน | เก็บงานผ่านระบบ |
 | M2 | เช็กชื่อ (+ QR หมุน), ส่งออก, ผังที่นั่ง + แจกแต้ม, สุ่ม/แบ่งกลุ่ม, EXP/เลเวล/ไข่, leaderboard | ใช้ในคาบ |
 | M3 | บันทึกคะแนนสอบ (สร้างรายการ, กรอก/paste, เผยแพร่, รวมในสมุดคะแนน Excel) + แท็บ "คะแนน" ของนักเรียน | กรอกคะแนนสอบจากกระดาษ |
-| M4 | ไลฟ์หน้าห้อง (LiveRoom โหมด live) + จอโปรเจกเตอร์ | กิจกรรมหน้าห้อง |
+| M4 | คลิปย้อนหลัง YouTube (ดูในเว็บเท่านั้น) + ค่าเอกสารเรียนที่ค้างจ่าย | ทบทวนบทเรียน + ตามเก็บค่าเอกสาร |
 
 ## 10. Deploy และสิ่งที่ครูต้องเตรียม
 - บัญชี Cloudflare (ฟรี) + API token (สิทธิ์ Workers, D1, R2) สำหรับ deploy
