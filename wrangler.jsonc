@@ -18,5 +18,8 @@
   ],
   // รูปงาน — ต้องเปิดใช้ R2 ในแดชบอร์ดและสร้าง bucket ก่อน deploy
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "classroom-files" }],
+  // ไลฟ์หน้าห้อง: 1 Durable Object ต่อไลฟ์ (SQLite-backed ใช้ได้บนแพ็กเกจฟรี)
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveRoom"] }],
   "vars": {}
 }
