@@ -34,7 +34,7 @@ export type StudentAssignment = {
   maxScore: number
   submitMode: SubmitMode
   status: StudentStatus
-  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number } | null
+  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean } | null
 }
 
 export const submissionInputSchema = z.object({

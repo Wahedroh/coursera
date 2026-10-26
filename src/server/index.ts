@@ -12,6 +12,7 @@ import { teacherPointsRoutes } from './points/teacher-routes'
 import { fileRoutes } from './files/routes'
 import { rosterRoutes } from './roster/routes'
 import { studentScoreRoutes } from './scores/student-routes'
+import { teacherStorageRoutes } from './storage/routes'
 import { studentVideoRoutes } from './videos/student-routes'
 import { teacherVideoRoutes } from './videos/teacher-routes'
 import { studentFeeRoutes } from './fees/student-routes'
@@ -32,6 +33,7 @@ app.route('/api/teacher', teacherPointsRoutes)
 app.route('/api/teacher', teacherScoreRoutes)
 app.route('/api/teacher', teacherVideoRoutes)
 app.route('/api/teacher', teacherFeeRoutes)
+app.route('/api/teacher', teacherStorageRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)

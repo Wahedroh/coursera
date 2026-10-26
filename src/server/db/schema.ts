@@ -95,6 +95,8 @@ export const submissions = sqliteTable(
     score: real('score'),
     comment: text('comment').notNull().default(''),
     gradedAt: integer('graded_at'),
+    /** ครูลบรูปงาน (ที่ตรวจแล้ว) เพื่อประหยัดพื้นที่ — คะแนน/คอมเมนต์ยังอยู่ */
+    imagesPurgedAt: integer('images_purged_at'),
     clientRequestId: text('client_request_id'),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -251,4 +253,19 @@ export const studentAvatars = sqliteTable('student_avatars', {
   nickname: text('nickname').notNull().default(''),
   config: text('config', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
   updatedAt: integer('updated_at').notNull(),
+})
+
+/** ไฟล์ใน R2 ที่ระบบรู้ขนาด (ใช้คิดพื้นที่ต่องาน) */
+export const storedFiles = sqliteTable('stored_files', {
+  key: text('key').primaryKey(),
+  size: integer('size').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
+
+/** ยอดรวมพื้นที่ (แถวเดียว id='main') — อัปเดตทุกครั้งที่อัปโหลด/ลบ ไม่ต้องรวมทั้งตารางทุกครั้ง */
+export const storageStats = sqliteTable('storage_stats', {
+  id: text('id').primaryKey(),
+  bytes: integer('bytes').notNull().default(0),
+  files: integer('files').notNull().default(0),
+  syncedAt: integer('synced_at'),
 })

@@ -107,7 +107,7 @@ function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submi
     submitMode: a.submitMode,
     status: s ? s.status : 'missing',
     submission: s
-      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt }
+      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null }
       : null,
   }
 }

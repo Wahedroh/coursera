@@ -112,6 +112,7 @@ export default function StudentSubmit() {
             {a.submission.score}/{a.maxScore}
           </p>
           {a.submission.comment && <p className="text-sm">“{a.submission.comment}”</p>}
+          {a.submission.imagesPurged && <p className="text-xs text-stone-500">ครูลบรูปงานนี้แล้วเพื่อประหยัดพื้นที่ (คะแนนยังอยู่)</p>}
           {a.submission.annotatedKeys.map((k, i) => (
             <img key={k} src={fileUrl(k)} alt={`รูปที่ครูตรวจ ${i + 1}`} className="rounded-xl border border-line" />
           ))}

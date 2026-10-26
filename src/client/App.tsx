@@ -23,6 +23,7 @@ import TeacherGrade from './pages/TeacherGrade'
 import TeacherGradebook from './pages/TeacherGradebook'
 import TeacherHome from './pages/TeacherHome'
 import TeacherImport from './pages/TeacherImport'
+import TeacherStorage from './pages/TeacherStorage'
 import TeacherLogin from './pages/TeacherLogin'
 
 export default function App() {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/teacher/classes/:id/videos" element={<TeacherVideos />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
+        <Route path="/teacher/storage" element={<TeacherStorage />} />
         <Route path="/teacher/attendance/:dayId/qr" element={<TeacherCheckinScreen />} />
         <Route path="/teacher/assignments/new" element={<TeacherAssignmentForm />} />
         <Route path="/teacher/assignments/:id/edit" element={<TeacherAssignmentForm />} />

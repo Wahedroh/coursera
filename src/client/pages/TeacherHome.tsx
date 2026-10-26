@@ -15,6 +15,11 @@ export default function TeacherHome() {
   const handle = useTeacherErrorHandler()
   const [schools, setSchools] = useState<School[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [storage, setStorage] = useState<{ bytes: number; freeBytes: number } | null>(null)
+
+  useEffect(() => {
+    api<{ bytes: number; freeBytes: number }>('/api/teacher/storage/usage').then(setStorage).catch(() => {})
+  }, [])
 
   useEffect(() => {
     api<School[]>('/api/teacher/classes')
@@ -42,6 +47,13 @@ export default function TeacherHome() {
         </Link>
       </div>
       <ErrorBox message={error} />
+      {storage && storage.bytes / storage.freeBytes >= 0.75 && (
+        <Link to="/teacher/storage" className="block">
+          <Card className="p-3 bg-amber-50 border-amber-200 text-sm">
+            ⚠️ <b>พื้นที่เก็บรูปใช้ไป {Math.round((storage.bytes / storage.freeBytes) * 100)}%</b> · แตะเพื่อลบรูปงานที่ตรวจแล้ว
+          </Card>
+        </Link>
+      )}
       {!schools && !error && <Loading />}
       {schools && schools.length === 0 && (
         <Card className="p-6 text-center">
