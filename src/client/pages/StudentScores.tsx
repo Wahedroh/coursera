@@ -37,7 +37,6 @@ export default function StudentScores() {
                 <span className="text-xs text-stone-500">{formatDate(s.takenOn)}</span>
               </div>
               <h3 className="font-bold mt-1">{s.title}</h3>
-              {s.note && <p className="text-sm text-stone-500">“{s.note}”</p>}
             </div>
             <div className="text-right shrink-0" data-testid="my-score">
               {s.absent ? (

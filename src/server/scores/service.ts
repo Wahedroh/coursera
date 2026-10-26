@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, eq, isNotNull, or, sql } from 'drizzle-orm'
 import { validScore, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
 import { newId, now, type Db } from '../db/client'
 import { classes, scoreItems, scores, students } from '../db/schema'
@@ -79,13 +79,15 @@ export async function getScoreSheet(db: Db, id: string): Promise<ScoreSheet> {
 
 export async function updateScoreItem(db: Db, id: string, input: ScoreItemInput): Promise<void> {
   await getItem(db, id)
-  const [over] = await db
-    .select({ id: scores.id })
-    .from(scores)
-    .where(and(eq(scores.itemId, id), gt(scores.score, input.maxScore)))
-    .limit(1)
-  if (over) throw apiError('scores_exceed_max', 'มีคะแนนที่กรอกแล้วเกินคะแนนเต็มใหม่ กรุณาแก้คะแนนก่อน', 409)
-  await db.update(scoreItems).set({ ...input, updatedAt: now() }).where(eq(scoreItems.id, id))
+  // ตรวจและแก้ในคำสั่งเดียว: คะแนนที่บันทึกพร้อมกันจะไม่หลุดเกินคะแนนเต็มใหม่
+  const r = await db.$client
+    .prepare(
+      `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, updated_at = ?
+       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE item_id = ? AND score > ?)`,
+    )
+    .bind(input.title, input.category, input.maxScore, input.takenOn, now(), id, id, input.maxScore)
+    .run()
+  if (r.meta.changes === 0) throw apiError('scores_exceed_max', 'มีคะแนนที่กรอกแล้วเกินคะแนนเต็มใหม่ กรุณาแก้คะแนนก่อน', 409)
 }
 
 export async function setPublished(db: Db, id: string, published: boolean): Promise<void> {
@@ -131,13 +133,12 @@ export async function scoresForStudent(db: Db, studentId: string, classId: strin
     takenOn: i.takenOn,
     score: s?.score ?? null,
     absent: s?.absent ?? false,
-    note: s?.note ?? '',
   }))
 }
 
 export async function scoreBook(db: Db, classId: string): Promise<ScoreBook> {
   const items = await db
-    .select({ id: scoreItems.id, title: scoreItems.title, maxScore: scoreItems.maxScore })
+    .select({ id: scoreItems.id, title: scoreItems.title, maxScore: scoreItems.maxScore, takenOn: scoreItems.takenOn })
     .from(scoreItems)
     .where(eq(scoreItems.classId, classId))
     .orderBy(asc(scoreItems.takenOn), asc(scoreItems.createdAt))

@@ -32,8 +32,11 @@ export function validScore(v: number, max: number): boolean {
 
 /** แปลงข้อความในช่องกรอก: ว่าง = ยังไม่กรอก; รับคอมมาเป็นจุดทศนิยม */
 export function parseScore(text: string, max: number): { ok: true; value: number | null } | { ok: false } {
-  const t = text.trim().replace(',', '.')
-  if (t === '') return { ok: true, value: null }
+  const trimmed = text.trim()
+  if (trimmed === '') return { ok: true, value: null }
+  // "1,000" คือคั่นหลักพัน ไม่ใช่ทศนิยม — ไม่เดา ให้ครูแก้
+  if (/,\d{3}$/.test(trimmed)) return { ok: false }
+  const t = trimmed.replace(',', '.')
   if (!/^\d+(\.\d+)?$/.test(t)) return { ok: false }
   const v = Number(t)
   return validScore(v, max) ? { ok: true, value: v } : { ok: false }
@@ -80,9 +83,10 @@ export type ScoreSheet = {
   students: ScoreRow[]
 }
 
-export type StudentScore = { id: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; score: number | null; absent: boolean; note: string }
+/** หมายเหตุเป็นของครูเท่านั้น ไม่ส่งให้นักเรียน */
+export type StudentScore = { id: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; score: number | null; absent: boolean }
 
 export type ScoreBook = {
-  items: { id: string; title: string; maxScore: number }[]
+  items: { id: string; title: string; maxScore: number; takenOn: string }[]
   cells: Record<string, Record<string, { score: number | null; absent: boolean }>>
 }

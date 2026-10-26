@@ -50,6 +50,22 @@ test('ครูสร้างรายการคะแนน → วางค
   await teacher.getByLabel(/^ขาดสอบ /).nth(1).check()
   await expect(teacher.getByTestId('score-stats')).toContainText('3/3')
 
+  // Enter ข้ามคนขาดสอบไปคนถัดไป
+  await first.click()
+  await first.press('Enter')
+  await expect(teacher.getByLabel('คะแนน มานี มีนา')).toBeFocused()
+
+  // วางซ้ำ: ค่าของคนขาดสอบถูกข้าม แถวไม่เลื่อน (ค่าที่ 3 ลงคนที่ 3)
+  await first.evaluate((el) => {
+    const data = new DataTransfer()
+    data.setData('text/plain', '19\n5\n17.5\n')
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  await expect(first).toHaveValue('19')
+  await expect(teacher.getByLabel('คะแนน มานี มีนา')).toHaveValue('17.5')
+  await expect(teacher.getByText(/ข้ามคนที่ติ๊กขาดสอบ 1 คน/)).toBeVisible()
+  await expect(teacher.getByTestId('score-stats')).toContainText('18.25')
+
   const student = await studentPage(browser, '3', '1357')
   await student.getByRole('link', { name: /คะแนนสอบ/ }).click()
   await expect(student.getByText('ยังไม่มีคะแนนที่ครูเผยแพร่')).toBeVisible()
@@ -60,5 +76,5 @@ test('ครูสร้างรายการคะแนน → วางค
   await student.reload()
   await expect(student.getByText('สอบย่อย บทที่ 3')).toBeVisible()
   await expect(student.getByTestId('my-score')).toHaveText('17.5/20')
-  await expect(student.getByText('18')).toHaveCount(0)
+  await expect(student.getByText('19')).toHaveCount(0)
 })

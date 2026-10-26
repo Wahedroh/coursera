@@ -8,10 +8,10 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type RowState = 'idle' | 'saving' | 'saved' | 'invalid' | 'error'
-/** score/absent/note = ค่าที่บันทึกในเซิร์ฟเวอร์แล้ว; text/noteText = ค่าที่กำลังพิมพ์ */
-type Row = ScoreRow & { text: string; noteText: string; state: RowState }
+/** score/absent/note = ค่าที่บันทึกในเซิร์ฟเวอร์แล้ว; text/noteText/absentDraft = ค่าบนหน้าจอ */
+type Row = ScoreRow & { text: string; noteText: string; absentDraft: boolean; state: RowState }
 
-const toRow = (s: ScoreRow): Row => ({ ...s, text: s.score === null ? '' : String(s.score), noteText: s.note, state: 'idle' })
+const toRow = (s: ScoreRow): Row => ({ ...s, text: s.score === null ? '' : String(s.score), noteText: s.note, absentDraft: s.absent, state: 'idle' })
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
 
 export default function TeacherScoreEntry() {
@@ -22,8 +22,8 @@ export default function TeacherScoreEntry() {
   const [rows, setRowsState] = useState<Row[]>([])
   const rowsRef = useRef<Row[]>([])
   const inputs = useRef<(HTMLInputElement | null)[]>([])
-  // Enter แล้วโฟกัสย้าย → blur เรียก commit ซ้ำด้วยค่าเดิม: ไม่ยิงซ้ำถ้ากำลังส่งค่าเดียวกันอยู่
-  const inflight = useRef(new Map<string, string>())
+  // คิวต่อแถว: บันทึกทีละครั้งตามลำดับ และอ่านค่าล่าสุดตอนถึงคิว (กันคำตอบเก่ามาทับค่าใหม่)
+  const queues = useRef(new Map<string, Promise<void>>())
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
 
@@ -45,38 +45,53 @@ export default function TeacherScoreEntry() {
 
   const max = sheet?.item.maxScore ?? 0
 
-  /** บันทึกแถว i ถ้าค่าเปลี่ยนจากที่บันทึกไว้; ค่าผิดขึ้นกรอบแดงไม่บันทึก */
-  const commit = useCallback(
-    async (i: number, over: { absent?: boolean } = {}) => {
+  /** บันทึกแถว i ถ้าค่าเปลี่ยนจากที่บันทึกไว้; ค่าผิดขึ้นกรอบแดงไม่บันทึก (หมายเหตุยังบันทึกได้ด้วยคะแนนเดิม) */
+  const saveNow = useCallback(
+    async (rowId: string, over: { absent?: boolean; noteOnly?: boolean }) => {
+      const i = rowsRef.current.findIndex((x) => x.id === rowId)
       const r = rowsRef.current[i]
       if (!r) return
-      const absent = over.absent ?? r.absent
+      const absent = over.absent ?? r.absentDraft
       const parsed = absent ? ({ ok: true, value: null } as const) : parseScore(r.text, max)
-      if (!parsed.ok) return patch(i, { state: 'invalid' })
-      const body = { score: parsed.value, absent, note: r.noteText.trim() }
-      if (body.score === r.score && body.absent === r.absent && body.note === r.note) return patch(i, { state: r.state === 'invalid' ? 'idle' : r.state })
-      const key = JSON.stringify(body)
-      if (inflight.current.get(r.id) === key) return
-      inflight.current.set(r.id, key)
-      patch(i, { state: 'saving', absent, ...(absent ? { text: '' } : {}) })
+      if (!parsed.ok && !over.noteOnly) return patch(i, { state: 'invalid' })
+      const body = { score: parsed.ok ? parsed.value : r.score, absent, note: r.noteText.trim() }
+      if (body.score === r.score && body.absent === r.absent && body.note === r.note) return patch(i, { state: r.state === 'invalid' && parsed.ok ? 'idle' : r.state })
+      patch(i, { state: 'saving', absentDraft: absent })
       try {
         await api(`/api/teacher/score-items/${id}/scores/${r.id}`, { method: 'PUT', body })
-        patch(i, { score: body.score, absent: body.absent, note: body.note, state: 'saved' })
+        const j = rowsRef.current.findIndex((x) => x.id === rowId)
+        // ขาดสอบแล้วล้างช่องคะแนน (หลังบันทึกสำเร็จเท่านั้น ถ้าพลาดคะแนนเดิมยังอยู่)
+        patch(j, { score: body.score, absent: body.absent, note: body.note, state: parsed.ok ? 'saved' : 'invalid', ...(body.absent ? { text: '' } : {}) })
+        setError(null)
       } catch (e) {
-        patch(i, { state: 'error', absent: r.absent })
+        const j = rowsRef.current.findIndex((x) => x.id === rowId)
+        patch(j, { state: 'error', absentDraft: rowsRef.current[j]?.absent ?? absent })
         setError(handle(e))
-      } finally {
-        if (inflight.current.get(r.id) === key) inflight.current.delete(r.id)
       }
     },
     [id, max, patch, handle],
   )
 
-  function focus(i: number) {
-    const el = inputs.current[i]
-    if (el) {
-      el.focus()
-      el.select()
+  const commit = useCallback(
+    (i: number, over: { absent?: boolean; noteOnly?: boolean } = {}): Promise<void> => {
+      const r = rowsRef.current[i]
+      if (!r) return Promise.resolve()
+      const next = (queues.current.get(r.id) ?? Promise.resolve()).then(() => saveNow(r.id, over))
+      queues.current.set(r.id, next)
+      return next
+    },
+    [saveNow],
+  )
+
+  /** โฟกัสช่องถัดไปที่กรอกได้ (ข้ามคนขาดสอบซึ่งช่องถูกปิด) */
+  function focus(i: number, step: 1 | -1) {
+    for (let k = i; k >= 0 && k < inputs.current.length; k += step) {
+      const el = inputs.current[k]
+      if (el && !el.disabled) {
+        el.focus()
+        el.select()
+        return
+      }
     }
   }
 
@@ -84,29 +99,36 @@ export default function TeacherScoreEntry() {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault()
       void commit(i)
-      focus(i + 1)
+      focus(i + 1, 1)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       void commit(i)
-      focus(i - 1)
+      focus(i - 1, -1)
     }
   }
 
-  /** วางทั้งคอลัมน์จาก Excel/Sheets: เติมตั้งแต่แถวนี้ลงไปตามลำดับรายชื่อ */
+  /** วางทั้งคอลัมน์จาก Excel/Sheets: ค่าที่ k ลงแถว i+k ตรงตามลำดับรายชื่อ
+   *  ช่องว่างไม่แตะคะแนนเดิม · แถวขาดสอบข้ามไป (แต่ใช้ค่าของแถวนั้นไปแล้ว ไม่เลื่อนแถว) */
   async function onPaste(i: number, e: React.ClipboardEvent<HTMLInputElement>) {
-    const values = parsePastedColumn(e.clipboardData.getData('text'))
+    const raw = e.clipboardData.getData('text')
+    const values = parsePastedColumn(raw)
     if (values.length < 2) return
     e.preventDefault()
     const targets: number[] = []
-    let k = i
-    for (const v of values) {
-      while (k < rowsRef.current.length && rowsRef.current[k].absent) k++
-      if (k >= rowsRef.current.length) break
-      patch(k, { text: v })
-      targets.push(k++)
-    }
-    if (values.length > targets.length) setError(`วางได้ ${targets.length} จาก ${values.length} ค่า (รายชื่อหมดแล้ว)`)
-    for (const t of targets) await commit(t)
+    let skippedAbsent = 0
+    values.forEach((v, k) => {
+      const r = rowsRef.current[i + k]
+      if (!r || v === '') return
+      if (r.absentDraft) return void skippedAbsent++
+      patch(i + k, { text: v })
+      targets.push(i + k)
+    })
+    const notes = []
+    if (i + values.length > rowsRef.current.length) notes.push(`วางได้ถึงคนสุดท้าย ${rowsRef.current.length - i} จาก ${values.length} ค่า`)
+    if (skippedAbsent) notes.push(`ข้ามคนที่ติ๊กขาดสอบ ${skippedAbsent} คน`)
+    if (raw.split(/\r?\n/).some((l) => l.includes('\t'))) notes.push('วางมาหลายคอลัมน์ ใช้คอลัมน์แรกเท่านั้น กรุณาตรวจ')
+    await Promise.all(targets.map((t) => commit(t)))
+    if (notes.length) setError(notes.join(' · '))
   }
 
   async function togglePublish() {
@@ -248,8 +270,8 @@ export default function TeacherScoreEntry() {
                       inputMode="decimal"
                       aria-label={`คะแนน ${r.firstName} ${r.lastName}`}
                       aria-invalid={r.state === 'invalid'}
-                      disabled={r.absent}
-                      value={r.text}
+                      disabled={r.absentDraft}
+                      value={r.absentDraft ? '' : r.text}
                       onChange={(e) => patch(i, { text: e.target.value, state: r.state === 'invalid' ? 'idle' : r.state })}
                       onKeyDown={(e) => onKey(i, e)}
                       onBlur={() => void commit(i)}
@@ -263,7 +285,7 @@ export default function TeacherScoreEntry() {
                   {r.state === 'invalid' && <span className="block text-xs text-red-600">0–{it.maxScore} ทศนิยมไม่เกิน 2 ตำแหน่ง</span>}
                 </td>
                 <td className="p-2 text-center">
-                  <input type="checkbox" aria-label={`ขาดสอบ ${r.firstName} ${r.lastName}`} checked={r.absent} onChange={(e) => void commit(i, { absent: e.target.checked })} />
+                  <input type="checkbox" aria-label={`ขาดสอบ ${r.firstName} ${r.lastName}`} checked={r.absentDraft} onChange={(e) => void commit(i, { absent: e.target.checked })} />
                 </td>
                 <td className="p-1">
                   <input
@@ -271,7 +293,7 @@ export default function TeacherScoreEntry() {
                     maxLength={500}
                     value={r.noteText}
                     onChange={(e) => patch(i, { noteText: e.target.value })}
-                    onBlur={() => void commit(i)}
+                    onBlur={() => void commit(i, { noteOnly: true })}
                     onKeyDown={(e) => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
                     className="w-full min-w-28 rounded-lg border-2 border-line px-2 py-1"
                   />

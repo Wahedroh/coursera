@@ -13,7 +13,7 @@ describe('parseScore', () => {
     expect(parseScore('10', 10)).toEqual({ ok: true, value: 10 })
   })
   it('ปฏิเสธค่าผิด', () => {
-    for (const v of ['10.001', '-1', '11', 'abc', '1e1', '5.', '.5.5', 'Infinity']) expect(parseScore(v, 10)).toEqual({ ok: false })
+    for (const v of ['1,000', '10.001', '-1', '11', 'abc', '1e1', '5.', '.5.5', 'Infinity']) expect(parseScore(v, 10)).toEqual({ ok: false })
   })
 })
 

@@ -10,7 +10,7 @@ export async function exportGradebook(gb: Gradebook, book: ScoreBook): Promise<v
     'ZipGrade ID',
     'ชื่อ-นามสกุล',
     ...gb.assignments.map((a) => `${a.title} (${a.maxScore})`),
-    ...book.items.map((it) => `${it.title} (${it.maxScore})`),
+    ...book.items.map((it) => `${it.title} ${it.takenOn} (${it.maxScore})`),
   ].map((value) => ({
     value,
     fontWeight: 'bold' as const,

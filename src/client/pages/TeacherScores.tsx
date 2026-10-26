@@ -114,7 +114,7 @@ export default function TeacherScores() {
             ชื่อรายการ
             <input className={input} required maxLength={200} placeholder="เช่น สอบย่อย บทที่ 3" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <label className="text-sm font-semibold">
               หมวด
               <select className={input} value={category} onChange={(e) => setCategory(e.target.value as ScoreCategory)}>
