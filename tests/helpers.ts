@@ -79,3 +79,26 @@ export async function loginTeacher(): Promise<string> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const json = (r: Response) => r.json() as Promise<any>
+
+export async function studentCookie(studentId: string, ua = 'ua'): Promise<string> {
+  const { env } = await import('cloudflare:test')
+  const { createSession } = await import('../src/server/auth/sessions')
+  const { getDb } = await import('../src/server/db/client')
+  const { token } = await createSession(getDb(env), { kind: 'student', studentId }, ua, env.SESSION_SECRET)
+  return `sid=${token}`
+}
+
+/** JPEG ขนาดเล็กที่สุดที่ถูกต้อง (1×1) */
+export const TINY_JPEG = Uint8Array.from(
+  atob('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='),
+  (c) => c.charCodeAt(0),
+)
+
+export async function uploadFile(query: string, body: BodyInit, contentType: string, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x/api/files?${query}`, {
+    method: 'POST',
+    headers: { 'content-type': contentType, ...(cookie ? { cookie } : {}) },
+    body,
+  })
+}
