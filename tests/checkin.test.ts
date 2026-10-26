@@ -33,7 +33,7 @@ it('ครูขอ QR ได้ url ที่มี token และเช็ก
   expect(qr.expiresAt).toBeGreaterThan(Date.now())
   const res = await checkin(day.id, url.searchParams.get('t')!, sc)
   expect(res.status).toBe(200)
-  expect(await json(res)).toEqual({ status: 'present', className: 'ห้อง A ชั้น 1', date: '2026-10-26' })
+  expect(await json(res)).toEqual({ status: 'present', className: 'ห้อง A ชั้น 1', date: '2026-10-26', earnedExp: true })
   expect(await status()).toMatchObject({ status: 'present', source: 'self' })
 })
 

@@ -26,6 +26,11 @@ export default function TeacherAttendance() {
   const [error, setError] = useState<string | null>(null)
   const [from, setFrom] = useState(date.slice(0, 8) + '01')
   const [to, setTo] = useState(date)
+  // เปลี่ยนวันที่ด้านบน → ช่วงส่งออกตามเป็นต้นเดือนถึงวันนั้น
+  useEffect(() => {
+    setFrom(date.slice(0, 8) + '01')
+    setTo(date)
+  }, [date])
 
   const load = useCallback(() => {
     setData(null)

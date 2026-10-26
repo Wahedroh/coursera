@@ -10,7 +10,8 @@ export type Layout = { cols: number; seats: (string | null)[] }
 
 export async function givePoints(db: Db, studentIds: string[], delta: number, reason: string): Promise<void> {
   const unique = [...new Set(studentIds)]
-  const found = await db.select({ id: students.id }).from(students).where(inArray(students.id, unique))
+  // ≤ 60 คน (จำกัดที่ route) — ไม่เกินข้อจำกัด 100 ตัวแปรของ D1; ให้แต้มเฉพาะคนที่ยังอยู่ในห้อง
+  const found = await db.select({ id: students.id }).from(students).where(and(inArray(students.id, unique), eq(students.active, true)))
   if (found.length !== unique.length) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
   const t = now()
   const rows = unique.map((studentId) => ({ id: newId(), studentId, delta, reason, source: 'manual' as const, refId: null, createdAt: t }))
@@ -145,10 +146,12 @@ export async function leaderboard(db: Db, classId: string, studentId: string) {
     .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)
-  return rows
-    .sort((a, b) => b.exp - a.exp)
-    .slice(0, 10)
-    .map((r, i) => ({ rank: i + 1, firstName: r.firstName, exp: r.exp, level: levelOf(r.exp), isMe: r.id === studentId, avatar: parseAvatar(r.avatar) }))
+  // แต้มเท่ากันได้อันดับเท่ากัน (1, 2, 2, 4) และเรียงชื่อเพื่อให้ลำดับคงที่
+  const sorted = rows.sort((a, b) => b.exp - a.exp || a.firstName.localeCompare(b.firstName, 'th'))
+  return sorted
+    .map((r, i) => ({ r, rank: sorted.findIndex((x) => x.exp === r.exp) + 1, i }))
+    .filter(({ rank }) => rank <= 10)
+    .map(({ r, rank }) => ({ rank, firstName: r.firstName, exp: r.exp, level: levelOf(r.exp), isMe: r.id === studentId, avatar: parseAvatar(r.avatar) }))
 }
 
 /** ค่าที่เก็บไว้ผิดรูปแบบ (เช่น ตัวเลือกที่ถูกเอาออกในเวอร์ชันหลัง) → ใช้ค่าเริ่มต้น */

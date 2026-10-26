@@ -161,6 +161,15 @@ export async function studentCheckin(db: Db, secret: string, p: { dayId: string;
   const w = Math.floor(now() / CHECKIN_WINDOW_MS)
   const valid = [await checkinToken(secret, day.id, w), await checkinToken(secret, day.id, w - 1)]
   if (!valid.includes(p.token)) throw invalid()
+  const [rec] = await db
+    .select({ status: attendanceRecords.status, source: attendanceRecords.source })
+    .from(attendanceRecords)
+    .where(and(eq(attendanceRecords.dayId, day.id), eq(attendanceRecords.studentId, p.studentId)))
+  // ครูตั้งสาย/ป่วย/ลาไว้แล้ว: สแกนไม่ลบล้างสิ่งที่ครูบันทึก
+  if (rec && rec.source === 'teacher' && (rec.status === 'late' || rec.status === 'sick' || rec.status === 'leave')) {
+    return { status: rec.status, className: day.className, date: day.date, earnedExp: false }
+  }
   await setStatus(db, day.id, p.studentId, 'present', 'self')
-  return { status: 'present' as const, className: day.className, date: day.date }
+  // ทุกคนเริ่มต้นเป็น "มา" (ได้ EXP แล้ว) — ได้ EXP เพิ่มเฉพาะคนที่เคยถูกตั้งเป็นขาด/ยังไม่มีแถว
+  return { status: 'present' as const, className: day.className, date: day.date, earnedExp: !rec || rec.status === 'absent' }
 }
