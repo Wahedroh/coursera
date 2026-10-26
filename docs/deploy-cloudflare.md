@@ -1,5 +1,7 @@
 # คู่มือ deploy "ผู้ช่วยครู" ขึ้น Cloudflare
 
+> **ทางลัด:** ไม่อยากใช้ terminal ไปที่ [ข้อ 10](#10-deploy-อัตโนมัติด้วย-github-actions-ไม่ต้องใช้-terminal) ได้เลย
+
 คู่มือนี้พาตั้งแต่สมัครบัญชีจนได้เว็บที่นักเรียนใช้งานได้จริง ใช้ **แพ็กเกจฟรี** ของ Cloudflare ทั้งหมด
 (Workers 100,000 คำขอ/วัน, D1 5GB, R2 10GB — เกินพอสำหรับนักเรียน ~300–500 คน)
 
@@ -44,7 +46,7 @@ npx wrangler d1 create classroom
 ```
 เปิดไฟล์ `wrangler.jsonc` แล้วแทนค่า `"database_id": "00000000-0000-0000-0000-000000000000"` ด้วยค่าที่ได้
 
-## 4. สร้างที่เก็บไฟล์ R2 (สำหรับรูปงานใน M1)
+## 4. สร้างที่เก็บไฟล์ R2 (ข้ามได้ — ใช้ตั้งแต่ M1 สำหรับรูปงาน)
 
 1. ในแดชบอร์ด Cloudflare เลือกเมนู **R2 Object Storage** → กดเปิดใช้งาน
    (ฟรี 10GB แต่ Cloudflare อาจขอข้อมูลบัตรเพื่อยืนยันตัวตน — ไม่ถูกเก็บเงินถ้าใช้ไม่เกินโควตา)
@@ -111,17 +113,27 @@ https://classroom.<ชื่อบัญชี>.workers.dev
 
 > **ข้อมูลนักเรียนเป็นข้อมูลส่วนบุคคล (PDPA)** — อย่า commit ไฟล์ CSV ลง git (โปรเจกต์ตั้ง `.gitignore` กันไว้แล้ว) และอย่าแชร์รหัสผ่านครู
 
-## 10. (ตัวเลือก) Deploy อัตโนมัติด้วย GitHub Actions
+## 10. Deploy อัตโนมัติด้วย GitHub Actions (ไม่ต้องใช้ terminal)
 
-เมื่อ push เข้า branch `main` ระบบจะทดสอบ → migrate → deploy ให้เอง (ไฟล์ `.github/workflows/deploy.yml`)
+ฐานข้อมูล D1 `classroom` สร้างและมีตารางครบแล้ว (`database_id` อยู่ใน `wrangler.jsonc`) — วิธีนี้แทนข้อ 0–7 ได้ทั้งหมด
+เมื่อมีโค้ดเข้า branch `main` (หรือกด Run workflow) GitHub จะทดสอบ → migrate → deploy → ตั้งรหัสครูให้เอง
 
-1. สร้าง API token: แดชบอร์ด → รูปโปรไฟล์ → **My Profile → API Tokens → Create Token**
-   → ใช้เทมเพลต **Edit Cloudflare Workers** แล้วเพิ่มสิทธิ์ **Account → D1 → Edit** → Create → คัดลอก token
-2. หา Account ID: แดชบอร์ด → Workers & Pages → แถบขวามี **Account ID**
-3. ใน GitHub: repo → **Settings → Secrets and variables → Actions → New repository secret** เพิ่ม 2 ค่า:
-   - `CLOUDFLARE_API_TOKEN` = token จากข้อ 1
-   - `CLOUDFLARE_ACCOUNT_ID` = Account ID จากข้อ 2
-4. ต้องทำข้อ 3–5 ด้านบน (สร้าง D1/R2/secret และใส่ `database_id` ใน `wrangler.jsonc`) ก่อน workflow จะทำงานได้
+1. **สร้าง API token:** แดชบอร์ด Cloudflare → รูปโปรไฟล์ → **My Profile → API Tokens → Create Token**
+   → เทมเพลต **Edit Cloudflare Workers** → เพิ่มสิทธิ์ **Account · D1 · Edit** → Continue → Create Token → คัดลอก token (เห็นครั้งเดียว)
+2. **หา Account ID:** แดชบอร์ด → **Workers & Pages** → ด้านขวามี **Account ID** → คัดลอก
+3. **ใส่ secret ใน GitHub:** repo → **Settings → Secrets and variables → Actions → New repository secret** เพิ่ม 4 ค่า:
+
+   | ชื่อ | ค่า |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | token จากข้อ 1 |
+   | `CLOUDFLARE_ACCOUNT_ID` | Account ID จากข้อ 2 |
+   | `TEACHER_PASSWORD` | รหัสผ่านครูที่ต้องการ (อย่างน้อย 10 ตัวอักษร) — ระบบเก็บเป็น hash บน Cloudflare |
+   | `SESSION_SECRET` | ข้อความสุ่มยาว ๆ อะไรก็ได้ (เช่น พิมพ์มั่ว ๆ 40 ตัว) — เปลี่ยนเมื่อไรทุกคนจะถูกออกจากระบบ |
+
+4. **สั่ง deploy:** repo → แท็บ **Actions → Deploy to Cloudflare → Run workflow** (หรือ merge โค้ดเข้า `main`)
+5. รอประมาณ 2–3 นาที เปิดขั้นตอน **Run npm run deploy** จะเห็น URL เช่น `https://classroom.<ชื่อบัญชี>.workers.dev` → ไปข้อ 8
+
+ถ้าขั้น **Check secrets** แดง แปลว่ายังใส่ secret ไม่ครบ
 
 ## 11. (ตัวเลือก) ใช้โดเมนของตัวเอง
 

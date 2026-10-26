@@ -12,11 +12,10 @@
     {
       "binding": "DB",
       "database_name": "classroom",
-      // แทนค่าด้วย database_id จริงจาก `npx wrangler d1 create classroom` (ดู docs/deploy-cloudflare.md)
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "b8a9794b-f266-4540-8cd8-0125f6395ed7",
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "classroom-files" }],
+  // R2 (รูปงาน) จะเพิ่มใน M1 — ต้องเปิดใช้ R2 ในแดชบอร์ดก่อน
   "vars": {}
 }

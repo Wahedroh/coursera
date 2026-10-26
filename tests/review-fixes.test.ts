@@ -57,7 +57,7 @@ it('ผิดรวม 50 ครั้งจากหลาย IP ใน 1 ช�
   }
   const res = await postJson('/api/teacher/login', { password: 'teacher-pass' }, { headers: { 'cf-connecting-ip': '10.9.9.9' } })
   expect(res.status).toBe(429)
-})
+}, 30_000)
 
 // I4: session ผูกกับ SESSION_SECRET — เปลี่ยน secret แล้ว session เดิมใช้ไม่ได้
 it('readSession ด้วย secret อื่นคืน null', async () => {

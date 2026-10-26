@@ -15,14 +15,25 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TEACHER_PASSWORD: ${{ secrets.TEACHER_PASSWORD }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Check secrets
+        run: |
+          for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID TEACHER_PASSWORD SESSION_SECRET; do
+            if [ -z "${!v}" ]; then echo "::error::ยังไม่ได้ตั้ง GitHub secret: $v (ดู docs/deploy-cloudflare.md)"; exit 1; fi
+          done
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npx wrangler d1 migrations apply classroom --remote
       - run: npm run deploy
+      - name: Set Worker secrets
+        run: |
+          node scripts/hash-password.mjs "$TEACHER_PASSWORD" | npx wrangler secret put TEACHER_PASSWORD_HASH
+          printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET
