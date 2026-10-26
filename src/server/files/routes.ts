@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { requireSession } from '../auth/middleware'
 import { getDb, newId, now } from '../db/client'
 import { assertRoom, recordFile } from '../storage/service'
-import { submissions } from '../db/schema'
+import { materials, submissions } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError } from '../http'
 import { canRead, checkImage, EXT, MAX_IMAGE_BYTES, putImage } from './service'
@@ -60,12 +60,19 @@ fileRoutes.get('/*', async (c) => {
   if (!(await canRead(getDb(c.env), s, key))) throw notFound()
   const obj = await c.env.BUCKET.get(key)
   if (!obj) throw notFound()
-  return new Response(obj.body, {
-    headers: {
-      'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
-      'cache-control': 'private, max-age=86400',
-      'x-content-type-options': 'nosniff',
-      'content-security-policy': "sandbox; default-src 'none'",
-    },
-  })
+  const type = obj.httpMetadata?.contentType ?? 'application/octet-stream'
+  const headers: Record<string, string> = {
+    'content-type': type,
+    'cache-control': 'private, max-age=86400',
+    'x-content-type-options': 'nosniff',
+    'content-security-policy': "sandbox; default-src 'none'",
+  }
+  if (key.startsWith('mat/')) {
+    // เอกสารเรียน: PDF/รูปเปิดดูในเบราว์เซอร์ (ตัวดู PDF ใช้ไม่ได้ถ้ามี sandbox) ส่วน Word/PowerPoint ให้ดาวน์โหลดพร้อมชื่อไฟล์เดิม
+    const [m] = await getDb(c.env).select({ fileName: materials.fileName }).from(materials).where(eq(materials.fileKey, key)).limit(1)
+    const inline = type === 'application/pdf' || type.startsWith('image/')
+    if (type === 'application/pdf') headers['content-security-policy'] = "default-src 'none'"
+    headers['content-disposition'] = `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(m?.fileName ?? key.split('/').pop()!)}`
+  }
+  return new Response(obj.body, { headers })
 })

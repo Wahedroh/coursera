@@ -1,0 +1,40 @@
+import { expect, test } from '@playwright/test'
+
+// ห้อง "โรงเรียนทดสอบ ชั้น 1" · มานี (รหัส 3, PIN 1357)
+test('ครูอัปโหลดเอกสาร PDF และ Word — นักเรียนเห็นตามหัวข้อและเปิดได้', async ({ browser }) => {
+  const teacher = await (await browser.newContext()).newPage()
+  await teacher.goto('/teacher/login')
+  await teacher.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await teacher.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'เอกสารเรียน' }).click()
+  await expect(teacher.getByRole('heading', { name: 'เอกสารเรียน' })).toBeVisible()
+
+  await teacher.getByLabel(/ไฟล์/).setInputFiles({ name: 'ใบความรู้ เรื่องแรง.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF\n') })
+  await expect(teacher.getByLabel('ชื่อเอกสาร')).toHaveValue('ใบความรู้ เรื่องแรง')
+  await teacher.getByLabel(/หัวข้อ/).fill('บทที่ 1')
+  await teacher.getByRole('button', { name: 'อัปโหลด' }).click()
+  await expect(teacher.getByText(/อัปโหลด "ใบความรู้ เรื่องแรง" แล้ว 1 ห้อง/)).toBeVisible()
+
+  await teacher.getByLabel(/ไฟล์/).setInputFiles({ name: 'แบบฝึก.docx', mimeType: 'application/octet-stream', buffer: Buffer.from('PK\u0003\u0004rest') })
+  await teacher.getByLabel(/หัวข้อ/).fill('บทที่ 1')
+  await teacher.getByRole('button', { name: 'อัปโหลด' }).click()
+  await expect(teacher.getByText('แบบฝึก.docx', { exact: false })).toBeVisible()
+
+  await teacher.getByLabel(/ไฟล์/).setInputFiles({ name: 'โปรแกรม.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ') })
+  await expect(teacher.getByText('รองรับเฉพาะ PDF, Word, PowerPoint หรือรูป')).toBeVisible()
+  await expect(teacher.getByRole('button', { name: 'อัปโหลด' })).toBeDisabled()
+
+  const student = await (await browser.newContext()).newPage()
+  await student.goto('/')
+  await student.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('3')
+  await student.getByRole('button', { name: 'ถัดไป' }).click()
+  for (const d of '1357') await student.getByRole('button', { name: d, exact: true }).click()
+  await student.getByRole('link', { name: /เอกสารเรียน/ }).click()
+  await expect(student.getByRole('heading', { name: 'บทที่ 1' })).toBeVisible()
+  const link = student.getByRole('link', { name: /ใบความรู้ เรื่องแรง/ })
+  const res = await student.request.get((await link.getAttribute('href'))!)
+  expect(res.status()).toBe(200)
+  expect(res.headers()['content-type']).toBe('application/pdf')
+  await expect(student.getByRole('link', { name: /แบบฝึก/ })).toBeVisible()
+})

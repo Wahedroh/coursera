@@ -218,6 +218,20 @@ export const videos = sqliteTable('videos', {
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('videos_class_idx').on(t.classId)])
 
+export const materials = sqliteTable('materials', {
+  id: text('id').primaryKey(),
+  classId: text('class_id')
+    .notNull()
+    .references(() => classes.id),
+  title: text('title').notNull(),
+  topic: text('topic').notNull().default(''),
+  fileKey: text('file_key').notNull(),
+  fileName: text('file_name').notNull(),
+  size: integer('size').notNull(),
+  published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('materials_class_idx').on(t.classId)])
+
 export const feeItems = sqliteTable('fee_items', {
   id: text('id').primaryKey(),
   classId: text('class_id')
