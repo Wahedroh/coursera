@@ -118,3 +118,14 @@ export async function del(path: string, cookie?: string) {
 }
 
 export const ASSIGNMENT = { title: 'ใบงาน 1', instructions: 'ทำข้อ 1-10', attachmentKeys: [], dueAt: null, maxScore: 10, submitMode: 'both' }
+
+export async function seedAssignment(classId: string, over: Record<string, unknown> = {}): Promise<string> {
+  const { env } = await import('cloudflare:test')
+  const { getDb, newId, now } = await import('../src/server/db/client')
+  const { assignments } = await import('../src/server/db/schema')
+  const id = newId()
+  await getDb(env)
+    .insert(assignments)
+    .values({ id, classId, title: 'ใบงาน', maxScore: 10, submitMode: 'both', createdAt: now(), updatedAt: now(), ...over } as never)
+  return id
+}

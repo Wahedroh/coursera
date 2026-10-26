@@ -24,3 +24,22 @@ export type AssignmentSummary = {
   submitMode: SubmitMode
   counts: Record<StudentStatus, number>
 }
+
+export type StudentAssignment = {
+  id: string
+  title: string
+  instructions: string
+  attachmentKeys: string[]
+  dueAt: number | null
+  maxScore: number
+  submitMode: SubmitMode
+  status: StudentStatus
+  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number } | null
+}
+
+export const submissionInputSchema = z.object({
+  text: z.string().max(5000),
+  imageKeys: z.array(z.string()).max(10),
+  clientRequestId: z.string().min(1).max(64),
+})
+export type SubmissionInput = z.infer<typeof submissionInputSchema>
