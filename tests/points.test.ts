@@ -19,7 +19,8 @@ it('แจกแต้มหลายคน แล้ว exp/level รวมถ�
   for (let i = 0; i < 11; i++) expect((await postJson('/api/teacher/points', { studentIds: [a.id], delta: 10, reason: 'ตอบคำถาม' }, { cookie })).status).toBe(200)
   await postJson('/api/teacher/points', { studentIds: [a.id, b.id], delta: -1, reason: 'คุยในห้อง' }, { cookie })
   const pts = await json(await getJson(`/api/teacher/classes/${classId}/points`, cookie))
-  expect(pts).toEqual(expect.arrayContaining([{ studentId: a.id, exp: 109, level: 1 }, { studentId: b.id, exp: -1, level: 0 }]))
+  expect(pts).toEqual(expect.arrayContaining([expect.objectContaining({ studentId: a.id, exp: 109, level: 1 }), expect.objectContaining({ studentId: b.id, exp: -1, level: 0 })]))
+  expect(pts[0].avatar).toEqual(expect.objectContaining({ job: 'student' }))
 })
 
 it('delta 0 / เกินช่วง / ไม่มีนักเรียน → 400', async () => {

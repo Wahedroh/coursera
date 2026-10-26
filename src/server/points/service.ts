@@ -18,14 +18,15 @@ export async function givePoints(db: Db, studentIds: string[], delta: number, re
   for (let i = 0; i < rows.length; i += 10) await db.insert(pointEvents).values(rows.slice(i, i + 10))
 }
 
-export async function classPoints(db: Db, classId: string): Promise<{ studentId: string; exp: number; level: number }[]> {
+export async function classPoints(db: Db, classId: string): Promise<{ studentId: string; exp: number; level: number; avatar: AvatarConfig }[]> {
   const rows = await db
-    .select({ studentId: students.id, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)` })
+    .select({ studentId: students.id, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
     .from(students)
     .leftJoin(pointEvents, eq(pointEvents.studentId, students.id))
+    .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)
-  return rows.map((r) => ({ ...r, level: levelOf(r.exp) }))
+  return rows.map((r) => ({ ...r, level: levelOf(r.exp), avatar: parseAvatar(r.avatar) }))
 }
 
 export async function getSeating(db: Db, classId: string): Promise<Layout> {
