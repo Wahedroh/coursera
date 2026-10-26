@@ -29,13 +29,6 @@
       "when": 1792982115676,
       "tag": "0003_shiny_johnny_blaze",
       "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1792984867419,
-      "tag": "0004_careful_punisher",
-      "breakpoints": true
     }
   ]
 }

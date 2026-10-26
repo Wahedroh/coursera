@@ -11,9 +11,6 @@ import { studentPointsRoutes } from './points/student-routes'
 import { teacherPointsRoutes } from './points/teacher-routes'
 import { fileRoutes } from './files/routes'
 import { rosterRoutes } from './roster/routes'
-import { studentLiveRoutes } from './live/student-routes'
-import { teacherLiveRoutes } from './live/teacher-routes'
-import { liveWsRoutes } from './live/ws-routes'
 import { studentScoreRoutes } from './scores/student-routes'
 import { teacherScoreRoutes } from './scores/teacher-routes'
 import { apiError, onError } from './http'
@@ -29,12 +26,9 @@ app.route('/api/teacher', teacherAssignmentRoutes)
 app.route('/api/teacher', teacherAttendanceRoutes)
 app.route('/api/teacher', teacherPointsRoutes)
 app.route('/api/teacher', teacherScoreRoutes)
-app.route('/api/teacher', teacherLiveRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)
-app.route('/api/student/live', studentLiveRoutes)
-app.route('/api/live', liveWsRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)
@@ -45,5 +39,4 @@ app.all('/api/*', () => {
 
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
 
-export { LiveRoom } from './do/LiveRoom'
 export default app
