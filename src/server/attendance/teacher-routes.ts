@@ -4,7 +4,8 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb } from '../db/client'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
-import { attendanceRange, openDay, setStatus } from './service'
+import { z } from 'zod'
+import { attendanceRange, currentQr, getDay, openDay, setSelfCheckin, setStatus } from './service'
 
 export const teacherAttendanceRoutes = new Hono<AppEnv>()
 teacherAttendanceRoutes.use('*', requireTeacher)
@@ -26,3 +27,13 @@ teacherAttendanceRoutes.put('/attendance/:dayId/records/:studentId', async (c) =
 teacherAttendanceRoutes.get('/classes/:id/attendance-range', async (c) =>
   c.json(await attendanceRange(getDb(c.env), c.req.param('id'), date(c.req.query('from')), date(c.req.query('to')))),
 )
+
+teacherAttendanceRoutes.put('/attendance/:dayId/self-checkin', async (c) => {
+  const { open } = await parseBody(c, z.object({ open: z.boolean() }))
+  await setSelfCheckin(getDb(c.env), c.req.param('dayId'), open)
+  return c.json({ ok: true })
+})
+
+teacherAttendanceRoutes.get('/attendance/:dayId/qr', async (c) => c.json(await currentQr(getDb(c.env), c.env.SESSION_SECRET, c.req.param('dayId'))))
+
+teacherAttendanceRoutes.get('/attendance/:dayId', async (c) => c.json(await getDay(getDb(c.env), c.req.param('dayId'))))

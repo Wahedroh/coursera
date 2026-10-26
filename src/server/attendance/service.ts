@@ -4,6 +4,7 @@ import { EARNS_EXP, type AttendanceDay, type AttendanceRange, type AttendanceSta
 import { EXP_RULES } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { attendanceDays, attendanceRecords, classes, pointEvents, students } from '../db/schema'
+import { hmacSha256Hex } from '../auth/crypto'
 import { apiError } from '../http'
 
 const CHUNK = 10 // ≤ 100 ตัวแปรต่อคำสั่งของ D1
@@ -106,4 +107,38 @@ export async function attendanceRange(db: Db, classId: string, from: string, to:
     totals[r.studentId][r.status]++
   }
   return { days, students: roster, cells, totals }
+}
+
+export const CHECKIN_WINDOW_MS = 30_000
+
+export async function checkinToken(secret: string, dayId: string, window: number): Promise<string> {
+  return (await hmacSha256Hex(secret, `checkin:${dayId}:${window}`)).slice(0, 16)
+}
+
+export async function currentQr(db: Db, secret: string, dayId: string) {
+  const [day] = await db.select({ id: attendanceDays.id }).from(attendanceDays).where(eq(attendanceDays.id, dayId))
+  if (!day) throw apiError('day_not_found', 'ไม่พบวันเช็กชื่อ', 404)
+  const window = Math.floor(now() / CHECKIN_WINDOW_MS)
+  const token = await checkinToken(secret, dayId, window)
+  return { url: `/checkin?d=${encodeURIComponent(dayId)}&t=${token}`, expiresAt: (window + 1) * CHECKIN_WINDOW_MS }
+}
+
+export async function setSelfCheckin(db: Db, dayId: string, open: boolean): Promise<void> {
+  const res = await db.update(attendanceDays).set({ selfCheckinOpen: open }).where(eq(attendanceDays.id, dayId)).returning({ id: attendanceDays.id })
+  if (!res.length) throw apiError('day_not_found', 'ไม่พบวันเช็กชื่อ', 404)
+}
+
+export async function studentCheckin(db: Db, secret: string, p: { dayId: string; token: string; studentId: string; classId: string }) {
+  const invalid = () => apiError('invalid_checkin', 'QR หมดอายุหรือไม่ถูกต้อง ให้สแกนใหม่จากจอหน้าห้อง', 400)
+  const [day] = await db
+    .select({ id: attendanceDays.id, date: attendanceDays.date, open: attendanceDays.selfCheckinOpen, className: classes.name })
+    .from(attendanceDays)
+    .innerJoin(classes, eq(attendanceDays.classId, classes.id))
+    .where(and(eq(attendanceDays.id, p.dayId), eq(attendanceDays.classId, p.classId)))
+  if (!day || !day.open) throw invalid()
+  const w = Math.floor(now() / CHECKIN_WINDOW_MS)
+  const valid = [await checkinToken(secret, day.id, w), await checkinToken(secret, day.id, w - 1)]
+  if (!valid.includes(p.token)) throw invalid()
+  await setStatus(db, day.id, p.studentId, 'present', 'self')
+  return { status: 'present' as const, className: day.className, date: day.date }
 }

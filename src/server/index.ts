@@ -4,6 +4,7 @@ import { studentAuthRoutes } from './auth/student-routes'
 import { teacherAuthRoutes } from './auth/teacher-routes'
 import { studentAssignmentRoutes } from './assignments/student-routes'
 import { teacherAssignmentRoutes } from './assignments/teacher-routes'
+import { studentCheckinRoutes } from './attendance/student-routes'
 import { teacherAttendanceRoutes } from './attendance/teacher-routes'
 import type { AppEnv } from './env'
 import { fileRoutes } from './files/routes'
@@ -20,6 +21,7 @@ app.route('/api/teacher', rosterRoutes)
 app.route('/api/teacher', teacherAssignmentRoutes)
 app.route('/api/teacher', teacherAttendanceRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
+app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)
 
