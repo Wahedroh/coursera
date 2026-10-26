@@ -66,6 +66,9 @@ export default function TeacherClass() {
               <Link to={`/teacher/classes/${data.class.id}/scores`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
                 คะแนนสอบ
               </Link>
+              <Link to={`/teacher/classes/${data.class.id}/grades`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
+                เกรด
+              </Link>
               <Link to={`/teacher/classes/${data.class.id}/videos`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
                 คลิปย้อนหลัง
               </Link>

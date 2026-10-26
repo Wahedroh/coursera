@@ -3,17 +3,20 @@ import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { CATEGORY_LABEL, type StudentScore } from '../../shared/scores'
 import { formatDate } from '../lib/format'
+import type { StudentGrade } from '../../shared/grades'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 
 export default function StudentScores() {
   const navigate = useNavigate()
   const [items, setItems] = useState<StudentScore[] | null>(null)
+  const [grade, setGrade] = useState<StudentGrade | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     api<StudentScore[]>('/api/student/scores')
       .then(setItems)
       .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+    api<StudentGrade>('/api/student/grade').then(setGrade).catch(() => {})
   }, [navigate])
 
   return (
@@ -27,6 +30,19 @@ export default function StudentScores() {
       </header>
       <section className="p-5 flex flex-col gap-3">
         <ErrorBox message={error} />
+        {grade?.visible && (
+          <Card className="p-4 flex items-center justify-between gap-3 bg-amber-50 border-amber-200" >
+            <div>
+              <p className="text-sm font-semibold">เกรดคาดการณ์ตอนนี้</p>
+              <p className="text-xs text-stone-500">
+                คะแนนสะสม {grade.total}/{grade.maxTotal} · อิงกลุ่มในห้อง เปลี่ยนได้เมื่อมีคะแนนใหม่
+              </p>
+            </div>
+            <span className="text-4xl font-extrabold text-board" data-testid="my-grade">
+              {grade.grade ?? '–'}
+            </span>
+          </Card>
+        )}
         {!items && !error && <Loading />}
         {items?.length === 0 && <p className="text-sm text-stone-500 text-center py-6">ยังไม่มีคะแนนที่ครูเผยแพร่</p>}
         {items?.map((s) => (
