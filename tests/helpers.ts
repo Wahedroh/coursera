@@ -102,3 +102,19 @@ export async function uploadFile(query: string, body: BodyInit, contentType: str
     body,
   })
 }
+
+export async function putJson(path: string, body: unknown, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function del(path: string, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, { method: 'DELETE', headers: cookie ? { cookie } : {} })
+}
+
+export const ASSIGNMENT = { title: 'ใบงาน 1', instructions: 'ทำข้อ 1-10', attachmentKeys: [], dueAt: null, maxScore: 10, submitMode: 'both' }
