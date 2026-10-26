@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { requireSession } from '../auth/middleware'
-import { getDb, newId } from '../db/client'
+import { getDb, newId, now } from '../db/client'
+import { assertRoom, recordFile } from '../storage/service'
 import { submissions } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError } from '../http'
@@ -40,7 +41,10 @@ fileRoutes.post('/', async (c) => {
   } else {
     throw apiError('invalid_request', 'ข้อมูลไม่ถูกต้อง', 400)
   }
+  const db = getDb(c.env)
+  await assertRoom(db, body.byteLength, s.kind === 'teacher')
   await putImage(c.env.BUCKET, key, body, type)
+  await recordFile(db, key, body.byteLength, now())
   return c.json({ key })
 })
 

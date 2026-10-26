@@ -8,7 +8,7 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type Detail = {
-  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number }
+  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null }
   assignment: { id: string; classId: string; title: string; maxScore: number; dueAt: number | null }
   student: { title: string | null; firstName: string; lastName: string; zipgradeId: string }
   neighbors: { prevId: string | null; nextId: string | null }
@@ -123,7 +123,9 @@ export default function TeacherGrade() {
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] items-start">
         <div className="flex flex-col gap-4 min-w-0">
-          {d.submission.imageKeys.length === 0 && <Card className="p-4 text-sm text-stone-500">ไม่มีรูปงาน</Card>}
+          {d.submission.imageKeys.length === 0 && (
+            <Card className="p-4 text-sm text-stone-500">{d.submission.imagesPurgedAt ? 'ลบรูปงานนี้แล้วเพื่อประหยัดพื้นที่ (คะแนนยังอยู่)' : 'ไม่มีรูปงาน'}</Card>
+          )}
           {d.submission.imageKeys.map((k, i) => (
             <div key={k} className="flex flex-col gap-1">
               {d.submission.annotatedKeys[i] && <p className="text-xs text-stone-500">แสดงรูปที่ตรวจไว้แล้ว เขียนเพิ่มต่อได้</p>}
