@@ -19,3 +19,7 @@ export function timeLeft(due: number | null, now = Date.now()): { label: string;
   if (h < 24) return { label: h < 1 ? 'เหลือไม่ถึง 1 ชม.' : `เหลือ ${h} ชม.`, tone: 'red' }
   return { label: `เหลือ ${Math.floor(h / 24)} วัน`, tone: 'gray' }
 }
+
+const dateFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric', month: 'short', year: '2-digit' })
+/** YYYY-MM-DD → "20 ต.ค. 69" */
+export const formatDate = (d: string) => dateFmt.format(new Date(`${d}T00:00:00Z`))

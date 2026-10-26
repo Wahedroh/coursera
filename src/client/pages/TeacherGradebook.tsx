@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import { api } from '../api'
 import { missingText, type Gradebook, type GradebookCell } from '../../shared/assignments'
+import type { ScoreBook } from '../../shared/scores'
 import { exportGradebook } from '../lib/excel'
 import { formatDue } from '../lib/format'
 import { Card, ErrorBox, Loading } from '../ui'
@@ -28,6 +29,15 @@ export default function TeacherGradebook() {
     api<Gradebook>(`/api/teacher/classes/${id}/gradebook`).then(setGb).catch((e) => setError(handle(e)))
   }, [id, handle])
 
+  async function exportAll() {
+    if (!gb) return
+    try {
+      await exportGradebook(gb, await api<ScoreBook>(`/api/teacher/classes/${id}/score-book`))
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
+
   async function copyMissing(assignmentId: string) {
     if (!gb) return
     await navigator.clipboard.writeText(missingText(gb, assignmentId)).catch(() => {})
@@ -52,7 +62,7 @@ export default function TeacherGradebook() {
               </p>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => exportGradebook(gb)} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
+              <button type="button" onClick={exportAll} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
                 ⬇ Excel
               </button>
               <Link to={`/teacher/assignments/new?classId=${id}`} className="rounded-2xl bg-board text-white px-4 py-2 font-bold">

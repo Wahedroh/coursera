@@ -3,12 +3,15 @@ import StudentHome from './pages/StudentHome'
 import StudentCheckin from './pages/StudentCheckin'
 import StudentLogin from './pages/StudentLogin'
 import StudentProgress from './pages/StudentProgress'
+import StudentScores from './pages/StudentScores'
 import StudentSubmit from './pages/StudentSubmit'
 import TeacherAssignmentForm from './pages/TeacherAssignmentForm'
 import TeacherAttendance from './pages/TeacherAttendance'
 import TeacherCheckinScreen from './pages/TeacherCheckinScreen'
 import TeacherClass from './pages/TeacherClass'
 import TeacherSeating from './pages/TeacherSeating'
+import TeacherScoreEntry from './pages/TeacherScoreEntry'
+import TeacherScores from './pages/TeacherScores'
 import TeacherGrade from './pages/TeacherGrade'
 import TeacherGradebook from './pages/TeacherGradebook'
 import TeacherHome from './pages/TeacherHome'
@@ -23,6 +26,7 @@ export default function App() {
         <Route path="/me" element={<StudentHome />} />
         <Route path="/me/assignments/:id" element={<StudentSubmit />} />
         <Route path="/me/progress" element={<StudentProgress />} />
+        <Route path="/me/scores" element={<StudentScores />} />
         <Route path="/checkin" element={<StudentCheckin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />
@@ -31,6 +35,8 @@ export default function App() {
         <Route path="/teacher/classes/:id/gradebook" element={<TeacherGradebook />} />
         <Route path="/teacher/classes/:id/attendance" element={<TeacherAttendance />} />
         <Route path="/teacher/classes/:id/seating" element={<TeacherSeating />} />
+        <Route path="/teacher/classes/:id/scores" element={<TeacherScores />} />
+        <Route path="/teacher/score-items/:id" element={<TeacherScoreEntry />} />
         <Route path="/teacher/attendance/:dayId/qr" element={<TeacherCheckinScreen />} />
         <Route path="/teacher/assignments/new" element={<TeacherAssignmentForm />} />
         <Route path="/teacher/assignments/:id/edit" element={<TeacherAssignmentForm />} />

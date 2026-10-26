@@ -1,9 +1,17 @@
 import writeXlsxFile, { type SheetData } from 'write-excel-file/browser'
 import type { Gradebook } from '../../shared/assignments'
+import type { ScoreBook } from '../../shared/scores'
 import { ATTENDANCE_STATUSES, STATUS_LABEL, type AttendanceRange } from '../../shared/attendance'
 
-export async function exportGradebook(gb: Gradebook): Promise<void> {
-  const header = ['ลำดับ', 'ZipGrade ID', 'ชื่อ-นามสกุล', ...gb.assignments.map((a) => `${a.title} (${a.maxScore})`)].map((value) => ({
+/** สมุดคะแนนรวม: คอลัมน์งาน แล้วต่อด้วยคอลัมน์คะแนนสอบ */
+export async function exportGradebook(gb: Gradebook, book: ScoreBook): Promise<void> {
+  const header = [
+    'ลำดับ',
+    'ZipGrade ID',
+    'ชื่อ-นามสกุล',
+    ...gb.assignments.map((a) => `${a.title} (${a.maxScore})`),
+    ...book.items.map((it) => `${it.title} (${it.maxScore})`),
+  ].map((value) => ({
     value,
     fontWeight: 'bold' as const,
   }))
@@ -17,6 +25,11 @@ export async function exportGradebook(gb: Gradebook): Promise<void> {
       if (c.status === 'submitted' || c.status === 'late') return { value: 'ส่งแล้ว' }
       if (c.status === 'returned') return { value: 'ส่งกลับแก้' }
       return { value: undefined }
+    }),
+    ...book.items.map((it) => {
+      const c = book.cells[s.id]?.[it.id]
+      if (c?.absent) return { value: 'ขาดสอบ' }
+      return { value: c?.score ?? undefined }
     }),
   ])
   const data: SheetData = [header, ...rows]
