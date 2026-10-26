@@ -1,0 +1,15 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
+  --color-paper: #fbf8f1;
+  --color-ink: #1e2a26;
+  --color-line: #e6e0d2;
+  --color-board: #1f5e46;
+  --color-board-soft: #e3f1ea;
+  --color-amber: #f2b544;
+}
+
+body {
+  @apply bg-paper text-ink font-sans;
+}

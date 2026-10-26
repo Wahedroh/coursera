@@ -1,0 +1,9 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+*.csv
+!tests/fixtures/*.csv
+test-results
+playwright-report
+.superpowers

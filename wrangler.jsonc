@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "classroom",
+  "main": "src/server/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "classroom",
+      "database_id": "b8a9794b-f266-4540-8cd8-0125f6395ed7",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // R2 (รูปงาน) จะเพิ่มใน M1 — ต้องเปิดใช้ R2 ในแดชบอร์ดก่อน
+  "vars": {}
+}
