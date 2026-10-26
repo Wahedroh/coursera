@@ -52,6 +52,7 @@ export async function getFeeSheet(db: Db, id: string): Promise<FeeSheet> {
       title: students.title,
       firstName: students.firstName,
       lastName: students.lastName,
+      active: students.active,
       chargeId: feeCharges.id,
       amount: feeCharges.amount,
       paid: feeCharges.paid,
@@ -102,10 +103,8 @@ export async function removeCharge(db: Db, itemId: string, studentId: string): P
 /** เพิ่มหลายคนด้วยราคาของรายการ (คนที่มีอยู่แล้วไม่แตะ) — insert ทีละ 10 แถวเพื่อไม่ให้เกิน 100 ตัวแปร */
 export async function addCharges(db: Db, itemId: string, studentIds: string[], t: number): Promise<number> {
   const item = await getItem(db, itemId)
-  const roster = await db
-    .select({ id: students.id })
-    .from(students)
-    .where(and(eq(students.classId, item.classId), eq(students.active, true)))
+  // คนในห้องนี้ (รวมคนที่ออกแล้ว — ครูอาจติ๊กคืนให้คนที่ยังค้างจ่าย)
+  const roster = await db.select({ id: students.id }).from(students).where(eq(students.classId, item.classId))
   const allowed = new Set(roster.map((r) => r.id))
   const ids = [...new Set(studentIds)]
   if (ids.some((id) => !allowed.has(id))) throw studentNotFound()

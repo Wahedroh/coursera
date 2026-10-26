@@ -24,6 +24,7 @@ export type FeeRow = {
   title: string | null
   firstName: string
   lastName: string
+  active: boolean
   charge: { amount: number; paid: number; note: string } | null
 }
 export type FeeSheet = { item: { id: string; classId: string; title: string; amount: number }; class: { id: string; name: string }; students: FeeRow[] }

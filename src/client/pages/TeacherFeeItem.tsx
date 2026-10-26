@@ -8,7 +8,7 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 /** charge = ค่าที่บันทึกแล้ว; amountText/paidText/noteText = ค่าที่กำลังพิมพ์ */
-type Row = FeeRow & { amountText: string; paidText: string; noteText: string; invalid: boolean; saving: boolean }
+type Row = FeeRow & { amountText: string; paidText: string; noteText: string; invalid: string | false; saving: boolean }
 const toRow = (s: FeeRow): Row => ({
   ...s,
   amountText: s.charge ? String(s.charge.amount) : '',
@@ -58,16 +58,20 @@ export default function TeacherFeeItem() {
         if (!r?.charge) return
         const amount = num(r.amountText)
         const paid = over.paidAll ? amount : num(r.paidText)
-        if (!(amount > 0) || !(paid >= 0) || paid > amount) return patch(sid, { invalid: true })
+        if (!(amount > 0)) return patch(sid, { invalid: 'ยอดต้องเป็นตัวเลขมากกว่า 0 (ทศนิยมไม่เกิน 2 ตำแหน่ง)' })
+        if (!(paid >= 0) || paid > amount) return patch(sid, { invalid: 'จ่ายแล้วต้องไม่เกินยอด' })
         const body = { amount, paid, note: r.noteText.trim() }
         if (body.amount === r.charge.amount && body.paid === r.charge.paid && body.note === r.charge.note) return patch(sid, { invalid: false, paidText: String(paid) })
         patch(sid, { saving: true, invalid: false })
+        const still = () => !!rowsRef.current.find((x) => x.id === sid)?.charge
         try {
           await api(`/api/teacher/fee-items/${id}/charges/${sid}`, { method: 'PUT', body })
-          patch(sid, { charge: body, saving: false, paidText: String(paid), amountText: String(amount) })
+          if (still()) patch(sid, { charge: body, saving: false, paidText: String(paid), amountText: String(amount) })
           setError(null)
         } catch (e) {
-          patch(sid, { saving: false })
+          // บันทึกไม่สำเร็จ: กลับไปค่าที่บันทึกไว้ ไม่ให้หน้าจอหลอกว่าบันทึกแล้ว
+          const c = rowsRef.current.find((x) => x.id === sid)?.charge
+          patch(sid, { saving: false, ...(c ? { amountText: String(c.amount), paidText: String(c.paid), noteText: c.note } : {}) })
           setError(handle(e))
         }
       }
@@ -80,27 +84,31 @@ export default function TeacherFeeItem() {
 
   async function addCharges(studentIds: string[]) {
     if (studentIds.length === 0 || !sheet) return
-    // แสดงทันที แล้วโหลดค่าจริงจากเซิร์ฟเวอร์
+    // แสดงทันที (เซิร์ฟเวอร์สร้างด้วยราคาเดียวกัน) — ไม่โหลดทั้งตารางใหม่ ไม่ให้ทับช่องที่กำลังพิมพ์
     const amount = sheet.item.amount
-    const ids = new Set(studentIds)
-    setRows((rs) => rs.map((r) => (ids.has(r.id) && !r.charge ? { ...r, charge: { amount, paid: 0, note: '' }, amountText: String(amount), paidText: '0' } : r)))
+    const ids = new Set(studentIds.filter((sid) => !rowsRef.current.find((r) => r.id === sid)?.charge))
+    if (ids.size === 0) return
+    setRows((rs) => rs.map((r) => (ids.has(r.id) ? { ...r, charge: { amount, paid: 0, note: '' }, amountText: String(amount), paidText: '0', noteText: '' } : r)))
     try {
-      await api(`/api/teacher/fee-items/${id}/charges/bulk`, { body: { studentIds } })
-      load()
+      await api(`/api/teacher/fee-items/${id}/charges/bulk`, { body: { studentIds: [...ids] } })
     } catch (e) {
       setError(handle(e))
-      load()
+      setRows((rs) => rs.map((r) => (ids.has(r.id) ? { ...r, charge: null, amountText: '', paidText: '', noteText: '' } : r)))
     }
   }
 
-  async function removeCharge(r: Row) {
+  function removeCharge(r: Row) {
     if (r.charge && r.charge.paid > 0 && !window.confirm(`${fullName(r)} จ่ายแล้ว ${baht(r.charge.paid)} — ยกเลิกการเรียกเก็บ?`)) return
-    try {
-      await api(`/api/teacher/fee-items/${id}/charges/${r.id}`, { method: 'DELETE' })
-      patch(r.id, { charge: null, amountText: '', paidText: '', noteText: '', invalid: false })
-    } catch (e) {
-      setError(handle(e))
+    // เข้าคิวเดียวกับการบันทึกอัตโนมัติ: ไม่ให้ PUT ที่ค้างอยู่สร้างยอดกลับมาหลังลบ
+    const run = async () => {
+      try {
+        await api(`/api/teacher/fee-items/${id}/charges/${r.id}`, { method: 'DELETE' })
+        patch(r.id, { charge: null, amountText: '', paidText: '', noteText: '', invalid: false })
+      } catch (e) {
+        setError(handle(e))
+      }
     }
+    queues.current.set(r.id, (queues.current.get(r.id) ?? Promise.resolve()).then(run))
   }
 
   async function saveDetails(e: React.FormEvent<HTMLFormElement>) {
@@ -204,7 +212,9 @@ export default function TeacherFeeItem() {
                   onChange={(e) => (e.target.checked ? addCharges([r.id]) : removeCharge(r))}
                 />
                 <span className="flex-1 min-w-0">
-                  <span className="block">{fullName(r)}</span>
+                  <span className="block">
+                    {fullName(r)} {!r.active && <Chip>ออกแล้ว</Chip>}
+                  </span>
                   <span className="block text-xs text-stone-500 font-mono">{r.zipgradeId}</span>
                 </span>
                 <span className="whitespace-nowrap text-sm" data-testid={`fee-status-${r.zipgradeId}`}>
@@ -222,7 +232,7 @@ export default function TeacherFeeItem() {
                       onChange={(e) => patch(r.id, { amountText: e.target.value })}
                       onBlur={() => void commit(r.id)}
                       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                      className={field(r.invalid)}
+                      className={field(!!r.invalid)}
                     />
                   </label>
                   <label className="flex items-center gap-1">
@@ -234,7 +244,7 @@ export default function TeacherFeeItem() {
                       onChange={(e) => patch(r.id, { paidText: e.target.value })}
                       onBlur={() => void commit(r.id)}
                       onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                      className={field(r.invalid)}
+                      className={field(!!r.invalid)}
                     />
                   </label>
                   {out > 0 && (
@@ -252,7 +262,7 @@ export default function TeacherFeeItem() {
                     onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
                     className="flex-1 min-w-32 rounded-lg border-2 border-line px-2 py-1"
                   />
-                  {r.invalid && <span className="basis-full text-xs text-red-600">จ่ายแล้วต้องไม่เกินยอด และยอดต้องมากกว่า 0</span>}
+                  {r.invalid && <span className="basis-full text-xs text-red-600">{r.invalid}</span>}
                 </div>
               )}
             </div>

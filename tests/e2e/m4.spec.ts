@@ -72,7 +72,7 @@ test('ค่าเอกสาร: ครูเลือกบางคน → �
   // จ่ายเกินยอด → กรอบแดง ไม่บันทึก
   await teacher.getByLabel('จ่ายแล้ว มานี มีนา').fill('99')
   await teacher.getByLabel('จ่ายแล้ว มานี มีนา').press('Enter')
-  await expect(teacher.getByText(/จ่ายแล้วต้องไม่เกินยอด/)).toBeVisible()
+  await expect(teacher.getByText('จ่ายแล้วต้องไม่เกินยอด')).toBeVisible()
   await teacher.getByLabel('จ่ายแล้ว มานี มีนา').fill('20')
   await teacher.getByLabel('จ่ายแล้ว มานี มีนา').press('Enter')
 
