@@ -48,3 +48,24 @@ it('กระดานจัดอันดับ: แต้มเท่าก�
     [3, 'ค'],
   ])
 })
+
+it('URL ไฟล์ที่ถอดรหัสไม่ได้ → 404 ไม่ใช่ 500', async () => {
+  const cookie = await loginTeacher()
+  const { SELF } = await import('cloudflare:test')
+  const res = await SELF.fetch('http://x/api/files/%E0%A4%A', { headers: { cookie } })
+  expect(res.status).toBe(404)
+})
+
+it('อัปโหลดรูป: ใหญ่เกิน 5MB ถูกปฏิเสธจาก content-length; นักเรียนอัปได้ไม่เกิน 60 รูป/ชม.', async () => {
+  const { uploadFile, TINY_JPEG } = await import('./helpers')
+  const { classId } = await seedClass(db())
+  const sc = await studentCookie((await seedStudent(db(), classId)).id)
+  const { SELF } = await import('cloudflare:test')
+  const big = await SELF.fetch('http://x/api/files?kind=submission', { method: 'POST', headers: { 'content-type': 'image/jpeg', 'content-length': String(6 * 1024 * 1024), cookie: sc }, body: new Uint8Array(10) })
+  expect(big.status).toBe(400)
+  const { rateLimits } = await import('../src/server/db/schema')
+  const { students: st } = await import('../src/server/db/schema')
+  const [me] = await db().select({ id: st.id }).from(st).where(eq(st.classId, classId))
+  await db().insert(rateLimits).values({ key: `upload:s:${me.id}`, windowStart: Date.now(), count: 60 })
+  expect((await uploadFile('kind=submission', TINY_JPEG, 'image/jpeg', sc)).status).toBe(429)
+})

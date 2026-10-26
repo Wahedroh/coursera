@@ -22,3 +22,8 @@ export async function isRateLimited(db: Db, key: string, limit: number, windowMs
   )
   return (row?.count ?? 0) >= limit
 }
+
+/** คืนสิทธิ์ 1 ครั้ง (ใช้กับแบบ "จองก่อน ตรวจทีหลัง" เมื่อผลออกมาว่าสำเร็จ) */
+export async function refundRateLimit(db: Db, key: string): Promise<void> {
+  await db.run(sql`UPDATE rate_limits SET count = max(count - 1, 0) WHERE key = ${key}`)
+}

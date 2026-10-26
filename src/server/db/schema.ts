@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const schools = sqliteTable('schools', {
   id: text('id').primaryKey(),
@@ -35,7 +35,7 @@ export const students = sqliteTable('students', {
   lockedUntil: integer('locked_until'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
-})
+}, (t) => [index('students_class_idx').on(t.classId)])
 
 export const sessions = sqliteTable('sessions', {
   id: text('id').primaryKey(),
@@ -48,7 +48,7 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: integer('expires_at').notNull(),
   revokedAt: integer('revoked_at'),
   flaggedNewDevice: integer('flagged_new_device', { mode: 'boolean' }).notNull().default(false),
-})
+}, (t) => [index('sessions_student_idx').on(t.studentId)])
 
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
@@ -75,7 +75,7 @@ export const assignments = sqliteTable('assignments', {
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
-})
+}, (t) => [index('assignments_class_idx').on(t.classId)])
 
 export const submissions = sqliteTable(
   'submissions',
@@ -98,7 +98,7 @@ export const submissions = sqliteTable(
     clientRequestId: text('client_request_id'),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('submissions_assignment_student_unique').on(t.assignmentId, t.studentId)],
+  (t) => [index('submissions_student_idx').on(t.studentId), uniqueIndex('submissions_assignment_student_unique').on(t.assignmentId, t.studentId)],
 )
 
 export const pointEvents = sqliteTable(
@@ -114,7 +114,7 @@ export const pointEvents = sqliteTable(
     refId: text('ref_id'),
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [uniqueIndex('point_events_source_ref_unique').on(t.source, t.refId)],
+  (t) => [index('point_events_student_idx').on(t.studentId), uniqueIndex('point_events_source_ref_unique').on(t.source, t.refId)],
 )
 
 export const attendanceDays = sqliteTable(
@@ -145,7 +145,7 @@ export const attendanceRecords = sqliteTable(
     source: text('source', { enum: ['teacher', 'self'] }).notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('attendance_records_day_student_unique').on(t.dayId, t.studentId)],
+  (t) => [index('attendance_records_student_idx').on(t.studentId), uniqueIndex('attendance_records_day_student_unique').on(t.dayId, t.studentId)],
 )
 
 export const seating = sqliteTable('seating', {
@@ -184,7 +184,7 @@ export const scoreItems = sqliteTable('score_items', {
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
-})
+}, (t) => [index('score_items_class_idx').on(t.classId)])
 
 export const scores = sqliteTable(
   'scores',
@@ -201,7 +201,7 @@ export const scores = sqliteTable(
     note: text('note').notNull().default(''),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('scores_item_student_unique').on(t.itemId, t.studentId)],
+  (t) => [index('scores_student_idx').on(t.studentId), uniqueIndex('scores_item_student_unique').on(t.itemId, t.studentId)],
 )
 
 export const videos = sqliteTable('videos', {
@@ -214,7 +214,7 @@ export const videos = sqliteTable('videos', {
   youtubeId: text('youtube_id').notNull(),
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
-})
+}, (t) => [index('videos_class_idx').on(t.classId)])
 
 export const feeItems = sqliteTable('fee_items', {
   id: text('id').primaryKey(),
@@ -241,7 +241,7 @@ export const feeCharges = sqliteTable(
     note: text('note').notNull().default(''),
     updatedAt: integer('updated_at').notNull(),
   },
-  (t) => [uniqueIndex('fee_charges_item_student_unique').on(t.itemId, t.studentId)],
+  (t) => [index('fee_charges_student_idx').on(t.studentId), uniqueIndex('fee_charges_item_student_unique').on(t.itemId, t.studentId)],
 )
 
 export const studentAvatars = sqliteTable('student_avatars', {

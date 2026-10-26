@@ -50,13 +50,24 @@ it('ผิด 10 ครั้งจาก IP หนึ่ง ครูล็อ�
   expect((await postJson('/api/teacher/login', { password: 'teacher-pass' }, { headers: { 'cf-connecting-ip': '10.2.2.2' } })).status).toBe(200)
 })
 
-it('ผิดรวม 50 ครั้งจากหลาย IP ใน 1 ชั่วโมง → ปิดล็อกอินครูทั้งหมด', async () => {
-  for (let i = 0; i < 50; i++) {
-    const r = await postJson('/api/teacher/login', { password: 'x' }, { headers: { 'cf-connecting-ip': `10.3.${Math.floor(i / 5)}.1` } })
-    expect(r.status).toBe(401)
-  }
+it('ลองรวมทุก IP ครบเพดาน (300/ชม.) → ปิดล็อกอินครูชั่วคราว', async () => {
+  const { rateLimits } = await import('../src/server/db/schema')
+  await db().insert(rateLimits).values({ key: 'teacher-login', windowStart: Date.now(), count: 300 })
   const res = await postJson('/api/teacher/login', { password: 'teacher-pass' }, { headers: { 'cf-connecting-ip': '10.9.9.9' } })
   expect(res.status).toBe(429)
+})
+
+it('ยิงรหัสครูพร้อมกัน 15 คำขอจาก IP เดียว → ตรวจรหัสได้ไม่เกิน 10 ครั้ง', async () => {
+  const h = { 'cf-connecting-ip': '10.4.4.4' }
+  const rs = await Promise.all(Array.from({ length: 15 }, () => postJson('/api/teacher/login', { password: 'x' }, { headers: h })))
+  const codes = rs.map((r) => r.status)
+  expect(codes.filter((c) => c === 401).length).toBeLessThanOrEqual(10)
+  expect(codes.filter((c) => c === 429).length).toBeGreaterThanOrEqual(5)
+}, 30_000)
+
+it('ล็อกอินครูสำเร็จไม่กินโควตาการลองผิด', async () => {
+  const h = { 'cf-connecting-ip': '10.5.5.5' }
+  for (let i = 0; i < 12; i++) expect((await postJson('/api/teacher/login', { password: 'teacher-pass' }, { headers: h })).status).toBe(200)
 }, 30_000)
 
 // I4: session ผูกกับ SESSION_SECRET — เปลี่ยน secret แล้ว session เดิมใช้ไม่ได้
@@ -67,10 +78,10 @@ it('readSession ด้วย secret อื่นคืน null', async () => {
 })
 
 // ทั้งห้อง (~30 คน) อยู่หลัง NAT เดียวกัน ตั้ง PIN พร้อมกันในคาบแรก ต้องไม่โดน 429
-it('IP เดียวส่งได้ 300 คำขอต่อนาที คำขอที่ 301 ได้ 429', async () => {
+it('IP เดียวส่งได้ 150 คำขอต่อนาที คำขอที่ 151 ได้ 429', async () => {
   await student()
   const h = { 'cf-connecting-ip': '192.168.50.1' }
-  for (let i = 0; i < 300; i++) expect((await postJson('/api/student/lookup', { zipgradeId: '124' }, { headers: h })).status).toBe(200)
+  for (let i = 0; i < 150; i++) expect((await postJson('/api/student/lookup', { zipgradeId: '124' }, { headers: h })).status).toBe(200)
   const res = await postJson('/api/student/lookup', { zipgradeId: '124' }, { headers: h })
   expect(res.status).toBe(429)
   expect((await json(res)).error.code).toBe('too_many_requests')

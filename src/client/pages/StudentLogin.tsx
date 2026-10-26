@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api, ApiClientError, fullName, type Me } from '../api'
+import { clearDrafts, safeNext } from '../lib/session'
 import { Button, Card, ErrorBox } from '../ui'
 
 type Found = { title: string | null; firstName: string; lastName: string; className: string }
@@ -58,10 +59,7 @@ export default function StudentLogin() {
   const navigate = useNavigate()
   const [search] = useSearchParams()
   // กลับไปหน้าที่ตั้งใจเปิด (เช่น ลิงก์เช็กอิน) หลังล็อกอิน — รับเฉพาะ path ภายในเว็บ
-  const next = (() => {
-    const n = search.get('next') ?? ''
-    return n.startsWith('/') && !n.startsWith('//') ? n : '/me'
-  })()
+  const next = safeNext(search.get('next'))
   const [step, setStep] = useState<Step>({ name: 'id' })
   const [zipgradeId, setZipgradeId] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -94,12 +92,14 @@ export default function StudentLogin() {
   const setPin = (pin: string) =>
     run(async () => {
       await api('/api/student/set-pin', { body: { zipgradeId, pin } })
+      clearDrafts()
       navigate(next)
     })
 
   const login = (pin: string) =>
     run(async () => {
       await api('/api/student/login', { body: { zipgradeId, pin } })
+      clearDrafts()
       navigate(next)
     })
 

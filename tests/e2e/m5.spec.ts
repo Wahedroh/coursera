@@ -25,3 +25,12 @@ test('นักเรียนแต่งตัวละคร บันทึ�
   await expect(page.getByRole('button', { name: 'นักบินอวกาศ' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByLabel('ชื่อในเกม')).toHaveValue('นักบินน้อย')
 })
+
+test('ลิงก์ล็อกอินที่แอบพาไปเว็บอื่น (/\\evil.com) ถูกพากลับหน้าของเราเอง', async ({ page }) => {
+  await page.goto('/?next=/%5Cevil.example/phish')
+  await page.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('3')
+  await page.getByRole('button', { name: 'ถัดไป' }).click()
+  for (const d of '1357') await page.getByRole('button', { name: d, exact: true }).click()
+  await expect(page.getByText(/สวัสดี/)).toBeVisible()
+  expect(new URL(page.url()).host).toBe('localhost:5173')
+})
