@@ -225,10 +225,9 @@ export default function TeacherScoreEntry() {
           <thead>
             <tr className="text-left text-xs text-stone-500">
               <th className="p-2">#</th>
-              <th className="p-2">ZipGrade ID</th>
-              <th className="p-2">ชื่อ</th>
-              <th className="p-2">คะแนน (เต็ม {it.maxScore})</th>
-              <th className="p-2">ขาดสอบ</th>
+              <th className="p-2">ชื่อ · ZipGrade ID</th>
+              <th className="p-2 whitespace-nowrap">คะแนน /{it.maxScore}</th>
+              <th className="p-2 whitespace-nowrap">ขาดสอบ</th>
               <th className="p-2">หมายเหตุ</th>
             </tr>
           </thead>
@@ -236,8 +235,10 @@ export default function TeacherScoreEntry() {
             {rows.map((r, i) => (
               <tr key={r.id} className="border-t border-stone-100">
                 <td className="p-2 text-stone-500">{i + 1}</td>
-                <td className="p-2 font-mono">{r.zipgradeId}</td>
-                <td className="p-2 whitespace-nowrap">{fullName(r)}</td>
+                <td className="p-2">
+                  <span className="block">{fullName(r)}</span>
+                  <span className="block text-xs text-stone-500 font-mono">{r.zipgradeId}</span>
+                </td>
                 <td className="p-1">
                   <div className="flex items-center gap-1">
                     <input
@@ -253,7 +254,7 @@ export default function TeacherScoreEntry() {
                       onKeyDown={(e) => onKey(i, e)}
                       onBlur={() => void commit(i)}
                       onPaste={(e) => void onPaste(i, e)}
-                      className={`w-20 rounded-lg border-2 px-2 py-1 text-right disabled:bg-stone-100 ${r.state === 'invalid' ? 'border-red-500 bg-red-50' : 'border-line'}`}
+                      className={`w-16 rounded-lg border-2 px-2 py-1 text-right disabled:bg-stone-100 ${r.state === 'invalid' ? 'border-red-500 bg-red-50' : 'border-line'}`}
                     />
                     <span className="w-4 text-xs" aria-hidden>
                       {r.state === 'saving' ? '…' : r.state === 'saved' ? <span className="text-board">✓</span> : r.state === 'error' ? <span className="text-red-600">!</span> : ''}
@@ -261,7 +262,7 @@ export default function TeacherScoreEntry() {
                   </div>
                   {r.state === 'invalid' && <span className="block text-xs text-red-600">0–{it.maxScore} ทศนิยมไม่เกิน 2 ตำแหน่ง</span>}
                 </td>
-                <td className="p-2">
+                <td className="p-2 text-center">
                   <input type="checkbox" aria-label={`ขาดสอบ ${r.firstName} ${r.lastName}`} checked={r.absent} onChange={(e) => void commit(i, { absent: e.target.checked })} />
                 </td>
                 <td className="p-1">
