@@ -7,6 +7,7 @@ import StudentScores from './pages/StudentScores'
 import StudentVideos from './pages/StudentVideos'
 import StudentVideo from './pages/StudentVideo'
 import StudentFees from './pages/StudentFees'
+import StudentAvatar from './pages/StudentAvatar'
 import TeacherVideos from './pages/TeacherVideos'
 import TeacherFees from './pages/TeacherFees'
 import TeacherFeeItem from './pages/TeacherFeeItem'
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/me/videos" element={<StudentVideos />} />
         <Route path="/me/videos/:id" element={<StudentVideo />} />
         <Route path="/me/fees" element={<StudentFees />} />
+        <Route path="/me/avatar" element={<StudentAvatar />} />
         <Route path="/checkin" element={<StudentCheckin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />

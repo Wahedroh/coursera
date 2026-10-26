@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router'
 import { api, type Me } from '../api'
 import type { StudentAssignment, StudentStatus } from '../../shared/assignments'
 import { baht, type StudentFee } from '../../shared/fees'
+import type { AvatarConfig } from '../../shared/avatar'
+import { AvatarArt } from '../components/PixelArt'
 import { formatDue, timeLeft } from '../lib/format'
 import { Button, Card, Chip, Loading } from '../ui'
 
@@ -23,6 +25,7 @@ export default function StudentHome() {
   const [items, setItems] = useState<StudentAssignment[] | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
   const [feeOwed, setFeeOwed] = useState(0)
+  const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean } | null>(null)
 
   useEffect(() => {
     api<Me>('/api/me')
@@ -31,6 +34,9 @@ export default function StudentHome() {
     api<StudentAssignment[]>('/api/student/assignments')
       .then(setItems)
       .catch(() => setItems([]))
+    api<{ nickname: string; config: AvatarConfig; isDefault: boolean }>('/api/student/avatar')
+      .then(setAvatar)
+      .catch(() => {})
     api<StudentFee[]>('/api/student/fees')
       .then((fs) => setFeeOwed(fs.reduce((n, f) => n + f.outstanding, 0)))
       .catch(() => {})
@@ -50,10 +56,26 @@ export default function StudentHome() {
   return (
     <main className="min-h-screen max-w-md mx-auto pb-8">
       <header className="bg-board text-white px-5 pt-6 pb-6 rounded-b-3xl">
-        <h1 className="text-xl font-extrabold">สวัสดี {s.firstName} 👋</h1>
-        <p className="text-sm opacity-85">
-          {s.className} · รหัส {s.zipgradeId}
-        </p>
+        <div className="flex items-center gap-3">
+          {avatar && (
+            <Link to="/me/avatar" aria-label="แต่งตัวละคร" className="relative shrink-0 rounded-2xl bg-white/15 p-1.5">
+              <AvatarArt config={avatar.config} size={4} />
+              <span className="absolute -bottom-1 -right-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold px-1.5">แต่ง</span>
+            </Link>
+          )}
+          <div>
+            <h1 className="text-xl font-extrabold">สวัสดี {s.firstName} 👋</h1>
+            {avatar?.nickname && <p className="text-sm font-semibold text-amber-200">“{avatar.nickname}”</p>}
+            <p className="text-sm opacity-85">
+              {s.className} · รหัส {s.zipgradeId}
+            </p>
+          </div>
+        </div>
+        {avatar?.isDefault && (
+          <Link to="/me/avatar" className="mt-3 block rounded-xl bg-amber-400 text-amber-950 px-3 py-2 text-sm font-bold">
+            ✨ แต่งตัวละครของคุณเองได้แล้ว! แตะเพื่อเริ่ม
+          </Link>
+        )}
         <div className="flex flex-wrap gap-2 mt-3">
           <Link to="/me/progress" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             ⭐ ตัวละครและแต้มของฉัน

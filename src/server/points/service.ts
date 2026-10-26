@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { CHARACTERS, RARITY_WEIGHTS } from '../../shared/characters'
 import { EXP_PER_LEVEL, levelOf } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
-import { classes, eggs, pointEvents, seating, settings, students } from '../db/schema'
+import { classes, eggs, pointEvents, seating, settings, studentAvatars, students } from '../db/schema'
 import { apiError } from '../http'
 
 export type Layout = { cols: number; seats: (string | null)[] }
@@ -138,13 +139,30 @@ export async function setLeaderboard(db: Db, classId: string, enabled: boolean):
 export async function leaderboard(db: Db, classId: string, studentId: string) {
   if (!(await leaderboardEnabled(db, classId))) throw apiError('leaderboard_disabled', 'ครูยังไม่เปิดกระดานจัดอันดับ', 403)
   const rows = await db
-    .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)` })
+    .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
     .from(students)
     .leftJoin(pointEvents, eq(pointEvents.studentId, students.id))
+    .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)
   return rows
     .sort((a, b) => b.exp - a.exp)
     .slice(0, 10)
-    .map((r, i) => ({ rank: i + 1, firstName: r.firstName, exp: r.exp, level: levelOf(r.exp), isMe: r.id === studentId }))
+    .map((r, i) => ({ rank: i + 1, firstName: r.firstName, exp: r.exp, level: levelOf(r.exp), isMe: r.id === studentId, avatar: parseAvatar(r.avatar) }))
+}
+
+/** ค่าที่เก็บไว้ผิดรูปแบบ (เช่น ตัวเลือกที่ถูกเอาออกในเวอร์ชันหลัง) → ใช้ค่าเริ่มต้น */
+const parseAvatar = (v: unknown): AvatarConfig => {
+  const r = avatarConfigSchema.safeParse(v)
+  return r.success ? r.data : DEFAULT_AVATAR
+}
+
+export async function getAvatar(db: Db, studentId: string): Promise<{ nickname: string; config: AvatarConfig; isDefault: boolean }> {
+  const [row] = await db.select().from(studentAvatars).where(eq(studentAvatars.studentId, studentId))
+  return row ? { nickname: row.nickname, config: parseAvatar(row.config), isDefault: false } : { nickname: '', config: DEFAULT_AVATAR, isDefault: true }
+}
+
+export async function saveAvatar(db: Db, studentId: string, nickname: string, config: AvatarConfig, t: number): Promise<void> {
+  const values = { nickname, config, updatedAt: t }
+  await db.insert(studentAvatars).values({ studentId, ...values }).onConflictDoUpdate({ target: studentAvatars.studentId, set: values })
 }

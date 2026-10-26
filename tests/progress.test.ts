@@ -67,8 +67,8 @@ it('leaderboard ปิด 403 / เปิดแล้วเรียงถูก
   expect((await putJson(`/api/teacher/classes/${classId}/settings/leaderboard`, { enabled: true }, teacher)).status).toBe(200)
   const lb = await json(await getJson('/api/student/leaderboard', ac))
   expect(lb).toEqual([
-    { rank: 1, firstName: 'บี', exp: 30, level: 0, isMe: false },
-    { rank: 2, firstName: 'เอ', exp: 20, level: 0, isMe: true },
+    { rank: 1, firstName: 'บี', exp: 30, level: 0, isMe: false, avatar: expect.any(Object) },
+    { rank: 2, firstName: 'เอ', exp: 20, level: 0, isMe: true, avatar: expect.any(Object) },
   ])
   expect((await json(await getJson(`/api/teacher/classes/${classId}/settings`, teacher))).leaderboardEnabled).toBe(true)
 })

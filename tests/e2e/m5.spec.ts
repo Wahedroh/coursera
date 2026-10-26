@@ -1,0 +1,27 @@
+import { expect, test } from '@playwright/test'
+
+// ต่อจาก m4: มานี (รหัส 3, PIN 1357)
+test('นักเรียนแต่งตัวละคร บันทึก แล้วเห็นที่หน้าแรก', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('3')
+  await page.getByRole('button', { name: 'ถัดไป' }).click()
+  for (const d of '1357') await page.getByRole('button', { name: d, exact: true }).click()
+  await page.getByRole('link', { name: /แต่งตัวละครของคุณเอง/ }).click()
+  await expect(page.getByRole('heading', { name: 'แต่งตัวละครของฉัน' })).toBeVisible()
+  await page.getByLabel('ชื่อในเกม').fill('นักบินน้อย')
+  await page.getByRole('button', { name: 'หญิง' }).click()
+  await page.getByRole('button', { name: 'หางม้า' }).click()
+  await page.getByRole('button', { name: 'สีผม 5' }).click()
+  await page.getByRole('button', { name: 'นักบินอวกาศ' }).click()
+  await expect(page.getByRole('button', { name: 'นักบินอวกาศ' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('avatar-preview')).toContainText('นักบินน้อย')
+  await page.getByRole('button', { name: 'บันทึกตัวละคร' }).click()
+  await expect(page.getByRole('button', { name: '✓ บันทึกแล้ว' })).toBeVisible()
+
+  await page.getByRole('link', { name: '← งานของฉัน' }).click()
+  await expect(page.getByText('“นักบินน้อย”')).toBeVisible()
+  await expect(page.getByRole('link', { name: /แต่งตัวละครของคุณเอง/ })).toHaveCount(0)
+  await page.getByRole('link', { name: 'แต่งตัวละคร' }).click()
+  await expect(page.getByRole('button', { name: 'นักบินอวกาศ' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByLabel('ชื่อในเกม')).toHaveValue('นักบินน้อย')
+})
