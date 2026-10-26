@@ -189,92 +189,75 @@ export default function TeacherFeeItem() {
           </button>
         )}
       </div>
-      <Card className="p-2 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-stone-500">
-              <th className="p-2">ต้องจ่าย</th>
-              <th className="p-2">ชื่อ · ZipGrade ID</th>
-              <th className="p-2 whitespace-nowrap">ยอด (บาท)</th>
-              <th className="p-2 whitespace-nowrap">จ่ายแล้ว</th>
-              <th className="p-2">สถานะ</th>
-              <th className="p-2">หมายเหตุ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const out = r.charge ? outstanding(r.charge) : 0
-              return (
-                <tr key={r.id} className={`border-t border-stone-100 ${r.charge ? '' : 'text-stone-400'}`}>
-                  <td className="p-2 text-center">
+      <Card className="divide-y divide-stone-100">
+        {rows.map((r) => {
+          const out = r.charge ? outstanding(r.charge) : 0
+          const field = (invalid: boolean) => `w-20 rounded-lg border-2 px-2 py-1 text-right ${invalid ? 'border-red-500 bg-red-50' : 'border-line'}`
+          return (
+            <div key={r.id} className={`p-3 flex flex-col gap-2 ${r.charge ? '' : 'text-stone-400'}`}>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5"
+                  aria-label={`ต้องจ่าย ${r.firstName} ${r.lastName}`}
+                  checked={!!r.charge}
+                  onChange={(e) => (e.target.checked ? addCharges([r.id]) : removeCharge(r))}
+                />
+                <span className="flex-1 min-w-0">
+                  <span className="block">{fullName(r)}</span>
+                  <span className="block text-xs text-stone-500 font-mono">{r.zipgradeId}</span>
+                </span>
+                <span className="whitespace-nowrap text-sm" data-testid={`fee-status-${r.zipgradeId}`}>
+                  {!r.charge ? 'ไม่ต้องจ่าย' : r.saving ? '…' : out > 0 ? <Chip tone="red">ค้าง {baht(out)}</Chip> : <Chip tone="green">จ่ายครบ</Chip>}
+                </span>
+              </div>
+              {r.charge && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pl-8 text-sm">
+                  <label className="flex items-center gap-1">
+                    ยอด
                     <input
-                      type="checkbox"
-                      aria-label={`ต้องจ่าย ${r.firstName} ${r.lastName}`}
-                      checked={!!r.charge}
-                      onChange={(e) => (e.target.checked ? addCharges([r.id]) : removeCharge(r))}
+                      inputMode="decimal"
+                      aria-label={`ยอด ${r.firstName} ${r.lastName}`}
+                      value={r.amountText}
+                      onChange={(e) => patch(r.id, { amountText: e.target.value })}
+                      onBlur={() => void commit(r.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                      className={field(r.invalid)}
                     />
-                  </td>
-                  <td className="p-2">
-                    <span className="block whitespace-nowrap">{fullName(r)}</span>
-                    <span className="block text-xs text-stone-500 font-mono">{r.zipgradeId}</span>
-                  </td>
-                  {r.charge ? (
-                    <>
-                      <td className="p-1">
-                        <input
-                          inputMode="decimal"
-                          aria-label={`ยอด ${r.firstName} ${r.lastName}`}
-                          value={r.amountText}
-                          onChange={(e) => patch(r.id, { amountText: e.target.value })}
-                          onBlur={() => void commit(r.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                          className={`w-20 rounded-lg border-2 px-2 py-1 text-right ${r.invalid ? 'border-red-500 bg-red-50' : 'border-line'}`}
-                        />
-                      </td>
-                      <td className="p-1">
-                        <div className="flex items-center gap-1">
-                          <input
-                            inputMode="decimal"
-                            aria-label={`จ่ายแล้ว ${r.firstName} ${r.lastName}`}
-                            value={r.paidText}
-                            onChange={(e) => patch(r.id, { paidText: e.target.value })}
-                            onBlur={() => void commit(r.id)}
-                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                            className={`w-20 rounded-lg border-2 px-2 py-1 text-right ${r.invalid ? 'border-red-500 bg-red-50' : 'border-line'}`}
-                          />
-                          {out > 0 && (
-                            <button type="button" className="rounded-lg bg-board text-white px-2 py-1 text-xs font-bold whitespace-nowrap" onClick={() => void commit(r.id, { paidAll: true })}>
-                              จ่ายครบ
-                            </button>
-                          )}
-                        </div>
-                        {r.invalid && <span className="block text-xs text-red-600">จ่ายแล้วต้องไม่เกินยอด</span>}
-                      </td>
-                      <td className="p-2 whitespace-nowrap" data-testid={`fee-status-${r.zipgradeId}`}>
-                        {r.saving ? '…' : out > 0 ? <Chip tone="red">ค้าง {baht(out)}</Chip> : <Chip tone="green">จ่ายครบ</Chip>}
-                      </td>
-                      <td className="p-1">
-                        <input
-                          aria-label={`หมายเหตุ ${r.firstName} ${r.lastName}`}
-                          maxLength={500}
-                          value={r.noteText}
-                          onChange={(e) => patch(r.id, { noteText: e.target.value })}
-                          onBlur={() => void commit(r.id)}
-                          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-                          className="w-full min-w-24 rounded-lg border-2 border-line px-2 py-1"
-                        />
-                      </td>
-                    </>
-                  ) : (
-                    <td className="p-2 text-xs" colSpan={4}>
-                      ไม่ต้องจ่าย
-                    </td>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    จ่ายแล้ว
+                    <input
+                      inputMode="decimal"
+                      aria-label={`จ่ายแล้ว ${r.firstName} ${r.lastName}`}
+                      value={r.paidText}
+                      onChange={(e) => patch(r.id, { paidText: e.target.value })}
+                      onBlur={() => void commit(r.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                      className={field(r.invalid)}
+                    />
+                  </label>
+                  {out > 0 && (
+                    <button type="button" className="rounded-lg bg-board text-white px-3 py-1 text-xs font-bold whitespace-nowrap" onClick={() => void commit(r.id, { paidAll: true })}>
+                      จ่ายครบ
+                    </button>
                   )}
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                  <input
+                    aria-label={`หมายเหตุ ${r.firstName} ${r.lastName}`}
+                    placeholder="หมายเหตุ"
+                    maxLength={500}
+                    value={r.noteText}
+                    onChange={(e) => patch(r.id, { noteText: e.target.value })}
+                    onBlur={() => void commit(r.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                    className="flex-1 min-w-32 rounded-lg border-2 border-line px-2 py-1"
+                  />
+                  {r.invalid && <span className="basis-full text-xs text-red-600">จ่ายแล้วต้องไม่เกินยอด และยอดต้องมากกว่า 0</span>}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </Card>
     </TeacherLayout>
   )
