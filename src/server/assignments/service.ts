@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import type { AssignmentInput, AssignmentSummary, StudentAssignment, StudentStatus, SubmissionInput } from '../../shared/assignments'
+import { ASSIGNMENT_EXP, type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
 import { newId, now, type Db } from '../db/client'
-import { assignments, classes, students, submissions } from '../db/schema'
+import { assignments, classes, pointEvents, students, submissions } from '../db/schema'
 import { apiError } from '../http'
 
 export const assignmentNotFound = () => apiError('assignment_not_found', 'ไม่พบงานนี้', 404)
@@ -140,4 +140,98 @@ export async function upsertSubmission(
       .onConflictDoNothing()
   }
   return getForStudent(db, p.assignmentId, p.studentId, p.classId)
+}
+
+export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
+  const [cls] = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.id, classId))
+  if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
+  const list = (await listForClass(db, classId)).map(({ id, title, dueAt, maxScore }) => ({ id, title, dueAt, maxScore }))
+  const roster = await db
+    .select({ id: students.id, zipgradeId: students.zipgradeId, title: students.title, firstName: students.firstName, lastName: students.lastName })
+    .from(students)
+    .where(and(eq(students.classId, classId), eq(students.active, true)))
+    .orderBy(students.sortOrder, students.zipgradeId)
+  const subs = list.length
+    ? await db
+        .select({ id: submissions.id, assignmentId: submissions.assignmentId, studentId: submissions.studentId, status: submissions.status, score: submissions.score })
+        .from(submissions)
+        .where(inArray(submissions.assignmentId, list.map((a) => a.id)))
+    : []
+  const byKey = new Map(subs.map((s) => [`${s.studentId}|${s.assignmentId}`, s]))
+  return {
+    class: cls,
+    assignments: list,
+    students: roster.map((st) => ({
+      ...st,
+      cells: Object.fromEntries(
+        list.map((a) => {
+          const s = byKey.get(`${st.id}|${a.id}`)
+          return [a.id, s ? { status: s.status, score: s.score, submissionId: s.id } : { status: 'missing' as const, score: null, submissionId: null }]
+        }),
+      ),
+    })),
+  }
+}
+
+export const submissionNotFound = () => apiError('submission_not_found', 'ไม่พบงานที่ส่ง', 404)
+
+export async function getSubmission(db: Db, id: string) {
+  const [row] = await db
+    .select({ s: submissions, a: assignments, st: students })
+    .from(submissions)
+    .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+    .innerJoin(students, eq(submissions.studentId, students.id))
+    .where(eq(submissions.id, id))
+  if (!row) throw submissionNotFound()
+  const order = await db
+    .select({ id: submissions.id })
+    .from(submissions)
+    .innerJoin(students, eq(submissions.studentId, students.id))
+    .where(and(eq(submissions.assignmentId, row.a.id), eq(students.classId, row.a.classId)))
+    .orderBy(students.sortOrder, students.zipgradeId)
+  const i = order.findIndex((o) => o.id === id)
+  const { pinHash: _p, failedAttempts: _f, lockedUntil: _l, ...student } = row.st
+  return {
+    submission: row.s,
+    assignment: row.a,
+    student,
+    neighbors: { prevId: order[i - 1]?.id ?? null, nextId: order[i + 1]?.id ?? null },
+  }
+}
+
+export async function gradeSubmission(
+  db: Db,
+  id: string,
+  input: { score: number; comment: string; annotatedKeys: string[] },
+  t: number,
+): Promise<void> {
+  const { submission, assignment } = await getSubmission(db, id)
+  if (!(input.score >= 0 && input.score <= assignment.maxScore)) {
+    throw apiError('invalid_score', `คะแนนต้องอยู่ระหว่าง 0 ถึง ${assignment.maxScore}`, 400)
+  }
+  if (input.annotatedKeys.some((k) => !k.startsWith(`ann/${id}/`))) throw apiError('invalid_image', 'รูปไม่ถูกต้อง กรุณาบันทึกใหม่', 400)
+  const late = assignment.dueAt !== null && submission.submittedAt > assignment.dueAt
+  await db.batch([
+    db
+      .update(submissions)
+      .set({ status: 'graded', score: input.score, comment: input.comment, annotatedKeys: input.annotatedKeys, gradedAt: t, updatedAt: t })
+      .where(eq(submissions.id, id)),
+    db
+      .insert(pointEvents)
+      .values({
+        id: newId(),
+        studentId: submission.studentId,
+        delta: late ? ASSIGNMENT_EXP.late : ASSIGNMENT_EXP.onTime,
+        reason: `ส่งงาน: ${assignment.title}`,
+        source: 'assignment',
+        refId: id,
+        createdAt: t,
+      })
+      .onConflictDoNothing(),
+  ])
+}
+
+export async function returnSubmission(db: Db, id: string, comment: string, t: number): Promise<void> {
+  await getSubmission(db, id)
+  await db.update(submissions).set({ status: 'returned', comment, updatedAt: t }).where(eq(submissions.id, id))
 }
