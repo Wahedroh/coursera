@@ -19,6 +19,7 @@ export default function TeacherVideos() {
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [description, setDescription] = useState('')
@@ -93,6 +94,9 @@ export default function TeacherVideos() {
                   <div className="mt-1">{v.published ? <Chip tone="green">นักเรียนเห็น</Chip> : <Chip>ซ่อนอยู่</Chip>}</div>
                 </div>
                 <div className="flex flex-wrap gap-1">
+                  <button type="button" className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold" onClick={() => setEditing(editing === v.id ? null : v.id)}>
+                    แก้
+                  </button>
                   <button type="button" className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold" onClick={() => setPreview(preview === v.id ? null : v.id)}>
                     {preview === v.id ? 'ปิดตัวอย่าง' : 'ดูตัวอย่าง'}
                   </button>
@@ -104,6 +108,15 @@ export default function TeacherVideos() {
                   </button>
                 </div>
               </div>
+              {editing === v.id && (
+                <EditVideo
+                  video={v}
+                  onSave={async (body) => {
+                    await act(`/api/teacher/videos/${v.id}`, 'PUT', body)
+                    setEditing(null)
+                  }}
+                />
+              )}
               {preview === v.id && <ProtectedYouTube videoId={v.youtubeId} title={v.title} />}
             </div>
           ))}
@@ -155,5 +168,28 @@ export default function TeacherVideos() {
         </Card>
       </form>
     </TeacherLayout>
+  )
+}
+
+function EditVideo({ video, onSave }: { video: TeacherVideo; onSave: (body: { title: string; url: string; description: string }) => Promise<void> }) {
+  const [title, setTitle] = useState(video.title)
+  const [url, setUrl] = useState(`https://youtu.be/${video.youtubeId}`)
+  const [description, setDescription] = useState(video.description)
+  const ok = parseYouTubeId(url) !== null
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-xl bg-stone-50 p-3"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void onSave({ title, url, description })
+      }}
+    >
+      <input aria-label="แก้ชื่อคลิป" className={input} required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input aria-label="แก้ลิงก์ YouTube" className={`${input} ${ok ? '' : 'border-red-500 bg-red-50'}`} required value={url} onChange={(e) => setUrl(e.target.value)} />
+      <textarea aria-label="แก้คำอธิบาย" className={input} rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} />
+      <Button type="submit" disabled={!ok}>
+        บันทึกการแก้ไข
+      </Button>
+    </form>
   )
 }

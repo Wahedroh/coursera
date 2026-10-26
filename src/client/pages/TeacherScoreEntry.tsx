@@ -160,7 +160,8 @@ export default function TeacherScoreEntry() {
       await api(`/api/teacher/score-items/${id}`, { method: 'PUT', body })
       setEditing(false)
       setError(null)
-      load()
+      // แก้แค่หัวรายการ ไม่โหลดตารางใหม่ (ไม่ทับช่องที่กำลังพิมพ์)
+      setSheet((s) => (s ? { ...s, item: { ...s.item, ...body, category: body.category as ScoreSheet['item']['category'] } } : s))
     } catch (err) {
       setError(handle(err))
     }

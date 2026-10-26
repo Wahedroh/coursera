@@ -6,6 +6,7 @@ import { baht, type StudentFee } from '../../shared/fees'
 import type { AvatarConfig } from '../../shared/avatar'
 import { AvatarArt } from '../components/PixelArt'
 import { formatDue, timeLeft } from '../lib/format'
+import { clearDrafts } from '../lib/session'
 import { Button, Card, Chip, Loading } from '../ui'
 
 type StudentMe = Extract<Me, { kind: 'student' }>
@@ -44,6 +45,7 @@ export default function StudentHome() {
 
   async function logout() {
     await api('/api/logout', { body: {} }).catch(() => {})
+    clearDrafts()
     navigate('/', { replace: true })
   }
 

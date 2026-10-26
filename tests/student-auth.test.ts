@@ -123,3 +123,20 @@ it('ล็อกอินจาก user-agent ใหม่ขณะมี sessio
   expect((await json(other)).flaggedNewDevice).toBe(true)
 })
 
+
+it('PIN ผิดรวมหลายบัญชีจาก IP เดียวเกิน 40 ครั้ง → 429 (กันไล่เดา/ไล่ล็อกทั้งโรงเรียน); PIN ถูกไม่นับ', async () => {
+  const { classId } = await seedClass(db())
+  const h = { 'cf-connecting-ip': '172.16.0.9' }
+  const pinHash = await hashSecret('2468')
+  const ids: string[] = []
+  for (let i = 0; i < 9; i++) ids.push((await seedStudent(db(), classId, { zipgradeId: String(500 + i), pinHash })).zipgradeId)
+  // PIN ถูก 3 ครั้งก่อน ไม่กินโควตา
+  for (const z of ids.slice(0, 3)) expect((await post('/api/student/login', { zipgradeId: z, pin: '2468' }, h)).status).toBe(200)
+  let fails = 0
+  for (const z of ids) for (let k = 0; k < 5; k++) if ((await post('/api/student/login', { zipgradeId: z, pin: '0000' }, h)).status !== 429) fails++
+  expect(fails).toBe(40)
+  const fresh = (await seedStudent(db(), classId, { zipgradeId: '600', pinHash })).zipgradeId
+  expect((await post('/api/student/login', { zipgradeId: fresh, pin: '2468' }, h)).status).toBe(429)
+  // IP อื่นยังเข้าได้ตามปกติ
+  expect((await post('/api/student/login', { zipgradeId: fresh, pin: '2468' })).status).toBe(200)
+}, 60_000)

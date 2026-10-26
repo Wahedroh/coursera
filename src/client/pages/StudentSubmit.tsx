@@ -5,6 +5,7 @@ import type { StudentAssignment } from '../../shared/assignments'
 import { formatDue } from '../lib/format'
 import { resizeImage } from '../lib/image'
 import { fileUrl, uploadImage } from '../lib/upload'
+import { randomId } from '../lib/session'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 
 const MAX_IMAGES = 10
@@ -48,7 +49,7 @@ export default function StudentSubmit() {
     if (!files) return
     const room = MAX_IMAGES - images.length
     for (const file of [...files].slice(0, room)) {
-      const pid = crypto.randomUUID()
+      const pid = randomId()
       const preview = URL.createObjectURL(file)
       setImages((xs) => [...xs, { id: pid, preview }])
       try {
@@ -68,7 +69,7 @@ export default function StudentSubmit() {
     try {
       const next = await api<StudentAssignment>(`/api/student/assignments/${id}/submission`, {
         method: 'PUT',
-        body: { text, imageKeys: images.flatMap((x) => (x.key ? [x.key] : [])), clientRequestId: crypto.randomUUID() },
+        body: { text, imageKeys: images.flatMap((x) => (x.key ? [x.key] : [])), clientRequestId: randomId() },
       })
       storage(() => localStorage.removeItem(draftKey), undefined)
       setA(next)

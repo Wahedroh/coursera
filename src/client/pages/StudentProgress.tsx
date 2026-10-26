@@ -20,6 +20,8 @@ export default function StudentProgress() {
   const [p, setP] = useState<Progress | null>(null)
   const [board, setBoard] = useState<Rank[] | null>(null)
   const [opened, setOpened] = useState<string | null>(null)
+  // กันกดรัว (กดซ้ำระหว่างรอจะได้ 409)
+  const [opening, setOpening] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -31,12 +33,16 @@ export default function StudentProgress() {
   useEffect(load, [load])
 
   async function open(eggId: string) {
+    if (opening) return
+    setOpening(eggId)
     try {
       const { characterId } = await api<{ characterId: string }>(`/api/student/eggs/${eggId}/open`, { body: {} })
       setOpened(characterId)
       load()
     } catch (e) {
       setError(e instanceof ApiClientError ? e.message : 'เปิดไข่ไม่สำเร็จ')
+    } finally {
+      setOpening(null)
     }
   }
 
@@ -83,7 +89,7 @@ export default function StudentProgress() {
               <b>มีไข่รอเปิด!</b>
               <p className="text-xs text-stone-500">ได้จากการขึ้น LV {e.level}</p>
             </div>
-            <Button onClick={() => open(e.id)} className="bg-amber-400 text-amber-950 shadow-[0_3px_0_#c48d1c] px-3 py-2">
+            <Button onClick={() => open(e.id)} disabled={opening !== null} className="bg-amber-400 text-amber-950 shadow-[0_3px_0_#c48d1c] px-3 py-2">
               เปิดไข่ 🥚
             </Button>
           </Card>
@@ -104,8 +110,8 @@ export default function StudentProgress() {
           <>
             <h2 className="font-bold mt-2">กระดานจัดอันดับห้อง</h2>
             <Card className="p-2">
-              {board.map((r) => (
-                <div key={r.rank} className={`flex justify-between items-center px-2 py-1.5 text-sm ${r.isMe ? 'bg-board-soft rounded-lg font-bold' : ''}`}>
+              {board.map((r, i) => (
+                <div key={i} className={`flex justify-between items-center px-2 py-1.5 text-sm ${r.isMe ? 'bg-board-soft rounded-lg font-bold' : ''}`}>
                   <span className="flex items-center gap-2">
                     <span className="w-5 text-right">{r.rank}.</span>
                     <AvatarArt config={r.avatar} size={2} label={r.firstName} />

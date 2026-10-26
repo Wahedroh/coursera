@@ -8,17 +8,19 @@ import type { AppEnv } from '../env'
 import { apiError, getClientIp, parseBody } from '../http'
 import { hashSecret, PIN_ITERATIONS, verifySecret } from './crypto'
 import { clearLoginAttempts, lockStudent, reserveLoginAttempt } from './pin-attempts'
-import { hitRateLimit } from './rate-limit'
+import { hitRateLimit, refundRateLimit } from './rate-limit'
 import { createSession, setSessionCookie } from './sessions'
 
 const MAX_FAILS = 5
 const LOCK_MS = 15 * 60 * 1000
+/** PIN ผิดรวมทุกบัญชีต่อ IP: กันการไล่เดา/ไล่ล็อกบัญชีทั้งโรงเรียนจากเครื่องเดียว (คนพิมพ์ผิดตามปกติไม่ถึง) */
+const IP_FAIL = { limit: 40, windowMs: 15 * 60 * 1000 }
 
 export const studentAuthRoutes = new Hono<AppEnv>()
 
 studentAuthRoutes.use('*', async (c, next) => {
-  // หลวมพอให้ทั้งห้อง (~30 คน หลัง NAT เดียว) ตั้ง PIN พร้อมกันได้
-  if (await hitRateLimit(getDb(c.env), `ip:${getClientIp(c)}`, 300, 60 * 1000)) {
+  // หลวมพอให้ทั้งห้อง (~45 คน หลัง NAT เดียว) ค้นรหัส + ตั้ง/ใส่ PIN พร้อมกันได้
+  if (await hitRateLimit(getDb(c.env), `ip:${getClientIp(c)}`, 150, 60 * 1000)) {
     throw apiError('too_many_requests', 'ส่งคำขอบ่อยเกินไป กรุณารอสักครู่', 429)
   }
   await next()
@@ -84,6 +86,11 @@ studentAuthRoutes.post('/login', async (c) => {
   if (s.lockedUntil && s.lockedUntil > now()) throw lockedError(s.lockedUntil)
   if (!s.pinHash) throw apiError('pin_not_set', 'ยังไม่ได้ตั้ง PIN กรุณาตั้ง PIN ก่อน', 409)
 
+  // จองสิทธิ์ต่อ IP ก่อนตรวจ (คืนให้เมื่อ PIN ถูก) — นับเฉพาะครั้งที่ผิด
+  const ipKey = `pinfail:ip:${getClientIp(c)}`
+  if (await hitRateLimit(db, ipKey, IP_FAIL.limit, IP_FAIL.windowMs)) {
+    throw apiError('too_many_attempts', 'มีการใส่ PIN ผิดจากเครื่องนี้หลายครั้ง กรุณารอ 15 นาทีหรือแจ้งครู', 429)
+  }
   // จองสิทธิ์ก่อนตรวจ PIN: คำขอพร้อมกันหลายคำขอลอดการล็อกไม่ได้
   const t = now()
   const attempt = await reserveLoginAttempt(db, s.id, t)
@@ -100,6 +107,7 @@ studentAuthRoutes.post('/login', async (c) => {
     throw apiError('invalid_pin', `PIN ไม่ถูกต้อง (เหลืออีก ${MAX_FAILS - attempt} ครั้ง)`, 401)
   }
   if (!(await clearLoginAttempts(db, s.id, t))) throw lockedError(t + LOCK_MS)
+  await refundRateLimit(db, ipKey)
 
   const { token, flaggedNewDevice } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
   setSessionCookie(c, token, 'student')

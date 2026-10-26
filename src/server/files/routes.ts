@@ -5,7 +5,8 @@ import { getDb, newId } from '../db/client'
 import { submissions } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError } from '../http'
-import { canRead, checkImage, EXT, putImage } from './service'
+import { canRead, checkImage, EXT, MAX_IMAGE_BYTES, putImage } from './service'
+import { hitRateLimit } from '../auth/rate-limit'
 
 export const fileRoutes = new Hono<AppEnv>()
 
@@ -14,6 +15,13 @@ const unauthorized = () => apiError('unauthorized', 'กรุณาเข้า
 fileRoutes.post('/', async (c) => {
   const s = requireSession(c)
   const kind = c.req.query('kind')
+  // ใหญ่เกินไม่ต้องอ่านทั้งก้อน
+  if (Number(c.req.header('content-length') ?? 0) > MAX_IMAGE_BYTES) throw apiError('invalid_image', 'รูปใหญ่เกินไป', 400)
+  // จำกัดจำนวนอัปโหลด กันพื้นที่ R2 เต็ม (นักเรียน 60 รูป/ชม. ครู 600 รูป/ชม.)
+  const who = s.kind === 'student' ? `upload:s:${s.studentId}` : 'upload:teacher'
+  if (await hitRateLimit(getDb(c.env), who, s.kind === 'student' ? 60 : 600, 60 * 60 * 1000)) {
+    throw apiError('too_many_uploads', 'อัปโหลดรูปบ่อยเกินไป กรุณารอสักครู่', 429)
+  }
   const body = await c.req.arrayBuffer()
   const type = checkImage(body, c.req.header('content-type') ?? '')
   let key: string
@@ -38,8 +46,13 @@ fileRoutes.post('/', async (c) => {
 
 fileRoutes.get('/*', async (c) => {
   const s = requireSession(c)
-  const key = decodeURIComponent(c.req.path.replace(/^\/api\/files\//, ''))
   const notFound = () => apiError('not_found', 'ไม่พบไฟล์', 404)
+  let key: string
+  try {
+    key = decodeURIComponent(c.req.path.replace(/^\/api\/files\//, ''))
+  } catch {
+    throw notFound()
+  }
   if (!(await canRead(getDb(c.env), s, key))) throw notFound()
   const obj = await c.env.BUCKET.get(key)
   if (!obj) throw notFound()
