@@ -49,6 +49,9 @@ export default function StudentHome() {
         <p className="text-sm opacity-85">
           {s.className} · รหัส {s.zipgradeId}
         </p>
+        <Link to="/me/progress" className="inline-block mt-3 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+          ⭐ ตัวละครและแต้มของฉัน
+        </Link>
       </header>
       <section className="p-5 flex flex-col gap-3">
         {pending.length > 0 && (

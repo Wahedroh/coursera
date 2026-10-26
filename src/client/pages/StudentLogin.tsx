@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api, ApiClientError, fullName, type Me } from '../api'
 import { Button, Card, ErrorBox } from '../ui'
 
@@ -56,6 +56,12 @@ function PinPad({ title, hint, onComplete, busy }: { title: string; hint: string
 
 export default function StudentLogin() {
   const navigate = useNavigate()
+  const [search] = useSearchParams()
+  // กลับไปหน้าที่ตั้งใจเปิด (เช่น ลิงก์เช็กอิน) หลังล็อกอิน — รับเฉพาะ path ภายในเว็บ
+  const next = (() => {
+    const n = search.get('next') ?? ''
+    return n.startsWith('/') && !n.startsWith('//') ? n : '/me'
+  })()
   const [step, setStep] = useState<Step>({ name: 'id' })
   const [zipgradeId, setZipgradeId] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -63,9 +69,9 @@ export default function StudentLogin() {
 
   useEffect(() => {
     api<Me>('/api/me')
-      .then((me) => navigate(me.kind === 'student' ? '/me' : '/teacher', { replace: true }))
+      .then((me) => navigate(me.kind === 'student' ? next : '/teacher', { replace: true }))
       .catch(() => {})
-  }, [navigate])
+  }, [navigate, next])
 
   async function run(fn: () => Promise<void>) {
     setBusy(true)
@@ -88,13 +94,13 @@ export default function StudentLogin() {
   const setPin = (pin: string) =>
     run(async () => {
       await api('/api/student/set-pin', { body: { zipgradeId, pin } })
-      navigate('/me')
+      navigate(next)
     })
 
   const login = (pin: string) =>
     run(async () => {
       await api('/api/student/login', { body: { zipgradeId, pin } })
-      navigate('/me')
+      navigate(next)
     })
 
   const back = () => {

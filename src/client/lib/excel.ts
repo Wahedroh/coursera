@@ -1,5 +1,6 @@
 import writeXlsxFile, { type SheetData } from 'write-excel-file/browser'
 import type { Gradebook } from '../../shared/assignments'
+import { ATTENDANCE_STATUSES, STATUS_LABEL, type AttendanceRange } from '../../shared/attendance'
 
 export async function exportGradebook(gb: Gradebook): Promise<void> {
   const header = ['ลำดับ', 'ZipGrade ID', 'ชื่อ-นามสกุล', ...gb.assignments.map((a) => `${a.title} (${a.maxScore})`)].map((value) => ({
@@ -20,4 +21,20 @@ export async function exportGradebook(gb: Gradebook): Promise<void> {
   ])
   const data: SheetData = [header, ...rows]
   await writeXlsxFile(data, { sheet: 'คะแนน' }).toFile(`สมุดคะแนน-${gb.class.name}.xlsx`)
+}
+
+export async function exportAttendance(r: AttendanceRange, className: string, from: string, to: string): Promise<void> {
+  const header = ['ลำดับ', 'ZipGrade ID', 'ชื่อ-นามสกุล', ...r.days, ...ATTENDANCE_STATUSES.map((s) => `รวม${STATUS_LABEL[s]}`)].map((value) => ({
+    value,
+    fontWeight: 'bold' as const,
+  }))
+  const rows = r.students.map((s, i) => [
+    { value: i + 1 },
+    { value: s.zipgradeId },
+    { value: `${s.title ?? ''}${s.firstName} ${s.lastName}`.trim() },
+    ...r.days.map((d) => ({ value: r.cells[s.id]?.[d] ? STATUS_LABEL[r.cells[s.id][d]] : undefined })),
+    ...ATTENDANCE_STATUSES.map((st) => ({ value: r.totals[s.id]?.[st] ?? 0 })),
+  ])
+  const data: SheetData = [header, ...rows]
+  await writeXlsxFile(data, { sheet: 'เช็กชื่อ' }).toFile(`เช็กชื่อ-${className}-${from}-ถึง-${to}.xlsx`)
 }
