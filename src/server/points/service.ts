@@ -27,14 +27,20 @@ export async function classPoints(db: Db, classId: string): Promise<{ studentId:
 }
 
 export async function getSeating(db: Db, classId: string): Promise<Layout> {
+  const roster = (
+    await db
+      .select({ id: students.id })
+      .from(students)
+      .where(and(eq(students.classId, classId), eq(students.active, true)))
+      .orderBy(students.sortOrder, students.zipgradeId)
+  ).map((s) => s.id)
   const [row] = await db.select().from(seating).where(eq(seating.classId, classId))
-  if (row) return row.layout
-  const roster = await db
-    .select({ id: students.id })
-    .from(students)
-    .where(and(eq(students.classId, classId), eq(students.active, true)))
-    .orderBy(students.sortOrder, students.zipgradeId)
-  return { cols: 6, seats: roster.map((s) => s.id) }
+  if (!row) return { cols: 6, seats: roster }
+  // ผังที่บันทึกไว้: ซ่อนคนที่ไม่อยู่ห้อง/ปิดใช้งาน และต่อท้ายนักเรียนที่ยังไม่มีที่นั่ง
+  const active = new Set(roster)
+  const seats = row.layout.seats.map((s) => (s && active.has(s) ? s : null))
+  const placed = new Set(seats)
+  return { cols: row.layout.cols, seats: [...seats, ...roster.filter((s) => !placed.has(s))] }
 }
 
 export async function saveSeating(db: Db, classId: string, layout: Layout): Promise<void> {
@@ -117,20 +123,20 @@ export async function openEgg(db: Db, studentId: string, eggId: string, rand = s
   return { characterId }
 }
 
-const LEADERBOARD_KEY = 'leaderboard_enabled'
+const leaderboardKey = (classId: string) => `leaderboard_enabled:${classId}`
 
-export async function leaderboardEnabled(db: Db): Promise<boolean> {
-  const [row] = await db.select().from(settings).where(eq(settings.key, LEADERBOARD_KEY))
+export async function leaderboardEnabled(db: Db, classId: string): Promise<boolean> {
+  const [row] = await db.select().from(settings).where(eq(settings.key, leaderboardKey(classId)))
   return row ? JSON.parse(row.value) === true : false
 }
 
-export async function setLeaderboard(db: Db, enabled: boolean): Promise<void> {
+export async function setLeaderboard(db: Db, classId: string, enabled: boolean): Promise<void> {
   const value = JSON.stringify(enabled)
-  await db.insert(settings).values({ key: LEADERBOARD_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } })
+  await db.insert(settings).values({ key: leaderboardKey(classId), value }).onConflictDoUpdate({ target: settings.key, set: { value } })
 }
 
 export async function leaderboard(db: Db, classId: string, studentId: string) {
-  if (!(await leaderboardEnabled(db))) throw apiError('leaderboard_disabled', 'ครูยังไม่เปิดกระดานจัดอันดับ', 403)
+  if (!(await leaderboardEnabled(db, classId))) throw apiError('leaderboard_disabled', 'ครูยังไม่เปิดกระดานจัดอันดับ', 403)
   const rows = await db
     .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)` })
     .from(students)

@@ -14,11 +14,11 @@ async function setup() {
   const c2 = await seedClass(db())
   const s = await seedStudent(db(), c1.classId)
   const other = await seedStudent(db(), c2.classId)
-  const { day, records } = await json(await getJson(`/api/teacher/classes/${c1.classId}/attendance?date=2026-10-26`, cookie))
+  const { day, records } = await json(await postJson(`/api/teacher/classes/${c1.classId}/attendance`, { date: '2026-10-26' }, { cookie }))
   await putJson(`/api/teacher/attendance/${day.id}/records/${s.id}`, { status: 'absent' }, cookie)
   const open = (v: boolean) => putJson(`/api/teacher/attendance/${day.id}/self-checkin`, { open: v }, cookie)
   const status = async () =>
-    (await json(await getJson(`/api/teacher/classes/${c1.classId}/attendance?date=2026-10-26`, cookie))).records.find((r: { studentId: string }) => r.studentId === s.id)
+    (await json(await postJson(`/api/teacher/classes/${c1.classId}/attendance`, { date: '2026-10-26' }, { cookie }))).records.find((r: { studentId: string }) => r.studentId === s.id)
   return { cookie, day, records, s, other, open, status, sc: await studentCookie(s.id), oc: await studentCookie(other.id) }
 }
 const checkin = (dayId: string, token: string, cookie: string) => postJson('/api/student/checkin', { dayId, token }, { cookie })

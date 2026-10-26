@@ -17,7 +17,7 @@ export default function TeacherCheckinScreen() {
   const { dayId = '' } = useParams()
   const navigate = useNavigate()
   const handle = useTeacherErrorHandler()
-  const [qr, setQr] = useState<{ url: string; expiresAt: number } | null>(null)
+  const [qr, setQr] = useState<{ url: string; ttlMs: number } | null>(null)
   const [day, setDay] = useState<AttendanceDay | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,13 +25,18 @@ export default function TeacherCheckinScreen() {
     let timer: ReturnType<typeof setTimeout>
     let stop = false
     async function refresh() {
+      // ใช้ ttlMs จากเซิร์ฟเวอร์ ไม่พึ่งนาฬิกาเครื่อง · พลาดก็ลองใหม่ ไม่ให้ QR ค้างจนหมดอายุ
+      let wait = 3000
       try {
-        const next = await api<{ url: string; expiresAt: number }>(`/api/teacher/attendance/${dayId}/qr`)
+        const next = await api<{ url: string; ttlMs: number }>(`/api/teacher/attendance/${dayId}/qr`)
         if (stop) return
         setQr(next)
-        timer = setTimeout(refresh, Math.max(2000, next.expiresAt - Date.now() + 300))
+        setError(null)
+        wait = Math.max(2000, next.ttlMs + 300)
       } catch (e) {
-        setError(handle(e))
+        if (!stop) setError(handle(e))
+      } finally {
+        if (!stop) timer = setTimeout(refresh, wait)
       }
     }
     api(`/api/teacher/attendance/${dayId}/self-checkin`, { method: 'PUT', body: { open: true } })
@@ -62,7 +67,7 @@ export default function TeacherCheckinScreen() {
         <button type="button" onClick={close} className="rounded-xl bg-white/15 px-4 py-2 font-bold">
           ปิดการเช็กอินเอง
         </button>
-        <span className="opacity-80">{day?.day.date}</span>
+        <span className="opacity-80">{day?.day?.date}</span>
       </div>
       <ErrorBox message={error} />
       <div className="flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center flex-1">

@@ -32,9 +32,9 @@ teacherPointsRoutes.put('/classes/:id/seating', async (c) => {
   await saveSeating(getDb(c.env), c.req.param('id'), await parseBody(c, layoutSchema))
   return c.json({ ok: true })
 })
-teacherPointsRoutes.get('/settings', async (c) => c.json({ leaderboardEnabled: await leaderboardEnabled(getDb(c.env)) }))
-teacherPointsRoutes.put('/settings/leaderboard', async (c) => {
+teacherPointsRoutes.get('/classes/:id/settings', async (c) => c.json({ leaderboardEnabled: await leaderboardEnabled(getDb(c.env), c.req.param('id')) }))
+teacherPointsRoutes.put('/classes/:id/settings/leaderboard', async (c) => {
   const { enabled } = await parseBody(c, z.object({ enabled: z.boolean() }))
-  await setLeaderboard(getDb(c.env), enabled)
+  await setLeaderboard(getDb(c.env), c.req.param('id'), enabled)
   return c.json({ ok: true })
 })
