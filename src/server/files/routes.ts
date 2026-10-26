@@ -44,6 +44,11 @@ fileRoutes.get('/*', async (c) => {
   const obj = await c.env.BUCKET.get(key)
   if (!obj) throw notFound()
   return new Response(obj.body, {
-    headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=86400' },
+    headers: {
+      'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
+      'cache-control': 'private, max-age=86400',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "sandbox; default-src 'none'",
+    },
   })
 })

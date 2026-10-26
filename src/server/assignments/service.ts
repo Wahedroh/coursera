@@ -33,7 +33,9 @@ export async function listForClass(db: Db, classId: string): Promise<AssignmentS
     .select({ assignmentId: submissions.assignmentId, status: submissions.status, n: sql<number>`count(*)` })
     .from(submissions)
     .innerJoin(students, eq(submissions.studentId, students.id))
-    .where(and(inArray(submissions.assignmentId, rows.map((r) => r.id)), eq(students.classId, classId), eq(students.active, true)))
+    .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+    // กรองด้วยห้อง ไม่ใช่ list ของ id — D1 รับตัวแปรได้ไม่เกิน 100 ตัวต่อคำสั่ง
+    .where(and(eq(assignments.classId, classId), eq(students.classId, classId), eq(students.active, true)))
     .groupBy(submissions.assignmentId, submissions.status)
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)` })
@@ -129,8 +131,9 @@ export async function upsertSubmission(
   if (existing?.clientRequestId === clientRequestId) return a
   if (existing?.status === 'graded') throw apiError('already_graded', 'ครูตรวจแล้ว แก้ไขไม่ได้', 409)
 
-  const status = a.dueAt !== null && p.now > a.dueAt ? 'late' : 'submitted'
-  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now } as const
+  const status: 'late' | 'submitted' = a.dueAt !== null && p.now > a.dueAt ? 'late' : 'submitted'
+  // ส่งใหม่ (รวมหลังครูส่งกลับ) = งานชิ้นใหม่: ล้างผลตรวจเดิม ไม่ให้ครูเห็นรูปที่ตรวจไว้รอบก่อน
+  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null }
   if (existing) {
     await db.update(submissions).set(values).where(eq(submissions.id, existing.id))
   } else {
@@ -155,7 +158,8 @@ export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
     ? await db
         .select({ id: submissions.id, assignmentId: submissions.assignmentId, studentId: submissions.studentId, status: submissions.status, score: submissions.score })
         .from(submissions)
-        .where(inArray(submissions.assignmentId, list.map((a) => a.id)))
+        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+        .where(eq(assignments.classId, classId))
     : []
   const byKey = new Map(subs.map((s) => [`${s.studentId}|${s.assignmentId}`, s]))
   return {

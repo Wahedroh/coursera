@@ -82,6 +82,7 @@ export default function StudentSubmit() {
   if (!a) return error ? <ErrorBox message={error} /> : <Loading />
   const graded = a.status === 'graded'
   const uploading = images.some((x) => !x.key && !x.error)
+  const failed = images.some((x) => x.error)
 
   return (
     <main className="min-h-screen max-w-md mx-auto p-5 flex flex-col gap-3 pb-28">
@@ -177,8 +178,8 @@ export default function StudentSubmit() {
       {!graded && (
         <div className="fixed bottom-0 inset-x-0 p-4 bg-paper/95 border-t border-line">
           <div className="max-w-md mx-auto">
-            <Button onClick={submit} disabled={busy || uploading} className="w-full text-lg">
-              {uploading ? 'รออัปโหลดรูป…' : a.status === 'missing' ? 'ส่งงาน' : 'ส่งงานอีกครั้ง'}
+            <Button onClick={submit} disabled={busy || uploading || failed} className="w-full text-lg">
+              {uploading ? 'รออัปโหลดรูป…' : failed ? 'ลบรูปที่อัปโหลดไม่สำเร็จก่อนส่ง' : a.status === 'missing' ? 'ส่งงาน' : 'ส่งงานอีกครั้ง'}
             </Button>
           </div>
         </div>
