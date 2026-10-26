@@ -1,6 +1,7 @@
 import writeXlsxFile, { type SheetData } from 'write-excel-file/browser'
 import type { Gradebook } from '../../shared/assignments'
 import type { ScoreBook } from '../../shared/scores'
+import type { ClassGrades } from '../../shared/grades'
 import { outstanding, type FeeSheet } from '../../shared/fees'
 import { ATTENDANCE_STATUSES, STATUS_LABEL, type AttendanceRange } from '../../shared/attendance'
 
@@ -69,4 +70,22 @@ export async function exportFees(sheet: FeeSheet): Promise<void> {
     ])
   const data: SheetData = [header, ...rows]
   await writeXlsxFile(data, { sheet: 'ค่าเอกสาร' }).toFile(`ค่าเอกสาร-${sheet.item.title}-${sheet.class.name}.xlsx`)
+}
+
+/** เกรดอิงกลุ่มของห้อง */
+export async function exportGrades(g: ClassGrades, className: string): Promise<void> {
+  const header = ['ลำดับ', 'ZipGrade ID', 'ชื่อ-นามสกุล', 'คะแนนงาน', 'คะแนนสอบ', `รวม (${g.maxTotal})`, 'อันดับ', 'เปอร์เซ็นไทล์', 'เกรด'].map((value) => ({ value, fontWeight: 'bold' as const }))
+  const rows = g.students.map((s, i) => [
+    { value: i + 1 },
+    { value: s.zipgradeId },
+    { value: `${s.title ?? ''}${s.firstName} ${s.lastName}`.trim() },
+    { value: s.assignmentTotal },
+    { value: s.examTotal },
+    { value: s.total },
+    { value: s.rank ?? undefined },
+    { value: s.percentile ?? undefined },
+    { value: s.grade ?? undefined },
+  ])
+  const data: SheetData = [header, ...rows]
+  await writeXlsxFile(data, { sheet: 'เกรด' }).toFile(`เกรด-${className}.xlsx`)
 }
