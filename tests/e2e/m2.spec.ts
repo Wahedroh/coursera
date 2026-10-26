@@ -24,6 +24,7 @@ test('เช็กชื่อ + QR เช็กอิน + แจกแต้�
   const teacher = await teacherPage(browser)
   await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
   await teacher.getByRole('link', { name: 'เช็กชื่อ' }).click()
+  await teacher.getByRole('button', { name: 'เริ่มเช็กชื่อวันนี้' }).click()
   const absent = teacher.getByRole('button', { name: 'มานี มีนา ขาด' })
   await absent.click()
   await expect(absent).toHaveAttribute('aria-pressed', 'true')

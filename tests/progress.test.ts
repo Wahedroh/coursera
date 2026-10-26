@@ -58,17 +58,17 @@ it('rollCharacter ตามน้ำหนัก 60/25/12/3', () => {
 })
 
 it('leaderboard ปิด 403 / เปิดแล้วเรียงถูก', async () => {
-  const { teacher, a, b, ac, give } = await setup()
+  const { teacher, classId, a, b, ac, give } = await setup()
   const res = await getJson('/api/student/leaderboard', ac)
   expect(res.status).toBe(403)
   expect((await json(res)).error.code).toBe('leaderboard_disabled')
   await give(a.id, 2)
   await give(b.id, 3)
-  expect((await putJson('/api/teacher/settings/leaderboard', { enabled: true }, teacher)).status).toBe(200)
+  expect((await putJson(`/api/teacher/classes/${classId}/settings/leaderboard`, { enabled: true }, teacher)).status).toBe(200)
   const lb = await json(await getJson('/api/student/leaderboard', ac))
   expect(lb).toEqual([
     { rank: 1, firstName: 'บี', exp: 30, level: 0, isMe: false },
     { rank: 2, firstName: 'เอ', exp: 20, level: 0, isMe: true },
   ])
-  expect((await json(await getJson('/api/teacher/settings', teacher))).leaderboardEnabled).toBe(true)
+  expect((await json(await getJson(`/api/teacher/classes/${classId}/settings`, teacher))).leaderboardEnabled).toBe(true)
 })

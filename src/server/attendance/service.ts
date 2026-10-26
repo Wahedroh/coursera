@@ -1,21 +1,34 @@
 import { and, eq, gte, lte } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
-import { EARNS_EXP, type AttendanceDay, type AttendanceRange, type AttendanceStatus } from '../../shared/attendance'
+import { type AttendanceDay, type AttendanceRange, type AttendanceStatus } from '../../shared/attendance'
 import { EXP_RULES } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
-import { attendanceDays, attendanceRecords, classes, pointEvents, students } from '../db/schema'
+import { attendanceDays, attendanceRecords, classes, students } from '../db/schema'
 import { hmacSha256Hex } from '../auth/crypto'
 import { apiError } from '../http'
 
 const CHUNK = 10 // ≤ 100 ตัวแปรต่อคำสั่งของ D1
 
-function expStatements(db: Db, recordId: string, studentId: string, date: string, status: AttendanceStatus, t: number): BatchItem<'sqlite'> {
-  return EARNS_EXP.includes(status)
-    ? db
-        .insert(pointEvents)
-        .values({ id: newId(), studentId, delta: EXP_RULES.attendance, reason: `มาเรียน ${date}`, source: 'attendance', refId: recordId, createdAt: t })
-        .onConflictDoNothing()
-    : db.delete(pointEvents).where(and(eq(pointEvents.source, 'attendance'), eq(pointEvents.refId, recordId)))
+/** ให้/ถอน EXP มาเรียนจากสถานะที่บันทึกจริงในฐานข้อมูล (ไม่ใช้ id ที่สร้างฝั่งแอป) — ทนต่อคำขอซ้อนกัน */
+function syncExp(db: Db, dayId: string, date: string, t: number, studentId?: string): D1PreparedStatement[] {
+  const d1 = db.$client
+  const who = studentId ?? '%'
+  return [
+    d1
+      .prepare(
+        `INSERT INTO point_events (id, student_id, delta, reason, source, ref_id, created_at)
+         SELECT lower(hex(randomblob(13))), r.student_id, ?, ?, 'attendance', r.id, ?
+         FROM attendance_records r WHERE r.day_id = ? AND r.student_id LIKE ? AND r.status IN ('present', 'late')
+         ON CONFLICT DO NOTHING`,
+      )
+      .bind(EXP_RULES.attendance, `มาเรียน ${date}`, t, dayId, who),
+    d1
+      .prepare(
+        `DELETE FROM point_events WHERE source = 'attendance' AND ref_id IN (
+           SELECT r.id FROM attendance_records r WHERE r.day_id = ? AND r.student_id LIKE ? AND r.status NOT IN ('present', 'late'))`,
+      )
+      .bind(dayId, who),
+  ]
 }
 
 async function runBatches(db: Db, stmts: BatchItem<'sqlite'>[]) {
@@ -25,6 +38,12 @@ async function runBatches(db: Db, stmts: BatchItem<'sqlite'>[]) {
   }
 }
 
+export async function getDayByDate(db: Db, classId: string, date: string): Promise<AttendanceDay> {
+  const [day] = await db.select({ id: attendanceDays.id }).from(attendanceDays).where(and(eq(attendanceDays.classId, classId), eq(attendanceDays.date, date)))
+  return day ? getDay(db, day.id) : { day: null, records: [] }
+}
+
+/** เริ่มเช็กชื่อวันหนึ่ง (สร้างวัน + ทุกคนเป็น present) — ทำซ้ำได้ */
 export async function openDay(db: Db, classId: string, date: string): Promise<AttendanceDay> {
   const [cls] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
@@ -41,8 +60,8 @@ export async function openDay(db: Db, classId: string, date: string): Promise<At
   const missing = roster.filter((s) => !existing.has(s.id)).map((s) => ({ id: newId(), dayId: day.id, studentId: s.id, status: 'present' as const, source: 'teacher' as const, updatedAt: t }))
   const stmts: BatchItem<'sqlite'>[] = []
   for (let i = 0; i < missing.length; i += CHUNK) stmts.push(db.insert(attendanceRecords).values(missing.slice(i, i + CHUNK)).onConflictDoNothing())
-  for (const r of missing) stmts.push(expStatements(db, r.id, r.studentId, date, 'present', t))
   await runBatches(db, stmts)
+  await db.$client.batch(syncExp(db, day.id, date, t))
   return getDay(db, day.id)
 }
 
@@ -72,15 +91,16 @@ export async function setStatus(db: Db, dayId: string, studentId: string, status
   const [st] = await db.select({ id: students.id }).from(students).where(and(eq(students.id, studentId), eq(students.classId, day.classId)))
   if (!st) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
   const t = now()
-  await db
-    .insert(attendanceRecords)
-    .values({ id: newId(), dayId, studentId, status, source, updatedAt: t })
-    .onConflictDoUpdate({ target: [attendanceRecords.dayId, attendanceRecords.studentId], set: { status, source, updatedAt: t } })
-  const [rec] = await db
-    .select({ id: attendanceRecords.id })
-    .from(attendanceRecords)
-    .where(and(eq(attendanceRecords.dayId, dayId), eq(attendanceRecords.studentId, studentId)))
-  await db.batch([expStatements(db, rec.id, studentId, day.date, status, t)])
+  // upsert + ปรับ EXP ในคำสั่งชุดเดียว (atomic)
+  await db.$client.batch([
+    db.$client
+      .prepare(
+        `INSERT INTO attendance_records (id, day_id, student_id, status, source, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(day_id, student_id) DO UPDATE SET status = excluded.status, source = excluded.source, updated_at = excluded.updated_at`,
+      )
+      .bind(newId(), dayId, studentId, status, source, t),
+    ...syncExp(db, dayId, day.date, t, studentId),
+  ])
 }
 
 export async function attendanceRange(db: Db, classId: string, from: string, to: string): Promise<AttendanceRange> {
@@ -120,7 +140,9 @@ export async function currentQr(db: Db, secret: string, dayId: string) {
   if (!day) throw apiError('day_not_found', 'ไม่พบวันเช็กชื่อ', 404)
   const window = Math.floor(now() / CHECKIN_WINDOW_MS)
   const token = await checkinToken(secret, dayId, window)
-  return { url: `/checkin?d=${encodeURIComponent(dayId)}&t=${token}`, expiresAt: (window + 1) * CHECKIN_WINDOW_MS }
+  const expiresAt = (window + 1) * CHECKIN_WINDOW_MS
+  // ttlMs ให้เครื่องฉายตั้งเวลาเองโดยไม่ต้องพึ่งนาฬิกาของเครื่อง
+  return { url: `/checkin?d=${encodeURIComponent(dayId)}&t=${token}`, expiresAt, ttlMs: Math.max(1, expiresAt - now()) }
 }
 
 export async function setSelfCheckin(db: Db, dayId: string, open: boolean): Promise<void> {

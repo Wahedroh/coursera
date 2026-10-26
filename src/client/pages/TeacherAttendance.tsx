@@ -37,13 +37,22 @@ export default function TeacherAttendance() {
   }, [id])
 
   async function setStatus(studentId: string, status: AttendanceStatus) {
-    if (!data) return
+    const day = data?.day
+    if (!data || !day) return
     setData({ ...data, records: data.records.map((r) => (r.studentId === studentId ? { ...r, status, source: 'teacher' } : r)) })
     try {
-      await api(`/api/teacher/attendance/${data.day.id}/records/${studentId}`, { method: 'PUT', body: { status } })
+      await api(`/api/teacher/attendance/${day.id}/records/${studentId}`, { method: 'PUT', body: { status } })
     } catch (e) {
       setError(handle(e))
       load()
+    }
+  }
+
+  async function startDay() {
+    try {
+      setData(await api<AttendanceDay>(`/api/teacher/classes/${id}/attendance`, { method: 'POST', body: { date } }))
+    } catch (e) {
+      setError(handle(e))
     }
   }
 
@@ -71,7 +80,7 @@ export default function TeacherAttendance() {
             <input type="date" className={input} value={date} onChange={(e) => e.target.value && setSearch({ date: e.target.value })} />
           </label>
         </div>
-        {data && (
+        {data?.day && (
           <Link to={`/teacher/attendance/${data.day.id}/qr`} className="rounded-2xl bg-amber-400 text-amber-950 px-4 py-2 font-bold">
             เปิด QR ให้นักเรียนเช็กอินเอง
           </Link>
@@ -87,7 +96,19 @@ export default function TeacherAttendance() {
         ))}
       </div>
       {!data && !error && <Loading />}
-      {data && (
+      {data && !data.day && (
+        <Card className="p-6 flex flex-col items-center gap-3 text-center">
+          <p className="text-stone-500">ยังไม่ได้เช็กชื่อวันนี้</p>
+          {date > todayBangkok() ? (
+            <p className="text-sm text-stone-400">เช็กชื่อล่วงหน้าไม่ได้</p>
+          ) : (
+            <button type="button" onClick={startDay} className="rounded-2xl bg-board text-white px-5 py-2 font-bold">
+              เริ่มเช็กชื่อวันนี้
+            </button>
+          )}
+        </Card>
+      )}
+      {data?.day && (
         <Card className="p-2 divide-y divide-stone-100">
           {data.records.map((r, i) => (
             <div key={r.studentId} className="flex flex-wrap items-center justify-between gap-2 px-2 py-2">

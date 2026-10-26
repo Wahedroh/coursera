@@ -53,7 +53,7 @@ export default function TeacherSeating() {
       })
       .catch((e) => setError(handle(e)))
     api<Layout>(`/api/teacher/classes/${id}/seating`).then(setLayout).catch((e) => setError(handle(e)))
-    api<{ leaderboardEnabled: boolean }>('/api/teacher/settings').then((s) => setLeaderboard(s.leaderboardEnabled)).catch(() => {})
+    api<{ leaderboardEnabled: boolean }>(`/api/teacher/classes/${id}/settings`).then((s) => setLeaderboard(s.leaderboardEnabled)).catch(() => {})
     loadPoints()
   }, [id, handle, loadPoints])
 
@@ -123,7 +123,7 @@ export default function TeacherSeating() {
 
   async function toggleLeaderboard(v: boolean) {
     setLeaderboard(v)
-    await api('/api/teacher/settings/leaderboard', { method: 'PUT', body: { enabled: v } }).catch((e) => setError(handle(e)))
+    await api(`/api/teacher/classes/${id}/settings/leaderboard`, { method: 'PUT', body: { enabled: v } }).catch((e) => setError(handle(e)))
   }
 
   const name = (sid: string) => students.get(sid)?.firstName ?? ''

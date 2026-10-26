@@ -5,7 +5,8 @@ import { getDb } from '../db/client'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
 import { z } from 'zod'
-import { attendanceRange, currentQr, getDay, openDay, setSelfCheckin, setStatus } from './service'
+import { todayBangkok } from '../../shared/attendance'
+import { attendanceRange, currentQr, getDay, getDayByDate, openDay, setSelfCheckin, setStatus } from './service'
 
 export const teacherAttendanceRoutes = new Hono<AppEnv>()
 teacherAttendanceRoutes.use('*', requireTeacher)
@@ -16,7 +17,14 @@ const date = (v: string | undefined) => {
   return r.data
 }
 
-teacherAttendanceRoutes.get('/classes/:id/attendance', async (c) => c.json(await openDay(getDb(c.env), c.req.param('id'), date(c.req.query('date')))))
+teacherAttendanceRoutes.get('/classes/:id/attendance', async (c) => c.json(await getDayByDate(getDb(c.env), c.req.param('id'), date(c.req.query('date')))))
+
+teacherAttendanceRoutes.post('/classes/:id/attendance', async (c) => {
+  const body = await parseBody(c, z.object({ date: z.string() }))
+  const d = date(body.date)
+  if (d > todayBangkok()) throw apiError('future_date', 'เช็กชื่อล่วงหน้าไม่ได้', 400)
+  return c.json(await openDay(getDb(c.env), c.req.param('id'), d))
+})
 
 teacherAttendanceRoutes.put('/attendance/:dayId/records/:studentId', async (c) => {
   const { status } = await parseBody(c, statusInputSchema)

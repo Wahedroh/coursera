@@ -5,7 +5,11 @@ export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number]
 export const STATUS_LABEL: Record<AttendanceStatus, string> = { present: 'มา', late: 'สาย', sick: 'ป่วย', leave: 'ลา', absent: 'ขาด' }
 export const EARNS_EXP: AttendanceStatus[] = ['present', 'late']
 
-export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+/** YYYY-MM-DD ที่เป็นวันจริง ปี 2000 ขึ้นไป */
+export const dateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((v) => v >= '2000-01-01' && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v)
 export const statusInputSchema = z.object({ status: z.enum(ATTENDANCE_STATUSES) })
 
 export type AttendanceRecordRow = {
@@ -17,7 +21,7 @@ export type AttendanceRecordRow = {
   status: AttendanceStatus
   source: 'teacher' | 'self'
 }
-export type AttendanceDay = { day: { id: string; date: string; selfCheckinOpen: boolean }; records: AttendanceRecordRow[] }
+export type AttendanceDay = { day: { id: string; date: string; selfCheckinOpen: boolean } | null; records: AttendanceRecordRow[] }
 
 export type AttendanceRange = {
   days: string[]
