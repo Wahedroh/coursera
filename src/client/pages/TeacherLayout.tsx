@@ -4,6 +4,7 @@ import { api } from '../api'
 
 const NAV = [
   { to: '/teacher', label: 'หน้าแรก', end: true },
+  { to: '/teacher/assignments/new', label: 'สร้างงาน', end: false },
   { to: '/teacher/import', label: 'นำเข้ารายชื่อ', end: false },
 ]
 
@@ -15,7 +16,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
   }
   return (
     <div className="min-h-screen md:flex">
-      <aside className="bg-board text-green-50 md:w-56 md:min-h-screen px-4 py-3 md:py-6 flex md:flex-col items-center md:items-stretch gap-2">
+      <aside className="bg-board text-green-50 md:w-56 md:min-h-screen px-4 py-3 md:py-6 flex flex-wrap md:flex-nowrap md:flex-col items-center md:items-stretch gap-x-1 gap-y-1 md:gap-2">
         <Link to="/teacher" className="font-extrabold text-white text-lg md:mb-4 md:px-2 mr-auto md:mr-0 whitespace-nowrap">
           🦉 ผู้ช่วยครู
         </Link>
