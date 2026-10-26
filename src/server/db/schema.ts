@@ -203,3 +203,43 @@ export const scores = sqliteTable(
   },
   (t) => [uniqueIndex('scores_item_student_unique').on(t.itemId, t.studentId)],
 )
+
+export const videos = sqliteTable('videos', {
+  id: text('id').primaryKey(),
+  classId: text('class_id')
+    .notNull()
+    .references(() => classes.id),
+  title: text('title').notNull(),
+  description: text('description').notNull().default(''),
+  youtubeId: text('youtube_id').notNull(),
+  published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull(),
+})
+
+export const feeItems = sqliteTable('fee_items', {
+  id: text('id').primaryKey(),
+  classId: text('class_id')
+    .notNull()
+    .references(() => classes.id),
+  title: text('title').notNull(),
+  amount: real('amount').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
+
+export const feeCharges = sqliteTable(
+  'fee_charges',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => feeItems.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    amount: real('amount').notNull(),
+    paid: real('paid').notNull().default(0),
+    note: text('note').notNull().default(''),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('fee_charges_item_student_unique').on(t.itemId, t.studentId)],
+)

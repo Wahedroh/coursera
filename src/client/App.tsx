@@ -4,6 +4,12 @@ import StudentCheckin from './pages/StudentCheckin'
 import StudentLogin from './pages/StudentLogin'
 import StudentProgress from './pages/StudentProgress'
 import StudentScores from './pages/StudentScores'
+import StudentVideos from './pages/StudentVideos'
+import StudentVideo from './pages/StudentVideo'
+import StudentFees from './pages/StudentFees'
+import TeacherVideos from './pages/TeacherVideos'
+import TeacherFees from './pages/TeacherFees'
+import TeacherFeeItem from './pages/TeacherFeeItem'
 import StudentSubmit from './pages/StudentSubmit'
 import TeacherAssignmentForm from './pages/TeacherAssignmentForm'
 import TeacherAttendance from './pages/TeacherAttendance'
@@ -27,6 +33,9 @@ export default function App() {
         <Route path="/me/assignments/:id" element={<StudentSubmit />} />
         <Route path="/me/progress" element={<StudentProgress />} />
         <Route path="/me/scores" element={<StudentScores />} />
+        <Route path="/me/videos" element={<StudentVideos />} />
+        <Route path="/me/videos/:id" element={<StudentVideo />} />
+        <Route path="/me/fees" element={<StudentFees />} />
         <Route path="/checkin" element={<StudentCheckin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />
@@ -37,6 +46,9 @@ export default function App() {
         <Route path="/teacher/classes/:id/seating" element={<TeacherSeating />} />
         <Route path="/teacher/classes/:id/scores" element={<TeacherScores />} />
         <Route path="/teacher/score-items/:id" element={<TeacherScoreEntry />} />
+        <Route path="/teacher/classes/:id/videos" element={<TeacherVideos />} />
+        <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
+        <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/attendance/:dayId/qr" element={<TeacherCheckinScreen />} />
         <Route path="/teacher/assignments/new" element={<TeacherAssignmentForm />} />
         <Route path="/teacher/assignments/:id/edit" element={<TeacherAssignmentForm />} />
