@@ -243,3 +243,12 @@ export const feeCharges = sqliteTable(
   },
   (t) => [uniqueIndex('fee_charges_item_student_unique').on(t.itemId, t.studentId)],
 )
+
+export const studentAvatars = sqliteTable('student_avatars', {
+  studentId: text('student_id')
+    .primaryKey()
+    .references(() => students.id),
+  nickname: text('nickname').notNull().default(''),
+  config: text('config', { mode: 'json' }).$type<Record<string, unknown>>().notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})

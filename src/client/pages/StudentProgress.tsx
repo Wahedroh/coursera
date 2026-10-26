@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { CHARACTERS, characterById, RARITY_LABEL } from '../../shared/characters'
-import { CharacterArt, EggArt } from '../components/PixelArt'
+import { AvatarArt, CharacterArt, EggArt } from '../components/PixelArt'
+import type { AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
 type Progress = {
@@ -12,7 +13,7 @@ type Progress = {
   eggs: { id: string; level: number; characterId: string | null; openedAt: number | null }[]
   history: { delta: number; reason: string; createdAt: number }[]
 }
-type Rank = { rank: number; firstName: string; exp: number; level: number; isMe: boolean }
+type Rank = { rank: number; firstName: string; exp: number; level: number; isMe: boolean; avatar: AvatarConfig }
 
 export default function StudentProgress() {
   const navigate = useNavigate()
@@ -104,9 +105,11 @@ export default function StudentProgress() {
             <h2 className="font-bold mt-2">กระดานจัดอันดับห้อง</h2>
             <Card className="p-2">
               {board.map((r) => (
-                <div key={r.rank} className={`flex justify-between px-2 py-1.5 text-sm ${r.isMe ? 'bg-board-soft rounded-lg font-bold' : ''}`}>
-                  <span>
-                    {r.rank}. {r.firstName}
+                <div key={r.rank} className={`flex justify-between items-center px-2 py-1.5 text-sm ${r.isMe ? 'bg-board-soft rounded-lg font-bold' : ''}`}>
+                  <span className="flex items-center gap-2">
+                    <span className="w-5 text-right">{r.rank}.</span>
+                    <AvatarArt config={r.avatar} size={2} label={r.firstName} />
+                    {r.firstName}
                   </span>
                   <span>
                     LV {r.level} · {r.exp}

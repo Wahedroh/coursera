@@ -1,3 +1,4 @@
+import { AVATAR_H, AVATAR_W, avatarPixels, type AvatarConfig } from '../../shared/avatar'
 import { characterById, shapeRows } from '../../shared/characters'
 
 const EGG = ['...kkkk...', '..kwwwwk..', '.kwwbwwwk.', '.kwwwwbwk.', 'kwbwwwwwwk', 'kwwwwbwwwk', 'kwwbwwwwwk', 'kwwwwwwbwk', '.kwwwwwwk.', '..kkkkkk..']
@@ -22,4 +23,15 @@ export function CharacterArt({ id, size = 5 }: { id: string; size?: number }) {
 
 export function EggArt({ size = 6 }: { size?: number }) {
   return <Pixels rows={EGG} pal={EGG_PAL} size={size} label="ไข่" />
+}
+
+/** ตัวละครแต่งเองของนักเรียน */
+export function AvatarArt({ config, size = 6, label = 'ตัวละครของฉัน' }: { config: AvatarConfig; size?: number; label?: string }) {
+  return (
+    <svg width={AVATAR_W * size} height={AVATAR_H * size} viewBox={`0 0 ${AVATAR_W} ${AVATAR_H}`} shapeRendering="crispEdges" role="img" aria-label={label}>
+      {avatarPixels(config).map(([x, y, c]) => (
+        <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} fill={c} />
+      ))}
+    </svg>
+  )
 }
