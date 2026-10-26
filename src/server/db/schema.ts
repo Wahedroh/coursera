@@ -116,3 +116,57 @@ export const pointEvents = sqliteTable(
   },
   (t) => [uniqueIndex('point_events_source_ref_unique').on(t.source, t.refId)],
 )
+
+export const attendanceDays = sqliteTable(
+  'attendance_days',
+  {
+    id: text('id').primaryKey(),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    date: text('date').notNull(),
+    selfCheckinOpen: integer('self_checkin_open', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('attendance_days_class_date_unique').on(t.classId, t.date)],
+)
+
+export const attendanceRecords = sqliteTable(
+  'attendance_records',
+  {
+    id: text('id').primaryKey(),
+    dayId: text('day_id')
+      .notNull()
+      .references(() => attendanceDays.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    status: text('status', { enum: ['present', 'late', 'sick', 'leave', 'absent'] }).notNull(),
+    source: text('source', { enum: ['teacher', 'self'] }).notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('attendance_records_day_student_unique').on(t.dayId, t.studentId)],
+)
+
+export const seating = sqliteTable('seating', {
+  classId: text('class_id')
+    .primaryKey()
+    .references(() => classes.id),
+  layout: text('layout', { mode: 'json' }).$type<{ cols: number; seats: (string | null)[] }>().notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const eggs = sqliteTable(
+  'eggs',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    level: integer('level').notNull(),
+    characterId: text('character_id'),
+    openedAt: integer('opened_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('eggs_student_level_unique').on(t.studentId, t.level)],
+)

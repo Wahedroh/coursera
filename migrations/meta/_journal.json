@@ -15,6 +15,13 @@
       "when": 1792977131550,
       "tag": "0001_neat_blockbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792979301739,
+      "tag": "0002_light_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }
