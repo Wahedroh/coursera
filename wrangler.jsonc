@@ -16,6 +16,7 @@
       "migrations_dir": "migrations"
     }
   ],
-  // R2 (รูปงาน) จะเพิ่มใน M1 — ต้องเปิดใช้ R2 ในแดชบอร์ดก่อน
+  // รูปงาน — ต้องเปิดใช้ R2 ในแดชบอร์ดและสร้าง bucket ก่อน deploy
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "classroom-files" }],
   "vars": {}
 }

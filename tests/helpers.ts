@@ -79,3 +79,53 @@ export async function loginTeacher(): Promise<string> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const json = (r: Response) => r.json() as Promise<any>
+
+export async function studentCookie(studentId: string, ua = 'ua'): Promise<string> {
+  const { env } = await import('cloudflare:test')
+  const { createSession } = await import('../src/server/auth/sessions')
+  const { getDb } = await import('../src/server/db/client')
+  const { token } = await createSession(getDb(env), { kind: 'student', studentId }, ua, env.SESSION_SECRET)
+  return `sid=${token}`
+}
+
+/** JPEG ขนาดเล็กที่สุดที่ถูกต้อง (1×1) */
+export const TINY_JPEG = Uint8Array.from(
+  atob('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='),
+  (c) => c.charCodeAt(0),
+)
+
+export async function uploadFile(query: string, body: BodyInit, contentType: string, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x/api/files?${query}`, {
+    method: 'POST',
+    headers: { 'content-type': contentType, ...(cookie ? { cookie } : {}) },
+    body,
+  })
+}
+
+export async function putJson(path: string, body: unknown, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+}
+
+export async function del(path: string, cookie?: string) {
+  const { SELF } = await import('cloudflare:test')
+  return SELF.fetch(`http://x${path}`, { method: 'DELETE', headers: cookie ? { cookie } : {} })
+}
+
+export const ASSIGNMENT = { title: 'ใบงาน 1', instructions: 'ทำข้อ 1-10', attachmentKeys: [], dueAt: null, maxScore: 10, submitMode: 'both' }
+
+export async function seedAssignment(classId: string, over: Record<string, unknown> = {}): Promise<string> {
+  const { env } = await import('cloudflare:test')
+  const { getDb, newId, now } = await import('../src/server/db/client')
+  const { assignments } = await import('../src/server/db/schema')
+  const id = newId()
+  await getDb(env)
+    .insert(assignments)
+    .values({ id, classId, title: 'ใบงาน', maxScore: 10, submitMode: 'both', createdAt: now(), updatedAt: now(), ...over } as never)
+  return id
+}

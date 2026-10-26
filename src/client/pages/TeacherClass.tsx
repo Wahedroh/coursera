@@ -50,6 +50,14 @@ export default function TeacherClass() {
                 {data.students.filter((s) => s.active).length} คน · ตั้ง PIN แล้ว {data.students.filter((s) => s.pinSet).length}
               </p>
             </div>
+            <div className="flex gap-2">
+              <Link to={`/teacher/classes/${data.class.id}/gradebook`} className="rounded-2xl bg-board text-white px-4 py-2 font-bold">
+                ตารางทวงงาน
+              </Link>
+              <Link to={`/teacher/assignments/new?classId=${data.class.id}`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
+                + สร้างงาน
+              </Link>
+            </div>
             <div className="text-right">
               <div className="text-xs text-stone-500">รหัสห้อง</div>
               <div className="text-xl font-extrabold tracking-[0.3em]">{data.class.joinCode}</div>
