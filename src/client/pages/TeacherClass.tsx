@@ -63,6 +63,9 @@ export default function TeacherClass() {
               <Link to={`/teacher/classes/${data.class.id}/seating`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
                 ผังห้อง & แต้ม
               </Link>
+              <Link to={`/teacher/classes/${data.class.id}/scores`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
+                คะแนนสอบ
+              </Link>
             </div>
             <div className="text-right">
               <div className="text-xs text-stone-500">รหัสห้อง</div>

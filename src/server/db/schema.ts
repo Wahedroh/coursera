@@ -170,3 +170,36 @@ export const eggs = sqliteTable(
   },
   (t) => [uniqueIndex('eggs_student_level_unique').on(t.studentId, t.level)],
 )
+
+export const scoreItems = sqliteTable('score_items', {
+  id: text('id').primaryKey(),
+  classId: text('class_id')
+    .notNull()
+    .references(() => classes.id),
+  title: text('title').notNull(),
+  category: text('category', { enum: ['quiz', 'midterm', 'final', 'other'] }).notNull(),
+  maxScore: real('max_score').notNull(),
+  takenOn: text('taken_on').notNull(),
+  published: integer('published', { mode: 'boolean' }).notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export const scores = sqliteTable(
+  'scores',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => scoreItems.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    score: real('score'),
+    absent: integer('absent', { mode: 'boolean' }).notNull().default(false),
+    note: text('note').notNull().default(''),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('scores_item_student_unique').on(t.itemId, t.studentId)],
+)
