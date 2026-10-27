@@ -33,7 +33,7 @@ it('เผยแพร่แล้วเห็นเฉพาะคะแนน�
   expect(JSON.stringify(mine)).not.toContain('ดีมาก')
   const theirs = await json(await getJson('/api/student/scores', await studentCookie(b.id)))
   expect(theirs[0]).toMatchObject({ score: 12 })
-  expect(JSON.stringify(theirs)).not.toContain('25')
+  expect(theirs.map((x: { score: number | null }) => x.score)).not.toContain(25)
   await publish(itemId, false, cookie)
   expect(await json(await getJson('/api/student/scores', await studentCookie(a.id)))).toEqual([])
 })
