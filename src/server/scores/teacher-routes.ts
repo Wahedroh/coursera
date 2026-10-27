@@ -4,7 +4,8 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
-import { createScoreItems, deleteScoreItem, getScoreSheet, listScoreItems, saveScore, scoreBook, setPublished, updateScoreItem } from './service'
+import { scoreImportSchema } from '../../shared/zipgrade-results'
+import { createScoreItems, importScores, deleteScoreItem, getScoreSheet, listScoreItems, saveScore, scoreBook, setPublished, updateScoreItem } from './service'
 
 export const teacherScoreRoutes = new Hono<AppEnv>()
 teacherScoreRoutes.use('*', requireTeacher)
@@ -39,4 +40,8 @@ teacherScoreRoutes.delete('/score-items/:id', async (c) => {
 teacherScoreRoutes.put('/score-items/:id/scores/:studentId', async (c) => {
   await saveScore(getDb(c.env), c.req.param('id'), c.req.param('studentId'), await parseBody(c, scoreInputSchema), now())
   return c.json({ ok: true })
+})
+
+teacherScoreRoutes.post('/score-items/:id/import', async (c) => {
+  return c.json(await importScores(getDb(c.env), c.req.param('id'), await parseBody(c, scoreImportSchema), now()))
 })

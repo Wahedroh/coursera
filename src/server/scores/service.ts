@@ -1,4 +1,6 @@
 import { and, asc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import type { ScoreImportInput, ScoreImportResult } from '../../shared/zipgrade-results'
+import { canonicalZipgradeId } from '../../shared/zipgrade'
 import { validScore, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
 import { newId, now, type Db } from '../db/client'
 import { classes, scoreItems, scores, students } from '../db/schema'
@@ -152,4 +154,58 @@ export async function scoreBook(db: Db, classId: string): Promise<ScoreBook> {
   const cells: ScoreBook['cells'] = {}
   for (const r of rows) (cells[r.studentId] ??= {})[r.itemId] = { score: r.score, absent: r.absent }
   return { items, cells }
+}
+
+/** นำเข้าคะแนนจาก ZipGrade ลงรายการเดิม — จับคู่ด้วย ZipGrade ID เฉพาะนักเรียนที่ใช้งานในห้องนี้
+ *  overwrite=false ไม่แตะคนที่กรอก/ติ๊กขาดสอบไว้แล้ว · absentMissing ติ๊กขาดสอบให้คนที่ไม่มีในไฟล์และยังไม่มีคะแนน
+ *  หมายเหตุของครูคงเดิมเสมอ · ครูแก้คะแนนรายคนต่อได้ตามปกติ */
+export async function importScores(db: Db, itemId: string, input: ScoreImportInput, t: number): Promise<ScoreImportResult> {
+  const item = await getItem(db, itemId)
+  const roster = await db
+    .select({ id: students.id, zipgradeId: students.zipgradeId, score: scores.score, absent: scores.absent, note: scores.note })
+    .from(students)
+    .leftJoin(scores, and(eq(scores.studentId, students.id), eq(scores.itemId, itemId)))
+    .where(activeIn(item.classId))
+  const byZip = new Map(roster.map((r) => [canonicalZipgradeId(r.zipgradeId), r]))
+  const result: ScoreImportResult = { saved: 0, keptExisting: 0, markedAbsent: 0, notInClass: [], invalid: [] }
+  const writes: { studentId: string; score: number | null; absent: boolean; note: string }[] = []
+  const inFile = new Set<string>()
+  for (const row of input.rows) {
+    const st = byZip.get(canonicalZipgradeId(row.zipgradeId))
+    if (!st) {
+      result.notInClass.push(row.zipgradeId)
+      continue
+    }
+    if (inFile.has(st.id)) continue
+    inFile.add(st.id)
+    if (!validScore(row.score, item.maxScore)) {
+      result.invalid.push(row.zipgradeId)
+      continue
+    }
+    const hasValue = st.score !== null || st.absent === true
+    if (hasValue && !input.overwrite) {
+      result.keptExisting++
+      continue
+    }
+    writes.push({ studentId: st.id, score: row.score, absent: false, note: st.note ?? '' })
+    result.saved++
+  }
+  if (input.absentMissing) {
+    for (const st of roster) {
+      if (inFile.has(st.id) || st.score !== null || st.absent === true) continue
+      writes.push({ studentId: st.id, score: null, absent: true, note: st.note ?? '' })
+      result.markedAbsent++
+    }
+  }
+  for (let i = 0; i < writes.length; i += 40) {
+    const stmts = writes.slice(i, i + 40).map((w) => {
+      const values = { score: w.score, absent: w.absent, note: w.note, updatedAt: t }
+      return db
+        .insert(scores)
+        .values({ id: newId(), itemId, studentId: w.studentId, ...values })
+        .onConflictDoUpdate({ target: [scores.itemId, scores.studentId], set: values })
+    })
+    await db.batch(stmts as [(typeof stmts)[number], ...(typeof stmts)[number][]])
+  }
+  return result
 }
