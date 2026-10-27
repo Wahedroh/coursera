@@ -22,3 +22,11 @@ body {
 }
 .animate-hop { animation: hop 0.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .animate-hop { animation: none; } }
+
+/* รายงานรายบุคคล: 1 คนต่อ 1 หน้า A4 เมื่อพิมพ์ */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body { background: #fff; }
+  .report-page { break-after: page; }
+  .report-page:last-of-type { break-after: auto; }
+}

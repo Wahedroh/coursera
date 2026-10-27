@@ -18,7 +18,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
   }
   return (
     <div className="min-h-screen md:flex">
-      <aside className="bg-board text-green-50 md:w-56 md:min-h-screen px-4 py-3 md:py-6 flex flex-wrap md:flex-nowrap md:flex-col items-center md:items-stretch gap-x-1 gap-y-1 md:gap-2">
+      <aside className="print:hidden bg-board text-green-50 md:w-56 md:min-h-screen px-4 py-3 md:py-6 flex flex-wrap md:flex-nowrap md:flex-col items-center md:items-stretch gap-x-1 gap-y-1 md:gap-2">
         <Link to="/teacher" className="font-extrabold text-white text-lg md:mb-4 md:px-2 mr-auto md:mr-0 whitespace-nowrap">
           <span className="inline-flex items-center gap-2">
             <span className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-white p-1 shrink-0">
@@ -41,7 +41,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
           ออกจากระบบ
         </button>
       </aside>
-      <main className="flex-1 p-4 md:p-7 flex flex-col gap-4 min-w-0">{children}</main>
+      <main className="flex-1 p-4 md:p-7 print:p-0 flex flex-col gap-4 min-w-0">{children}</main>
     </div>
   )
 }
