@@ -72,3 +72,26 @@ it('ตั้งค่าเกรดผิดรูปแบบ → 400; นั
   expect((await getJson(`/api/teacher/classes/${classId}/grades`, await studentCookie(ss[0].id))).status).toBe(401)
   expect((await putJson('/api/teacher/classes/nope/grading', { bands: DEFAULT_BANDS, visible: true }, cookie)).status).toBe(404)
 })
+
+it('allClassGrades (รวมทุกห้อง) ให้เกรดตรงกับ classGrades ของแต่ละห้อง', async () => {
+  const { allClassGrades, classGrades } = await import('../src/server/grades/service')
+  const { getDb: gdb } = await import('../src/server/db/client')
+  const { env: e } = await import('cloudflare:test')
+  const { seedClass: sc, seedStudent: ss, loginTeacher: lt, postJson: pj, putJson: uj, json: js } = await import('./helpers')
+  const d = gdb(e)
+  const cookie = await lt()
+  const classIds: string[] = []
+  for (let k = 0; k < 2; k++) {
+    const { classId } = await sc(d)
+    classIds.push(classId)
+    const st = []
+    for (let i = 0; i < 5; i++) st.push(await ss(d, classId))
+    const { ids } = await js(await pj('/api/teacher/score-items', { title: 'สอบ', category: 'quiz', maxScore: 10, takenOn: '2026-10-20', classIds: [classId] }, { cookie }))
+    for (const [i, s] of st.entries()) await uj(`/api/teacher/score-items/${ids[0]}/scores/${s.id}`, { score: (i * 2 + k) % 11, absent: false, note: '' }, cookie)
+  }
+  const all = await allClassGrades(d)
+  for (const id of classIds) {
+    const one = await classGrades(d, id)
+    for (const s of one.students) expect(all.get(id)?.get(s.id)).toBe(s.grade)
+  }
+})

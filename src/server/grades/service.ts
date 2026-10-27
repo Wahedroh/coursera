@@ -71,3 +71,44 @@ export async function gradeForStudent(db: Db, studentId: string, classId: string
   const me = all.students.find((s) => s.id === studentId)
   return { visible: true, total: me?.total ?? 0, maxTotal: all.maxTotal, grade: me?.grade ?? null }
 }
+
+/** เกรดคาดการณ์ทุกห้องในคำสั่งไม่กี่ครั้ง (D1 แพ็กเกจฟรีจำกัด 50 คำสั่งต่อคำขอ) — วิธีคิดเดียวกับ classGrades */
+export async function allClassGrades(db: Db): Promise<Map<string, Map<string, string | null>>> {
+  const roster = await db.all<{ id: string; classId: string }>(sql`SELECT id, class_id AS classId FROM students WHERE active = 1`)
+  const asg = await db.all<{ studentId: string; total: number }>(sql`
+    SELECT s.student_id AS studentId, sum(s.score) AS total FROM submissions s JOIN assignments a ON a.id = s.assignment_id
+    WHERE s.status = 'graded' AND s.score IS NOT NULL GROUP BY s.student_id`)
+  const exam = await db.all<{ studentId: string; total: number }>(sql`
+    SELECT sc.student_id AS studentId, sum(coalesce(sc.score, 0)) AS total FROM scores sc GROUP BY sc.student_id`)
+  const maxes = await db.all<{ classId: string; max: number }>(sql`
+    SELECT class_id AS classId, sum(max) AS max FROM (
+      SELECT a.class_id, a.max_score AS max FROM assignments a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'graded')
+      UNION ALL
+      SELECT i.class_id, i.max_score FROM score_items i WHERE EXISTS (SELECT 1 FROM scores sc WHERE sc.item_id = i.id AND (sc.score IS NOT NULL OR sc.absent = 1))
+    ) GROUP BY class_id`)
+  const settingRows = await db.all<{ key: string; value: string }>(sql`SELECT key, value FROM settings WHERE key LIKE 'grading:%'`)
+  const bandsOf = new Map(
+    settingRows.map((r) => {
+      let g = DEFAULT_GRADING
+      try {
+        const p = gradingSchema.safeParse(JSON.parse(r.value))
+        if (p.success) g = p.data
+      } catch {}
+      return [r.key.slice('grading:'.length), g.bands]
+    }),
+  )
+  const a = new Map(asg.map((r) => [r.studentId, r.total]))
+  const e = new Map(exam.map((r) => [r.studentId, r.total]))
+  const maxBy = new Map(maxes.map((m) => [m.classId, m.max]))
+  const byClass = new Map<string, { id: string; total: number }[]>()
+  for (const s of roster) {
+    const total = Math.round(((a.get(s.id) ?? 0) + (e.get(s.id) ?? 0)) * 100) / 100
+    ;(byClass.get(s.classId) ?? byClass.set(s.classId, []).get(s.classId)!).push({ id: s.id, total })
+  }
+  const out = new Map<string, Map<string, string | null>>()
+  for (const [classId, rows] of byClass) {
+    const graded = (maxBy.get(classId) ?? 0) > 0 ? assignGrades(rows, bandsOf.get(classId) ?? DEFAULT_GRADING.bands) : new Map()
+    out.set(classId, new Map(rows.map((r) => [r.id, graded.get(r.id)?.grade ?? null])))
+  }
+  return out
+}

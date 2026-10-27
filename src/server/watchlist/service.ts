@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import type { WatchReason, Watchlist, WatchlistQuery, WatchStudent } from '../../shared/watchlist'
 import type { Db } from '../db/client'
-import { classGrades } from '../grades/service'
+import { allClassGrades } from '../grades/service'
 
 /** นักเรียนที่ต้องติดตาม ทุกห้อง — ค้างงานที่เลยกำหนด (รวมงานที่ครูส่งกลับให้แก้) · ขาดเรียนในช่วง N วัน · เกรดคาดการณ์ต่ำ · ยังไม่ตั้ง PIN */
 export async function watchlist(db: Db, q: WatchlistQuery, t: number): Promise<Watchlist> {
@@ -24,11 +24,12 @@ export async function watchlist(db: Db, q: WatchlistQuery, t: number): Promise<W
   const missingBy = new Map<string, string[]>()
   for (const m of missing) (missingBy.get(m.studentId) ?? missingBy.set(m.studentId, []).get(m.studentId)!).push(m.title)
   const attBy = new Map(att.map((a) => [a.studentId, a]))
+  const gradesAll = await allClassGrades(db)
   const out: Watchlist['classes'] = []
   for (const c of cls) {
     const members = roster.filter((s) => s.classId === c.id)
     if (!members.length) continue
-    const grades = new Map((await classGrades(db, c.id)).students.map((g) => [g.id, g.grade]))
+    const grades = gradesAll.get(c.id) ?? new Map<string, string | null>()
     const flagged: WatchStudent[] = []
     for (const s of members) {
       const titles = missingBy.get(s.id) ?? []
