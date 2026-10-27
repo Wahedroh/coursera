@@ -1,0 +1,28 @@
+import { expect, test } from '@playwright/test'
+
+// รันท้ายสุด (เพิ่มคนเข้าห้องแล้วจำนวนนักเรียนของเทสต์อื่นจะเปลี่ยน)
+test('ครูเพิ่มนักเรียนรายคน แล้วนักเรียนคนใหม่ตั้ง PIN และเข้าระบบได้', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('button', { name: '+ เพิ่มนักเรียน' }).click()
+  await t.getByLabel('ZipGrade ID').fill('3')
+  await t.getByLabel('ชื่อ', { exact: true }).fill('ซ้ำ')
+  await t.getByRole('button', { name: 'เพิ่ม', exact: true }).click()
+  await expect(t.getByText(/ZipGrade ID 3 เป็นของ มานี มีนา/)).toBeVisible()
+  await t.getByLabel('ZipGrade ID').fill('88')
+  await t.getByLabel('คำนำหน้า').selectOption('เด็กหญิง')
+  await t.getByLabel('ชื่อ', { exact: true }).fill('ใหม่ใจ')
+  await t.getByLabel('นามสกุล').fill('ย้ายมา')
+  await t.getByRole('button', { name: 'เพิ่ม', exact: true }).click()
+  await expect(t.getByText('เพิ่ม เด็กหญิงใหม่ใจ ย้ายมา แล้ว', { exact: false })).toBeVisible()
+  await expect(t.getByRole('cell', { name: 'เด็กหญิงใหม่ใจ ย้ายมา' })).toBeVisible()
+
+  const s = await (await browser.newContext()).newPage()
+  await s.goto('/')
+  await s.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('88')
+  await s.getByRole('button', { name: 'ถัดไป' }).click()
+  await expect(s.getByText('ใหม่ใจ ย้ายมา', { exact: false })).toBeVisible()
+})

@@ -5,6 +5,7 @@ import type { StudentAssignment, StudentStatus } from '../../shared/assignments'
 import { baht, type StudentFee } from '../../shared/fees'
 import type { AvatarConfig } from '../../shared/avatar'
 import { AvatarArt } from '../components/PixelArt'
+import StudentAnnouncements from '../components/StudentAnnouncements'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
 import { Button, Card, Chip, Loading } from '../ui'
@@ -97,6 +98,7 @@ export default function StudentHome() {
         </div>
       </header>
       <section className="p-5 flex flex-col gap-3">
+        <StudentAnnouncements />
         {feeOwed > 0 && (
           <Link to="/me/fees" className="block">
             <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">

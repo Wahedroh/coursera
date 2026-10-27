@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { api, fullName } from '../api'
 import { CATEGORY_LABEL, SCORE_CATEGORIES, parsePastedColumn, parseScore, scoreStats, type ScoreCategory, type ScoreRow, type ScoreSheet } from '../../shared/scores'
 import { formatDate } from '../lib/format'
+import ZipgradeImport from '../components/ZipgradeImport'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -26,6 +27,7 @@ export default function TeacherScoreEntry() {
   const queues = useRef(new Map<string, Promise<void>>())
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const [flash, setFlash] = useState<string | null>(null)
 
   const setRows = useCallback((f: (rs: Row[]) => Row[]) => {
     rowsRef.current = f(rowsRef.current)
@@ -194,6 +196,18 @@ export default function TeacherScoreEntry() {
           </button>
         </div>
       </div>
+      <div className="flex flex-wrap">
+        <ZipgradeImport
+          sheet={{ ...sheet, students: rows }}
+          onDone={(msg) => {
+            setFlash(msg)
+            setError(null)
+            load()
+          }}
+          onError={(e) => setError(handle(e))}
+        />
+      </div>
+      {flash && <Card className="p-3 bg-board-soft border-green-200 text-board font-semibold">{flash}</Card>}
       {editing && (
         <Card className="p-4">
           <form onSubmit={saveDetails} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] items-end">

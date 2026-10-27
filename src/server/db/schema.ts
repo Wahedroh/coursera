@@ -232,6 +232,32 @@ export const materials = sqliteTable('materials', {
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('materials_class_idx').on(t.classId)])
 
+export const announcements = sqliteTable('announcements', {
+  id: text('id').primaryKey(),
+  classId: text('class_id')
+    .notNull()
+    .references(() => classes.id),
+  title: text('title').notNull(),
+  body: text('body').notNull().default(''),
+  pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
+  expiresOn: text('expires_on'),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('announcements_class_idx').on(t.classId)])
+
+export const announcementReads = sqliteTable(
+  'announcement_reads',
+  {
+    announcementId: text('announcement_id')
+      .notNull()
+      .references(() => announcements.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    readAt: integer('read_at').notNull(),
+  },
+  (t) => [uniqueIndex('announcement_reads_unique').on(t.announcementId, t.studentId)],
+)
+
 export const feeItems = sqliteTable('fee_items', {
   id: text('id').primaryKey(),
   classId: text('class_id')

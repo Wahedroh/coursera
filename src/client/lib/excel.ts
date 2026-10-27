@@ -3,7 +3,8 @@ import type { Gradebook } from '../../shared/assignments'
 import type { ScoreBook } from '../../shared/scores'
 import type { ClassGrades } from '../../shared/grades'
 import { outstanding, type FeeSheet } from '../../shared/fees'
-import { ATTENDANCE_STATUSES, STATUS_LABEL, type AttendanceRange } from '../../shared/attendance'
+import { ATTENDANCE_STATUSES, STATUS_LABEL, todayBangkok, type AttendanceRange } from '../../shared/attendance'
+import { REASON_LABEL, type Watchlist } from '../../shared/watchlist'
 
 /** สมุดคะแนนรวม: คอลัมน์งาน แล้วต่อด้วยคอลัมน์คะแนนสอบ */
 export async function exportGradebook(gb: Gradebook, book: ScoreBook): Promise<void> {
@@ -88,4 +89,23 @@ export async function exportGrades(g: ClassGrades, className: string): Promise<v
   ])
   const data: SheetData = [header, ...rows]
   await writeXlsxFile(data, { sheet: 'เกรด' }).toFile(`เกรด-${className}.xlsx`)
+}
+
+/** นักเรียนที่ต้องติดตาม (ทุกห้องในไฟล์เดียว) */
+export async function exportWatchlist(w: Watchlist): Promise<void> {
+  const header = ['ห้อง', 'ZipGrade ID', 'ชื่อ-นามสกุล', 'เหตุผล', 'ค้างงาน', 'งานที่ค้าง', `ขาด (ตั้งแต่ ${w.from})`, 'สาย', 'เกรดคาดการณ์'].map((value) => ({ value, fontWeight: 'bold' as const }))
+  const rows = w.classes.flatMap((c) =>
+    c.students.map((s) => [
+      { value: c.name },
+      { value: s.zipgradeId },
+      { value: s.name },
+      { value: s.reasons.map((r) => REASON_LABEL[r]).join(', ') },
+      { value: s.missing },
+      { value: s.missingTitles.join(', ') },
+      { value: s.absent },
+      { value: s.late },
+      { value: s.grade ?? '' },
+    ]),
+  )
+  await writeXlsxFile([header, ...rows] as SheetData, { sheet: 'ติดตาม' }).toFile(`นักเรียนที่ต้องติดตาม-${todayBangkok()}.xlsx`)
 }

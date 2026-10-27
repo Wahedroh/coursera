@@ -14,6 +14,9 @@ import { rosterRoutes } from './roster/routes'
 import { studentScoreRoutes } from './scores/student-routes'
 import { studentGradeRoutes, teacherGradeRoutes } from './grades/routes'
 import { teacherStorageRoutes } from './storage/routes'
+import { studentAnnouncementRoutes, teacherAnnouncementRoutes } from './announcements/routes'
+import { teacherWatchlistRoutes } from './watchlist/routes'
+import { teacherReportRoutes } from './report/routes'
 import { studentMaterialRoutes, teacherMaterialRoutes } from './materials/routes'
 import { studentVideoRoutes } from './videos/student-routes'
 import { teacherVideoRoutes } from './videos/teacher-routes'
@@ -35,6 +38,9 @@ app.route('/api/teacher', teacherPointsRoutes)
 app.route('/api/teacher', teacherScoreRoutes)
 app.route('/api/teacher', teacherVideoRoutes)
 app.route('/api/teacher', teacherMaterialRoutes)
+app.route('/api/teacher', teacherAnnouncementRoutes)
+app.route('/api/teacher', teacherWatchlistRoutes)
+app.route('/api/teacher', teacherReportRoutes)
 app.route('/api/teacher', teacherFeeRoutes)
 app.route('/api/teacher', teacherStorageRoutes)
 app.route('/api/teacher', teacherGradeRoutes)
@@ -44,6 +50,7 @@ app.route('/api/student/scores', studentScoreRoutes)
 app.route('/api/student/grade', studentGradeRoutes)
 app.route('/api/student/videos', studentVideoRoutes)
 app.route('/api/student/materials', studentMaterialRoutes)
+app.route('/api/student/announcements', studentAnnouncementRoutes)
 app.route('/api/student/fees', studentFeeRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
