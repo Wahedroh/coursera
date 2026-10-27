@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
+import { AvatarArt } from '../components/PixelArt'
+import { DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type Student = { id: string; firstName: string; lastName: string; active: boolean }
 type Layout = { cols: number; seats: (string | null)[] }
-type Points = { studentId: string; exp: number; level: number }[]
+type Points = { studentId: string; exp: number; level: number; avatar: AvatarConfig }[]
+
+/** สุ่มได้แล้วโชว์ตัวละครก่อนกี่วินาที ค่อยเฉลยชื่อ */
+const REVEAL_SECONDS = 3
 
 const REASONS = ['ตอบคำถาม', 'ช่วยเพื่อน', 'ตั้งใจเรียน', 'ไม่ส่งการบ้าน', 'คุยในห้อง']
 
@@ -34,6 +39,8 @@ export default function TeacherSeating() {
   const [flash, setFlash] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(0)
+  const [avatars, setAvatars] = useState<Map<string, AvatarConfig>>(new Map())
   const [groupCount, setGroupCount] = useState(6)
   const [groups, setGroups] = useState<string[][] | null>(null)
   const [leaderboard, setLeaderboard] = useState(false)
@@ -41,7 +48,10 @@ export default function TeacherSeating() {
 
   const loadPoints = useCallback(() => {
     api<Points>(`/api/teacher/classes/${id}/points`)
-      .then((p) => setPoints(new Map(p.map((x) => [x.studentId, x.exp]))))
+      .then((p) => {
+        setPoints(new Map(p.map((x) => [x.studentId, x.exp])))
+        setAvatars(new Map(p.map((x) => [x.studentId, x.avatar])))
+      })
       .catch(() => {})
   }, [id])
 
@@ -56,6 +66,12 @@ export default function TeacherSeating() {
     api<{ leaderboardEnabled: boolean }>(`/api/teacher/classes/${id}/settings`).then((s) => setLeaderboard(s.leaderboardEnabled)).catch(() => {})
     loadPoints()
   }, [id, handle, loadPoints])
+
+  useEffect(() => {
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown((n) => n - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown])
 
   async function give(delta: number) {
     if (!selected) return
@@ -111,6 +127,7 @@ export default function TeacherSeating() {
       sessionStorage.setItem(pickKey, JSON.stringify([...done, s]))
     } catch {}
     setPicked(s ?? null)
+    setCountdown(s ? REVEAL_SECONDS : 0)
   }
 
   function makeGroups() {
@@ -211,13 +228,28 @@ export default function TeacherSeating() {
               </div>
             </Card>
           )}
-          <Card className="p-4 bg-board text-white text-center flex flex-col gap-2 border-0">
+          <div className="rounded-2xl p-4 bg-board text-white text-center flex flex-col items-center gap-2">
             <span className="text-xs opacity-80">🎲 สุ่มชื่อ (เหลือ {remaining} คนที่ยังไม่ถูกสุ่ม)</span>
-            {picked && <span className="text-2xl font-extrabold">{name(picked)}</span>}
-            <button type="button" onClick={pick} className="rounded-xl bg-amber-400 text-amber-950 px-3 py-2 font-bold">
-              สุ่มชื่อ
+            {picked && (
+              <div className="flex flex-col items-center gap-1 pt-3 pb-1" data-testid="pick-result">
+                <div className={`rounded-2xl bg-white/95 p-2 ${countdown > 0 ? 'animate-hop' : ''}`}>
+                  <AvatarArt config={avatars.get(picked) ?? DEFAULT_AVATAR} size={7} label="ตัวละครของคนที่ถูกสุ่ม" />
+                </div>
+                {countdown > 0 ? (
+                  <span className="text-3xl font-extrabold text-amber-300" aria-live="polite">
+                    {countdown}
+                  </span>
+                ) : (
+                  <span className="text-2xl font-extrabold" aria-live="polite" data-testid="picked-name">
+                    {name(picked)} {students.get(picked)?.lastName}
+                  </span>
+                )}
+              </div>
+            )}
+            <button type="button" onClick={pick} disabled={countdown > 0} className="w-full rounded-xl bg-amber-400 text-amber-950 px-3 py-2 font-bold disabled:opacity-60">
+              {countdown > 0 ? 'ใครกันนะ…' : 'สุ่มชื่อ'}
             </button>
-          </Card>
+          </div>
           <Card className="p-4 flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <label className="text-sm">
