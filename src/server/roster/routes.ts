@@ -1,14 +1,14 @@
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { parseZipgradeCsv } from '../../shared/roster/parse'
-import { MAX_CSV_CHARS, rosterApplySchema, rosterPreviewSchema } from '../../shared/schemas'
+import { addStudentSchema, MAX_CSV_CHARS, rosterApplySchema, rosterPreviewSchema } from '../../shared/schemas'
 import { requireTeacher } from '../auth/middleware'
 import { revokeStudentSessions } from '../auth/sessions'
 import { getDb, now, type Db } from '../db/client'
 import { classes, sessions, students } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
-import { applyImport, listClasses, listStudents, previewImport } from './service'
+import { addStudent, applyImport, listClasses, listStudents, previewImport } from './service'
 
 export const rosterRoutes = new Hono<AppEnv>()
 rosterRoutes.use('*', requireTeacher)
@@ -44,6 +44,10 @@ rosterRoutes.get('/classes/:classId/students', async (c) => {
     .where(eq(classes.id, c.req.param('classId')))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   return c.json({ class: cls, students: await listStudents(db, cls.id) })
+})
+
+rosterRoutes.post('/classes/:classId/students', async (c) => {
+  return c.json(await addStudent(getDb(c.env), c.req.param('classId'), await parseBody(c, addStudentSchema)))
 })
 
 async function requireStudentRow(db: Db, id: string) {

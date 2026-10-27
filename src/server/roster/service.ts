@@ -1,6 +1,9 @@
 import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { RosterRow } from '../../shared/roster/parse'
+import type { AddStudentInput } from '../../shared/schemas'
+import { canonicalZipgradeId } from '../../shared/zipgrade'
+import { apiError } from '../http'
 import { newId, now, type Db } from '../db/client'
 import { classes, schools, sessions, students } from '../db/schema'
 
@@ -228,4 +231,24 @@ export async function listStudents(db: Db, classId: string): Promise<StudentAdmi
       lastSeenAt: mine.length ? Math.max(...mine.map((x) => x.lastSeenAt)) : null,
     }
   })
+}
+
+/** เพิ่มนักเรียน 1 คนเข้าห้อง ต่อท้ายรายชื่อ · ZipGrade ID ซ้ำกับคนที่มีอยู่แล้ว (ทุกห้อง) ไม่ได้ */
+export async function addStudent(db: Db, classId: string, input: AddStudentInput): Promise<{ id: string }> {
+  const [cls] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
+  if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
+  const zipgradeId = canonicalZipgradeId(input.zipgradeId)
+  const [dup] = await db
+    .select({ name: classes.name, firstName: students.firstName, lastName: students.lastName, active: students.active })
+    .from(students)
+    .innerJoin(classes, eq(classes.id, students.classId))
+    .where(eq(students.zipgradeId, zipgradeId))
+  if (dup) {
+    throw apiError('duplicate_zipgrade_id', `ZipGrade ID ${zipgradeId} เป็นของ ${dup.firstName} ${dup.lastName} (${dup.name}${dup.active ? '' : ' · ปิดใช้งาน'}) อยู่แล้ว`, 409)
+  }
+  const [{ next }] = await db.select({ next: sql<number>`coalesce(max(${students.sortOrder}), 0) + 1` }).from(students).where(eq(students.classId, classId))
+  const id = newId()
+  const t = now()
+  await db.insert(students).values({ id, zipgradeId, classId, title: input.title, firstName: input.firstName, lastName: input.lastName, sortOrder: next, createdAt: t, updatedAt: t })
+  return { id }
 }

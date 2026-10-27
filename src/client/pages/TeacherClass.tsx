@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { api, fullName } from '../api'
 import type { StudentAdminRow } from '../../server/roster/service'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
+import AddStudentForm from '../components/AddStudentForm'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -15,6 +16,7 @@ export default function TeacherClass() {
   const handle = useTeacherErrorHandler()
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
 
   const load = useCallback(() => {
     api<Data>(`/api/teacher/classes/${id}/students`)
@@ -90,6 +92,16 @@ export default function TeacherClass() {
               <div className="text-xl font-extrabold tracking-[0.3em]">{data.class.joinCode}</div>
             </div>
           </div>
+          {flash && <Card className="p-3 bg-board-soft border-green-200 text-board font-semibold">{flash}</Card>}
+          <AddStudentForm
+            classId={data.class.id}
+            onAdded={(name) => {
+              setFlash(`เพิ่ม ${name} แล้ว — ให้นักเรียนเข้าเว็บด้วย ZipGrade ID แล้วตั้ง PIN`)
+              setError(null)
+              load()
+            }}
+            onError={(e) => setError(handle(e))}
+          />
           <Card className="p-2 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
