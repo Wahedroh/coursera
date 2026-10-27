@@ -5,6 +5,7 @@ import { api } from '../api'
 const NAV = [
   { to: '/teacher', label: 'หน้าแรก', end: true },
   { to: '/teacher/assignments/new', label: 'สร้างงาน', end: false },
+  { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', end: false },
   { to: '/teacher/import', label: 'นำเข้ารายชื่อ', end: false },
   { to: '/teacher/storage', label: 'พื้นที่ไฟล์', end: false },
 ]

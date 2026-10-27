@@ -12,6 +12,7 @@ import StudentAvatar from './pages/StudentAvatar'
 import TeacherVideos from './pages/TeacherVideos'
 import TeacherMaterials from './pages/TeacherMaterials'
 import TeacherAnnouncements from './pages/TeacherAnnouncements'
+import TeacherWatchlist from './pages/TeacherWatchlist'
 import TeacherFees from './pages/TeacherFees'
 import TeacherFeeItem from './pages/TeacherFeeItem'
 import StudentSubmit from './pages/StudentSubmit'
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/teacher/classes/:id/videos" element={<TeacherVideos />} />
         <Route path="/teacher/classes/:id/materials" element={<TeacherMaterials />} />
         <Route path="/teacher/classes/:id/announcements" element={<TeacherAnnouncements />} />
+        <Route path="/teacher/watchlist" element={<TeacherWatchlist />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />
