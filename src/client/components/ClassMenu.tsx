@@ -9,7 +9,6 @@ export const CLASS_MENU: { label: string; path: (id: string) => string; primary?
   { label: 'คะแนนสอบ', path: (id) => `/teacher/classes/${id}/scores` },
   { label: 'เกรด', path: (id) => `/teacher/classes/${id}/grades` },
   { label: 'คลิปย้อนหลัง', path: (id) => `/teacher/classes/${id}/videos` },
-  { label: 'รายงานรายบุคคล', path: (id) => `/teacher/classes/${id}/report` },
   { label: 'ประกาศ', path: (id) => `/teacher/classes/${id}/announcements` },
   { label: 'เอกสารเรียน', path: (id) => `/teacher/classes/${id}/materials` },
   { label: 'ค่าเอกสาร', path: (id) => `/teacher/classes/${id}/fees` },
