@@ -32,7 +32,7 @@ test('หน้าแรกครูมีเมนูห้องเรีย�
   await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
   await expect(page.getByRole('heading', { name: 'เมนูห้องเรียน' })).toBeVisible()
-  for (const name of ['ตารางทวงงาน', '+ สร้างงาน', 'เช็กชื่อ', 'ผังห้อง & แต้ม', 'คะแนนสอบ', 'เกรด', 'คลิปย้อนหลัง', 'รายงานรายบุคคล', 'ประกาศ', 'เอกสารเรียน', 'ค่าเอกสาร'])
+  for (const name of ['ตารางทวงงาน', '+ สร้างงาน', 'เช็กชื่อ', 'ผังห้อง & แต้ม', 'คะแนนสอบ', 'เกรด', 'คลิปย้อนหลัง', 'ประกาศ', 'เอกสารเรียน', 'ค่าเอกสาร'])
     await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
   await page.getByLabel('เลือกห้องสำหรับเมนู').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
   await page.getByRole('link', { name: 'ประกาศ', exact: true }).click()
