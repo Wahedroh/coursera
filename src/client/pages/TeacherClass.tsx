@@ -4,6 +4,7 @@ import { api, fullName } from '../api'
 import type { StudentAdminRow } from '../../server/roster/service'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import AddStudentForm from '../components/AddStudentForm'
+import ClassMenu from '../components/ClassMenu'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -52,41 +53,7 @@ export default function TeacherClass() {
                 {data.students.filter((s) => s.active).length} คน · ตั้ง PIN แล้ว {data.students.filter((s) => s.pinSet).length}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to={`/teacher/classes/${data.class.id}/gradebook`} className="rounded-2xl bg-board text-white px-4 py-2 font-bold">
-                ตารางทวงงาน
-              </Link>
-              <Link to={`/teacher/assignments/new?classId=${data.class.id}`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                + สร้างงาน
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/attendance`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                เช็กชื่อ
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/seating`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                ผังห้อง & แต้ม
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/scores`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                คะแนนสอบ
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/grades`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                เกรด
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/videos`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                คลิปย้อนหลัง
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/report`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                รายงานรายบุคคล
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/announcements`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                ประกาศ
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/materials`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                เอกสารเรียน
-              </Link>
-              <Link to={`/teacher/classes/${data.class.id}/fees`} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                ค่าเอกสาร
-              </Link>
-            </div>
+            <ClassMenu classId={data.class.id} />
             <div className="text-right">
               <div className="text-xs text-stone-500">รหัสห้อง</div>
               <div className="text-xl font-extrabold tracking-[0.3em]">{data.class.joinCode}</div>

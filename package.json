@@ -17,6 +17,8 @@
   "dependencies": {
     "drizzle-orm": "0.45.4",
     "hono": "4.13.14",
+    "html2canvas-pro": "2.5.2",
+    "jspdf": "4.2.1",
     "papaparse": "5.7.0",
     "qrcode-generator": "2.0.4",
     "react": "19.3.1",
