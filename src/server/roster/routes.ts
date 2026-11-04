@@ -8,6 +8,7 @@ import { getDb, now, type Db } from '../db/client'
 import { classes, sessions, students } from '../db/schema'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
+import { deleteStudent } from './delete'
 import { addStudent, applyImport, listClasses, listStudents, previewImport } from './service'
 
 export const rosterRoutes = new Hono<AppEnv>()
@@ -55,6 +56,8 @@ async function requireStudentRow(db: Db, id: string) {
   if (!s) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
   return s
 }
+
+rosterRoutes.delete('/students/:id', async (c) => c.json(await deleteStudent(getDb(c.env), c.env.BUCKET, c.req.param('id'))))
 
 rosterRoutes.post('/students/:id/reset-pin', async (c) => {
   const db = getDb(c.env)
