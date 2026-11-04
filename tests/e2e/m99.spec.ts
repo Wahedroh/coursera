@@ -41,3 +41,38 @@ test('หน้าแรกครูมีเมนูห้องเรีย�
   await expect(page.getByLabel('เลือกห้องสำหรับเมนู')).toHaveValue(await page.getByLabel('เลือกห้องสำหรับเมนู').inputValue())
   await expect(page.getByLabel('เลือกห้องสำหรับเมนู').locator('option:checked')).toHaveText('โรงเรียนทดสอบ ชั้น 1')
 })
+
+test('หน้าห้อง: เห็นคะแนนนักเรียน เรียงมาก→น้อย/น้อย→มาก ดูรายชิ้น และลบนักเรียนได้', async ({ page }) => {
+  await page.goto('/teacher/login')
+  await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await page.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  const totals = async () => {
+    await expect(page.getByRole('button', { name: /^ดูคะแนน / }).first()).toBeVisible()
+    return (await page.getByRole('button', { name: /^ดูคะแนน / }).allTextContents()).map(Number)
+  }
+  await page.getByLabel('เรียงตาม').selectOption('desc')
+  const desc = await totals()
+  expect(desc.length).toBeGreaterThan(1)
+  expect(desc).toEqual([...desc].sort((a, b) => b - a))
+  await page.getByLabel('เรียงตาม').selectOption('asc')
+  const asc = await totals()
+  expect(asc).toEqual([...asc].sort((a, b) => a - b))
+
+  await page.getByRole('button', { name: 'ดูคะแนน มานี มีนา' }).click()
+  await expect(page.getByText(/^งาน \(\d+\)$/)).toBeVisible()
+  await expect(page.getByText(/^คะแนนสอบ \(\d+\)$/)).toBeVisible()
+
+  // ลบนักเรียนที่เพิ่มในเทสต์ก่อนหน้า (รหัส 88)
+  page.once('dialog', (d) => d.accept())
+  const row = page.getByRole('row', { name: /เด็กหญิงใหม่ใจ ย้ายมา/ })
+  await row.getByRole('button', { name: 'ลบ', exact: true }).click()
+  await expect(page.getByText('ลบ เด็กหญิงใหม่ใจ ย้ายมา แล้ว')).toBeVisible()
+  await expect(page.getByRole('row', { name: /ใหม่ใจ ย้ายมา/ })).toHaveCount(0)
+  // นักเรียนที่ถูกลบเข้าระบบไม่ได้อีก
+  const s = await (await page.context().browser()!.newContext()).newPage()
+  await s.goto('/')
+  await s.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('88')
+  await s.getByRole('button', { name: 'ถัดไป' }).click()
+  await expect(s.getByText(/ไม่พบรหัสนี้/)).toBeVisible()
+})
