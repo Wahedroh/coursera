@@ -100,6 +100,7 @@ test('ครูบันทึกส่งงานกระดาษในต�
   // ยกเลิกของสมชายจากหน้าตรวจ
   await t.getByRole('link', { name: 'สมชาย รักเรียน · ใบงานเศษส่วน' }).click()
   await expect(t.getByText('นักเรียนส่งเป็นกระดาษ', { exact: false })).toBeVisible()
+  await expect(t.getByTestId('zipgrade-id')).toHaveText('ZipGrade ID 2')
   t.once('dialog', (d) => d.accept())
   await t.getByRole('button', { name: 'ยกเลิกการส่งกระดาษ' }).click()
   await expect(t.getByText(/ยกเลิกการส่งกระดาษของ\s*สมชาย แล้ว/)).toBeVisible()

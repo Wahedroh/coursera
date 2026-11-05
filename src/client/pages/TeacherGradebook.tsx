@@ -140,6 +140,7 @@ export default function TeacherGradebook() {
                       <td className="p-2 text-stone-500 sticky left-0 bg-white">{i + 1}</td>
                       <td className="p-2 whitespace-nowrap sticky left-6 bg-white">
                         {s.firstName} {s.lastName}
+                        <span className="block text-xs text-stone-500 font-mono">{s.zipgradeId}</span>
                       </td>
                       {gb.assignments.map((a) => {
                         const c = s.cells[a.id]
