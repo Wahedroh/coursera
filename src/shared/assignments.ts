@@ -34,7 +34,7 @@ export type StudentAssignment = {
   maxScore: number
   submitMode: SubmitMode
   status: StudentStatus
-  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean } | null
+  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean; onPaper: boolean } | null
 }
 
 export const submissionInputSchema = z.object({
@@ -44,7 +44,7 @@ export const submissionInputSchema = z.object({
 })
 export type SubmissionInput = z.infer<typeof submissionInputSchema>
 
-export type GradebookCell = { status: StudentStatus; score: number | null; submissionId: string | null }
+export type GradebookCell = { status: StudentStatus; score: number | null; submissionId: string | null; onPaper?: boolean }
 export type Gradebook = {
   class: { id: string; name: string }
   assignments: { id: string; title: string; dueAt: number | null; maxScore: number }[]
@@ -68,5 +68,7 @@ export const gradeInputSchema = z.object({
   annotatedKeys: z.array(z.string()).max(10),
 })
 export const returnInputSchema = z.object({ comment: z.string().max(2000) })
+/** ครูบันทึกว่านักเรียนส่งงานเป็นกระดาษ · score = null คือยังไม่ให้คะแนน (ตรวจทีหลังได้) */
+export const paperInputSchema = z.object({ score: z.number().nullable(), late: z.boolean(), comment: z.string().max(2000) })
 
 export const ASSIGNMENT_EXP = { onTime: 10, late: 5 } as const

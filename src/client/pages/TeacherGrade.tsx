@@ -8,7 +8,7 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type Detail = {
-  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null }
+  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null; onPaper: boolean }
   assignment: { id: string; classId: string; title: string; maxScore: number; dueAt: number | null }
   student: { title: string | null; firstName: string; lastName: string; zipgradeId: string }
   neighbors: { prevId: string | null; nextId: string | null }
@@ -52,6 +52,16 @@ export default function TeacherGrade() {
     if (!d) return
     if (d.neighbors.nextId) navigate(`/teacher/submissions/${d.neighbors.nextId}`, { state: { flash: message } })
     else navigate(`/teacher/classes/${d.assignment.classId}/gradebook`, { state: { flash: `${message} · ตรวจครบทุกคนที่ส่งแล้ว` } })
+  }
+
+  async function undoPaper() {
+    if (!d || !window.confirm(`ยกเลิกการส่งกระดาษของ ${d.student.firstName}? งานจะกลับเป็น "ยังไม่ส่ง" และหัก EXP ที่ได้จากงานนี้คืน`)) return
+    try {
+      await api(`/api/teacher/submissions/${d.submission.id}/paper`, { method: 'DELETE' })
+      navigate(`/teacher/classes/${d.assignment.classId}/gradebook`, { state: { flash: `ยกเลิกการส่งกระดาษของ ${d.student.firstName} แล้ว` } })
+    } catch (e) {
+      setError(handle(e))
+    }
   }
 
   async function save() {
@@ -123,7 +133,17 @@ export default function TeacherGrade() {
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] items-start">
         <div className="flex flex-col gap-4 min-w-0">
-          {d.submission.imageKeys.length === 0 && (
+          {d.submission.onPaper && (
+            <Card className="p-4 text-sm bg-amber-50 border-amber-200 flex flex-wrap items-center justify-between gap-2">
+              <span>
+                📄 <b>นักเรียนส่งเป็นกระดาษ</b> (ครูบันทึกเอง) — ให้/แก้คะแนนด้านขวาได้ตามปกติ
+              </span>
+              <button type="button" onClick={() => void undoPaper()} className="rounded-lg border border-red-200 text-red-700 bg-white px-2 py-1 text-xs font-semibold">
+                ยกเลิกการส่งกระดาษ
+              </button>
+            </Card>
+          )}
+          {d.submission.imageKeys.length === 0 && !d.submission.onPaper && (
             <Card className="p-4 text-sm text-stone-500">{d.submission.imagesPurgedAt ? 'ลบรูปงานนี้แล้วเพื่อประหยัดพื้นที่ (คะแนนยังอยู่)' : 'ไม่มีรูปงาน'}</Card>
           )}
           {d.submission.imageKeys.map((k, i) => (

@@ -107,7 +107,7 @@ export default function StudentSubmit() {
 
       {graded && a.submission && (
         <Card className="p-4 bg-board-soft border-green-200 flex flex-col gap-2">
-          <p className="text-sm text-board font-semibold">ครูตรวจแล้ว</p>
+          <p className="text-sm text-board font-semibold">ครูตรวจแล้ว{a.submission.onPaper && ' · 📄 ส่งเป็นกระดาษ'}</p>
           <p className="text-3xl font-extrabold text-board">
             {a.submission.score}/{a.maxScore}
           </p>
@@ -126,7 +126,10 @@ export default function StudentSubmit() {
       )}
       {(a.status === 'submitted' || a.status === 'late') && (
         <Card className="p-3 bg-board-soft border-green-200">
-          <p className="text-sm font-semibold text-board">{a.status === 'late' ? 'ส่งแล้ว (สาย) รอครูตรวจ' : 'ส่งแล้ว รอครูตรวจ'}</p>
+          <p className="text-sm font-semibold text-board">
+            {a.status === 'late' ? 'ส่งแล้ว (สาย) รอครูตรวจ' : 'ส่งแล้ว รอครูตรวจ'}
+            {a.submission?.onPaper && ' · 📄 ครูบันทึกว่าส่งเป็นกระดาษ'}
+          </p>
           <p className="text-xs text-stone-500">แก้ไขและส่งใหม่ได้จนกว่าครูจะตรวจ</p>
         </Card>
       )}

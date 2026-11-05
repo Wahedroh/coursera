@@ -23,7 +23,7 @@ it('gradebook มีทุกคน×ทุกงาน และไม่รว
   expect(gb.assignments.map((a: { id: string }) => a.id)).toEqual([a1, a2])
   expect(gb.students.map((s: { zipgradeId: string }) => s.zipgradeId)).toEqual(['2', '1'])
   const st1 = gb.students.find((s: { id: string }) => s.id === s1.id)
-  expect(st1.cells[a1]).toEqual({ status: 'graded', score: 7, submissionId: subId })
+  expect(st1.cells[a1]).toEqual({ status: 'graded', score: 7, submissionId: subId, onPaper: false })
   expect(st1.cells[a2]).toEqual({ status: 'missing', score: null, submissionId: null })
   expect(gb.students.find((s: { id: string }) => s.id === s2.id).cells[a1].status).toBe('missing')
 })

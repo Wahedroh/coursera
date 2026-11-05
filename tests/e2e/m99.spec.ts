@@ -76,3 +76,32 @@ test('หน้าห้อง: เห็นคะแนนนักเรีย
   await s.getByRole('button', { name: 'ถัดไป' }).click()
   await expect(s.getByText(/ไม่พบรหัสนี้/)).toBeVisible()
 })
+
+test('ครูบันทึกส่งงานกระดาษในตารางทวงงาน ให้คะแนนต่อเนื่องทีละคน · ยกเลิกได้', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('link', { name: 'ตารางทวงงาน' }).click()
+  await t.getByRole('button', { name: 'บันทึกส่งกระดาษ สมใจ ใจดี · ใบงานเศษส่วน' }).click()
+  await expect(t.getByText('📄 บันทึกส่งงานแบบกระดาษ')).toBeVisible()
+  await t.getByLabel('คะแนนงานกระดาษ').fill('11')
+  await expect(t.getByText('คะแนนต้องอยู่ระหว่าง 0–10')).toBeVisible()
+  await t.getByLabel('คะแนนงานกระดาษ').fill('9')
+  await t.getByLabel('คะแนนงานกระดาษ').press('Enter')
+  await expect(t.getByText('📄 บันทึกส่งกระดาษ: สมใจ ใจดี · 9 คะแนน')).toBeVisible()
+  // ไปคนถัดไปที่ยังไม่ส่งอัตโนมัติ (สมชาย) — ไม่ใส่คะแนน = ส่งแล้ว รอตรวจ
+  await expect(t.getByText(/สมชาย รักเรียน \(2\) · ใบงานเศษส่วน/)).toBeVisible()
+  await t.getByRole('button', { name: 'บันทึก', exact: true }).click()
+  await expect(t.getByText('📄 บันทึกส่งกระดาษ: สมชาย รักเรียน · รอให้คะแนน')).toBeVisible()
+  await expect(t.getByRole('link', { name: 'สมใจ ใจดี · ใบงานเศษส่วน' })).toContainText('9')
+
+  // ยกเลิกของสมชายจากหน้าตรวจ
+  await t.getByRole('link', { name: 'สมชาย รักเรียน · ใบงานเศษส่วน' }).click()
+  await expect(t.getByText('นักเรียนส่งเป็นกระดาษ', { exact: false })).toBeVisible()
+  t.once('dialog', (d) => d.accept())
+  await t.getByRole('button', { name: 'ยกเลิกการส่งกระดาษ' }).click()
+  await expect(t.getByText(/ยกเลิกการส่งกระดาษของ\s*สมชาย แล้ว/)).toBeVisible()
+  await expect(t.getByRole('button', { name: 'บันทึกส่งกระดาษ สมชาย รักเรียน · ใบงานเศษส่วน' })).toBeVisible()
+})

@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { assignmentInputSchema, createAssignmentsSchema, gradeInputSchema, returnInputSchema } from '../../shared/assignments'
+import { assignmentInputSchema, createAssignmentsSchema, gradeInputSchema, paperInputSchema, returnInputSchema } from '../../shared/assignments'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
@@ -12,6 +12,8 @@ import {
   gradeSubmission,
   gradebook,
   listForClass,
+  recordPaper,
+  undoPaper,
   returnSubmission,
   updateAssignment,
 } from './service'
@@ -50,5 +52,14 @@ teacherAssignmentRoutes.post('/submissions/:id/grade', async (c) => {
 teacherAssignmentRoutes.post('/submissions/:id/return', async (c) => {
   const { comment } = await parseBody(c, returnInputSchema)
   await returnSubmission(getDb(c.env), c.req.param('id'), comment, now())
+  return c.json({ ok: true })
+})
+
+teacherAssignmentRoutes.put('/assignments/:id/paper/:studentId', async (c) =>
+  c.json(await recordPaper(getDb(c.env), c.req.param('id'), c.req.param('studentId'), await parseBody(c, paperInputSchema), now())),
+)
+
+teacherAssignmentRoutes.delete('/submissions/:id/paper', async (c) => {
+  await undoPaper(getDb(c.env), c.req.param('id'))
   return c.json({ ok: true })
 })
