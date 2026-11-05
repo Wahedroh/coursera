@@ -1,0 +1,1 @@
+ALTER TABLE `submissions` ADD `on_paper` integer DEFAULT false NOT NULL;

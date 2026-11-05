@@ -107,7 +107,7 @@ function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submi
     submitMode: a.submitMode,
     status: s ? s.status : 'missing',
     submission: s
-      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null }
+      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null, onPaper: s.onPaper }
       : null,
   }
 }
@@ -133,7 +133,7 @@ export async function upsertSubmission(
 
   const status: 'late' | 'submitted' = a.dueAt !== null && p.now > a.dueAt ? 'late' : 'submitted'
   // ส่งใหม่ (รวมหลังครูส่งกลับ) = งานชิ้นใหม่: ล้างผลตรวจเดิม ไม่ให้ครูเห็นรูปที่ตรวจไว้รอบก่อน
-  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null }
+  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null, onPaper: false }
   if (existing) {
     await db.update(submissions).set(values).where(eq(submissions.id, existing.id))
   } else {
@@ -156,7 +156,7 @@ export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
     .orderBy(students.sortOrder, students.zipgradeId)
   const subs = list.length
     ? await db
-        .select({ id: submissions.id, assignmentId: submissions.assignmentId, studentId: submissions.studentId, status: submissions.status, score: submissions.score })
+        .select({ id: submissions.id, assignmentId: submissions.assignmentId, studentId: submissions.studentId, status: submissions.status, score: submissions.score, onPaper: submissions.onPaper })
         .from(submissions)
         .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
         .where(eq(assignments.classId, classId))
@@ -170,7 +170,7 @@ export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
       cells: Object.fromEntries(
         list.map((a) => {
           const s = byKey.get(`${st.id}|${a.id}`)
-          return [a.id, s ? { status: s.status, score: s.score, submissionId: s.id } : { status: 'missing' as const, score: null, submissionId: null }]
+          return [a.id, s ? { status: s.status, score: s.score, submissionId: s.id, onPaper: s.onPaper } : { status: 'missing' as const, score: null, submissionId: null }]
         }),
       ),
     })),
@@ -238,4 +238,53 @@ export async function gradeSubmission(
 export async function returnSubmission(db: Db, id: string, comment: string, t: number): Promise<void> {
   await getSubmission(db, id)
   await db.update(submissions).set({ status: 'returned', comment, updatedAt: t }).where(eq(submissions.id, id))
+}
+
+/** ครูบันทึกการส่งงานแบบกระดาษ (นักเรียนไม่ได้อัปโหลด) — ให้คะแนนเลยหรือตรวจทีหลังก็ได้
+ *  ใช้ได้กับคนที่ยังไม่ส่ง / ครูส่งกลับให้แก้ / ส่งกระดาษไว้แล้ว · ถ้านักเรียนส่งในระบบแล้ว ให้ตรวจตามปกติ */
+export async function recordPaper(db: Db, assignmentId: string, studentId: string, input: { score: number | null; late: boolean; comment: string }, t: number): Promise<{ submissionId: string }> {
+  const a = await getAssignment(db, assignmentId)
+  const [st] = await db.select({ id: students.id }).from(students).where(and(eq(students.id, studentId), eq(students.classId, a.classId)))
+  if (!st) throw apiError('student_not_found', 'ไม่พบนักเรียนในห้องนี้', 404)
+  if (input.score !== null && !(input.score >= 0 && input.score <= a.maxScore)) throw apiError('invalid_score', `คะแนนต้องอยู่ระหว่าง 0 ถึง ${a.maxScore}`, 400)
+  const [existing] = await db.select().from(submissions).where(and(eq(submissions.assignmentId, assignmentId), eq(submissions.studentId, studentId)))
+  if (existing && !existing.onPaper && existing.status !== 'returned') throw apiError('already_submitted', 'นักเรียนส่งงานนี้ในระบบแล้ว — เปิดงานเพื่อตรวจตามปกติ', 409)
+  // ส่งตรงเวลา = นับเป็นเวลาก่อนกำหนด (ครูบันทึกทีหลังได้ไม่เสียแต้ม)
+  const submittedAt = input.late || a.dueAt === null ? t : Math.min(t, a.dueAt)
+  const late = a.dueAt !== null && submittedAt > a.dueAt
+  const status = input.score !== null ? ('graded' as const) : late ? ('late' as const) : ('submitted' as const)
+  const values = {
+    text: '',
+    imageKeys: [],
+    annotatedKeys: [],
+    onPaper: true,
+    status,
+    submittedAt,
+    score: input.score,
+    comment: input.comment,
+    gradedAt: input.score !== null ? t : null,
+    clientRequestId: null,
+    updatedAt: t,
+  }
+  const id = existing?.id ?? newId()
+  if (existing) await db.update(submissions).set(values).where(eq(submissions.id, id))
+  else await db.insert(submissions).values({ id, assignmentId, studentId, ...values })
+  if (input.score !== null) {
+    await db
+      .insert(pointEvents)
+      .values({ id: newId(), studentId, delta: late ? ASSIGNMENT_EXP.late : ASSIGNMENT_EXP.onTime, reason: `ส่งงาน: ${a.title}`, source: 'assignment', refId: id, createdAt: t })
+      .onConflictDoNothing()
+  }
+  return { submissionId: id }
+}
+
+/** ยกเลิกการส่งกระดาษที่ครูบันทึกผิด — กลับเป็นยังไม่ส่ง และหัก EXP ที่ได้จากงานนี้ */
+export async function undoPaper(db: Db, submissionId: string): Promise<void> {
+  const [s] = await db.select().from(submissions).where(eq(submissions.id, submissionId))
+  if (!s) throw submissionNotFound()
+  if (!s.onPaper) throw apiError('not_paper', 'งานนี้นักเรียนส่งในระบบ ยกเลิกไม่ได้', 409)
+  await db.batch([
+    db.delete(pointEvents).where(and(eq(pointEvents.source, 'assignment'), eq(pointEvents.refId, submissionId))),
+    db.delete(submissions).where(eq(submissions.id, submissionId)),
+  ])
 }

@@ -97,6 +97,8 @@ export const submissions = sqliteTable(
     gradedAt: integer('graded_at'),
     /** ครูลบรูปงาน (ที่ตรวจแล้ว) เพื่อประหยัดพื้นที่ — คะแนน/คอมเมนต์ยังอยู่ */
     imagesPurgedAt: integer('images_purged_at'),
+    /** นักเรียนส่งเป็นกระดาษกับครู ครูบันทึกเอง (ไม่มีข้อความ/รูปในระบบ) */
+    onPaper: integer('on_paper', { mode: 'boolean' }).notNull().default(false),
     clientRequestId: text('client_request_id'),
     updatedAt: integer('updated_at').notNull(),
   },
