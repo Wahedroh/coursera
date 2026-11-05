@@ -112,11 +112,13 @@ export default function TeacherGrade() {
           </Link>
           <h1 className="text-xl font-extrabold">
             {d.student.title ?? ''}
-            {d.student.firstName} {d.student.lastName} <Chip tone={statusTone}>{statusLabel}</Chip>
+            {d.student.firstName} {d.student.lastName}{' '}
+            <span className="inline-block align-middle rounded-lg bg-stone-100 border border-line px-2 py-0.5 text-sm font-bold font-mono" data-testid="zipgrade-id">
+              ZipGrade ID {d.student.zipgradeId}
+            </span>{' '}
+            <Chip tone={statusTone}>{statusLabel}</Chip>
           </h1>
-          <p className="text-xs text-stone-500">
-            รหัส {d.student.zipgradeId} · ส่งเมื่อ {fmt.format(d.submission.submittedAt)}
-          </p>
+          <p className="text-xs text-stone-500">ส่งเมื่อ {fmt.format(d.submission.submittedAt)}</p>
         </div>
         <div className="flex gap-2">
           {d.neighbors.prevId && (
