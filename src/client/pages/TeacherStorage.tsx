@@ -138,6 +138,54 @@ export default function TeacherStorage() {
           ลบไฟล์ค้าง
         </Button>
       </Card>
+
+      <Backups />
     </TeacherLayout>
+  )
+}
+
+type Backup = { name: string; size: number; uploadedAt: number }
+const when = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+/** ไฟล์สำรองฐานข้อมูลรายสัปดาห์ (GitHub Actions เขียนลง R2 ส่วนตัว) */
+function Backups() {
+  const [list, setList] = useState<Backup[] | null>(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    api<Backup[]>('/api/teacher/backups')
+      .then(setList)
+      .catch(() => setFailed(true))
+  }, [])
+  const latest = list?.[0]
+  const stale = latest !== undefined && Date.now() - latest.uploadedAt > 9 * 86400_000
+  return (
+    <Card className="p-4 flex flex-col gap-2" data-testid="backups">
+      <h2 className="font-bold">🛟 สำรองข้อมูลอัตโนมัติ</h2>
+      <p className="text-sm text-stone-500">
+        ระบบสำรองฐานข้อมูลทั้งหมด (รายชื่อ งาน คะแนน เช็กชื่อ แต้ม ค่าเอกสาร ประกาศ) ทุกวันอาทิตย์ 02:00 น. เก็บย้อนหลัง 180 วัน · ไม่รวมไฟล์รูปงาน/เอกสารเรียน
+      </p>
+      {failed && <p className="text-sm text-red-700">โหลดรายการไฟล์สำรองไม่สำเร็จ</p>}
+      {list && list.length === 0 && <p className="text-sm text-amber-700">ยังไม่มีไฟล์สำรอง — ไฟล์แรกจะถูกสร้างในวันอาทิตย์ที่จะถึง</p>}
+      {latest && (
+        <p className={`text-sm font-semibold ${stale ? 'text-red-700' : 'text-board'}`}>
+          ล่าสุด: {when.format(latest.uploadedAt)} {stale && '— เกิน 9 วันแล้ว ควรแจ้งผู้ดูแลระบบตรวจ GitHub Actions'}
+        </p>
+      )}
+      {list && list.length > 0 && (
+        <div className="divide-y divide-stone-100 text-sm">
+          {list.slice(0, 8).map((b) => (
+            <div key={b.name} className="flex justify-between items-center py-1.5 gap-2">
+              <span>
+                {when.format(b.uploadedAt)} <span className="text-xs text-stone-500">· {fmtBytes(b.size)}</span>
+              </span>
+              <a className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold" href={`/api/teacher/backups/${encodeURIComponent(b.name)}`} download>
+                ⬇ ดาวน์โหลด
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-xs text-stone-500">ไฟล์ .sql.gz ใช้กู้ข้อมูลกลับเข้าระบบ (ผู้ดูแลระบบทำตามขั้นตอนใน docs/backup.md) · มีข้อมูลนักเรียน เก็บไว้ในที่ปลอดภัย</p>
+    </Card>
   )
 }

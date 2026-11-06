@@ -12,7 +12,20 @@ export type HairStyle = (typeof HAIR_STYLES)[number]
 export const HAIR_LABEL: Record<HairStyle, string> = { short: 'ทรงสั้น', long: 'ทรงยาว', spiky: 'ทรงตั้ง', ponytail: 'หางม้า', bob: 'บ็อบ', curly: 'ผมฟู', bun: 'มวยผม' }
 
 type Px = [x: number, y: number, color: string]
-type Job = { label: string; shirt: string; accent?: string; pants: string; belt?: string; shoes?: string; extras?: Px[]; hat?: Px[]; hidesHair?: boolean }
+type Job = { label: string; shirt: string; accent?: string; pants: string; belt?: string; shoes?: string; extras?: Px[]; hat?: Px[]; hidesHair?: boolean; robe?: boolean }
+
+/** ผ้าคลุม/หมวก — ผ้าคลุมซ่อนผมทั้งหมด · ทุกแบบแทนหมวกของชุดอาชีพ */
+export const HEADWEAR = ['none', 'hijab', 'hijab_long', 'kopiah', 'songkok', 'serban'] as const
+export type Headwear = (typeof HEADWEAR)[number]
+export const HEADWEAR_LABEL: Record<Headwear, string> = {
+  none: 'ไม่มี',
+  hijab: 'ผ้าคลุม (ฮิญาบ)',
+  hijab_long: 'ผ้าคลุมยาว',
+  kopiah: 'หมวกกะปิเยาะ',
+  songkok: 'หมวกซองกก',
+  serban: 'ผ้าโพกศีรษะ',
+}
+export const HEADWEAR_COLORS = ['#F7F7F7', '#1E1B2E', '#26335E', '#7B1F3A', '#E58FB7', '#9B5DE5', '#4F7FE8', '#2E7D5B', '#C9A15B', '#8D8D8D'] as const
 
 const row = (y: number, x0: number, x1: number, c: string): Px[] => Array.from({ length: x1 - x0 + 1 }, (_, i) => [x0 + i, y, c])
 const col = (x: number, y0: number, y1: number, c: string): Px[] => Array.from({ length: y1 - y0 + 1 }, (_, i) => [x, y0 + i, c])
@@ -53,6 +66,30 @@ export const JOBS = {
   musician: { label: 'นักดนตรี', shirt: '#222222', accent: '#E94F4F', pants: '#222222', extras: [...col(2, 4, 6, '#333333'), ...col(9, 4, 6, '#333333')], hat: row(2, 2, 9, '#333333') },
   farmer: { label: 'เกษตรกร', shirt: '#6A994E', accent: '#3E6B2F', pants: '#2F5C9E', hat: [...row(1, 4, 7, '#D9B26F'), ...row(2, 1, 10, '#C9A15B')] },
   scientist: { label: 'นักวิทยาศาสตร์', shirt: WHITE, accent: '#9B5DE5', pants: '#3B3A5E', extras: [[3, 5, '#222222'], [8, 5, '#222222']] },
+  nurse: { label: 'พยาบาล', shirt: WHITE, accent: '#F48FB1', pants: WHITE, shoes: WHITE, hat: [...row(1, 4, 7, WHITE), [5, 1, '#E53935'], [6, 1, '#E53935'], ...row(2, 3, 8, '#EEEEEE')] },
+  soldier: {
+    label: 'ทหาร',
+    shirt: '#5B6B2F',
+    pants: '#4B5320',
+    belt: '#2E2E2E',
+    shoes: '#2E2E2E',
+    extras: [[4, 9, '#3D4F1E'], [7, 11, '#3D4F1E'], [3, 12, '#3D4F1E'], [8, 8, '#3D4F1E']],
+    hat: [...row(1, 3, 8, '#5B6B2F'), ...row(2, 2, 9, '#3D4F1E')],
+  },
+  dentist: { label: 'ทันตแพทย์', shirt: '#7FC8E8', accent: '#5AB0D6', pants: '#7FC8E8', extras: [[4, 9, WHITE]] },
+  pharmacist: { label: 'เภสัชกร', shirt: WHITE, accent: '#43A047', pants: '#3B3A5E', extras: [[7, 9, '#43A047'], [7, 10, '#43A047']] },
+  thobe: { label: 'ชุดโต๊บ', shirt: WHITE, pants: '#F1F1F1', robe: true, shoes: '#8D6E63' },
+  business: {
+    label: 'นักธุรกิจ',
+    shirt: '#2F3B52',
+    accent: WHITE,
+    pants: '#2F3B52',
+    extras: [[5, 8, '#C62828'], [6, 8, '#C62828'], [5, 9, '#C62828'], [6, 9, '#C62828'], [5, 10, '#C62828'], [6, 10, '#C62828']],
+  },
+  lawyer: { label: 'ทนายความ', shirt: '#1E1E1E', accent: WHITE, pants: '#1E1E1E' },
+  mechanic: { label: 'ช่างยนต์', shirt: '#1565C0', pants: '#1565C0', belt: '#0D47A1', extras: [[3, 10, '#9E9E9E'], [3, 11, '#9E9E9E']], hat: [...row(1, 4, 8, '#1565C0'), ...row(2, 3, 9, '#0D47A1')] },
+  youtuber: { label: 'ยูทูบเบอร์', shirt: '#E53935', pants: '#212121', extras: [[5, 9, WHITE], [5, 10, WHITE], [6, 10, WHITE], [5, 11, WHITE]] },
+  vet: { label: 'สัตวแพทย์', shirt: '#26A69A', accent: '#00897B', pants: '#26A69A', extras: [[7, 9, WHITE]] },
 } satisfies Record<string, Job>
 export type JobId = keyof typeof JOBS
 export const JOB_IDS = Object.keys(JOBS) as JobId[]
@@ -64,11 +101,36 @@ export const avatarConfigSchema = z.object({
   hairColor: z.number().int().min(0).max(HAIR_COLORS.length - 1),
   job: z.enum(JOB_IDS as [JobId, ...JobId[]]),
   glasses: z.boolean(),
+  // เพิ่มทีหลัง: ตัวละครที่บันทึกไว้ก่อนหน้าไม่มีค่าเหล่านี้ → ใช้ค่าเริ่มต้น
+  headwear: z.enum(HEADWEAR).default('none'),
+  headwearColor: z.number().int().min(0).max(HEADWEAR_COLORS.length - 1).default(0),
+  longSkirt: z.boolean().default(false),
 })
 export type AvatarConfig = z.infer<typeof avatarConfigSchema>
 export const avatarInputSchema = z.object({ nickname: z.string().trim().max(20), config: avatarConfigSchema })
 
-export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false }
+export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false }
+
+function headwearPixels(h: Headwear, c: string): Px[] {
+  switch (h) {
+    case 'none':
+      return []
+    case 'hijab':
+    case 'hijab_long': {
+      // คลุมผมและกรอบหน้า เห็นเฉพาะใบหน้า แล้วชายผ้าคลุมไหล่ (แบบยาวคลุมถึงกลางตัว)
+      const px: Px[] = [...row(1, 4, 7, c), ...row(2, 3, 8, c), ...row(3, 2, 9, c), ...row(8, 2, 9, c)]
+      for (let y = 4; y <= 7; y++) px.push([2, y, c], [3, y, c], [8, y, c], [9, y, c])
+      if (h === 'hijab_long') px.push(...row(9, 2, 9, c), ...row(10, 2, 9, c), ...row(11, 3, 8, c))
+      return px
+    }
+    case 'kopiah':
+      return [...row(1, 3, 8, c), ...row(2, 3, 8, c)]
+    case 'songkok':
+      return [...row(0, 3, 8, c), ...row(1, 3, 8, c), ...row(2, 3, 8, c)]
+    case 'serban':
+      return [...row(0, 4, 7, c), ...row(1, 3, 8, c), ...row(2, 2, 9, c), ...row(3, 2, 9, c)]
+  }
+}
 
 function hairPixels(style: HairStyle, c: string): Px[] {
   const top = [...row(2, 3, 8, c), ...row(3, 3, 8, c)]
@@ -104,21 +166,34 @@ export function avatarPixels(cfg: AvatarConfig): Px[] {
   for (let y = 8; y <= 12; y++) px.push(...row(y, 3, 8, job.shirt))
   px.push(...col(2, 8, 11, job.shirt), ...col(9, 8, 11, job.shirt), [2, 12, skin], [9, 12, skin])
   if (job.accent) px.push(...col(5, 8, 12, job.accent), ...col(6, 8, 12, job.accent))
-  if (cfg.gender === 'f') {
+  if (cfg.gender === 'f' && (cfg.longSkirt || job.robe)) {
+    // กระโปรงยาวถึงข้อเท้า
+    px.push(...row(13, 3, 8, job.pants))
+    for (let y = 14; y <= 17; y++) px.push(...row(y, 2, 9, job.pants))
+    px.push(...row(18, 3, 4, shoes), ...row(18, 7, 8, shoes))
+  } else if (cfg.gender === 'f') {
     // กระโปรง + ขา
     px.push(...row(13, 3, 8, job.pants), ...row(14, 2, 9, job.pants), ...col(4, 15, 17, skin), ...col(7, 15, 17, skin), ...row(18, 3, 4, shoes), ...row(18, 7, 8, shoes))
+  } else if (job.robe) {
+    // ชุดยาว (โต๊บ): ไม่แยกขา
+    for (let y = 13; y <= 17; y++) px.push(...row(y, 3, 8, job.pants))
+    px.push(...row(18, 3, 4, shoes), ...row(18, 7, 8, shoes))
   } else {
     px.push(...row(13, 3, 8, job.belt ?? job.pants))
     for (let y = 14; y <= 17; y++) px.push(...row(y, 3, 4, job.pants), ...row(y, 7, 8, job.pants))
     px.push(...row(18, 3, 4, shoes), ...row(18, 7, 8, shoes))
   }
   px.push(...(job.extras ?? []))
-  if (!job.hidesHair) px.push(...hairPixels(cfg.hair, hair))
+  const head = cfg.headwear ?? 'none'
+  const covered = head === 'hijab' || head === 'hijab_long'
+  if (!job.hidesHair && !covered) px.push(...hairPixels(cfg.hair, hair))
+  px.push(...headwearPixels(head, HEADWEAR_COLORS[cfg.headwearColor ?? 0] ?? HEADWEAR_COLORS[0]))
   // ตา ปาก (+ แก้มแดงสำหรับผู้หญิง)
   px.push([4, 5, '#1E1B2E'], [7, 5, '#1E1B2E'], [5, 7, '#A0523D'], [6, 7, '#A0523D'])
-  if (cfg.gender === 'f') px.push([3, 6, '#F09A9A'], [8, 6, '#F09A9A'])
+  if (cfg.gender === 'f' && !covered) px.push([3, 6, '#F09A9A'], [8, 6, '#F09A9A'])
   if (cfg.glasses) px.push([4, 4, '#333333'], [7, 4, '#333333'], [5, 5, '#333333'], [6, 5, '#333333'], [3, 5, '#333333'], [8, 5, '#333333'])
-  px.push(...(job.hat ?? []))
+  // ผ้าคลุม/หมวกที่เลือกเอง แทนหมวกของชุดอาชีพ
+  if (head === 'none') px.push(...(job.hat ?? []))
   // ช่องเดียวกันเอาสีที่วาดทีหลังสุด
   const m = new Map<string, Px>()
   for (const p of px) if (p[0] >= 0 && p[0] < AVATAR_W && p[1] >= 0 && p[1] < AVATAR_H) m.set(`${p[0]},${p[1]}`, p)
