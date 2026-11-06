@@ -17,6 +17,10 @@
     }
   ],
   // รูปงาน — ต้องเปิดใช้ R2 ในแดชบอร์ดและสร้าง bucket ก่อน deploy
-  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "classroom-files" }],
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "classroom-files" },
+    // สำรองฐานข้อมูลรายสัปดาห์ (เขียนโดย GitHub Actions: .github/workflows/backup.yml) — Worker อ่านอย่างเดียว
+    { "binding": "BACKUPS", "bucket_name": "classroom-backups" }
+  ],
   "vars": {}
 }
