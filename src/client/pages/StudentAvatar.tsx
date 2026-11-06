@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { AvatarArt } from '../components/PixelArt'
-import { DEFAULT_AVATAR, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, JOB_IDS, JOBS, SKINS, type AvatarConfig } from '../../shared/avatar'
+import { DEFAULT_AVATAR, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, JOB_IDS, JOBS, SKINS, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
@@ -63,6 +63,9 @@ export default function StudentAvatar() {
       hairColor: Math.floor(Math.random() * HAIR_COLORS.length),
       job: pick(JOB_IDS),
       glasses: Math.random() < 0.25,
+      headwear: Math.random() < 0.5 ? 'none' : pick(HEADWEAR),
+      headwearColor: Math.floor(Math.random() * HEADWEAR_COLORS.length),
+      longSkirt: Math.random() < 0.5,
     })
   }
 
@@ -105,7 +108,7 @@ export default function StudentAvatar() {
               <button key={c} type="button" aria-label={`สีผิว ${i + 1}`} aria-pressed={cfg.skin === i} className={swatch(cfg.skin === i)} style={{ background: c }} onClick={() => set({ skin: i })} />
             ))}
           </Group>
-          <Group label="ทรงผม">
+          <Group label={cfg.headwear === 'hijab' || cfg.headwear === 'hijab_long' ? 'ทรงผม (ซ่อนใต้ผ้าคลุม)' : 'ทรงผม'}>
             {HAIR_STYLES.map((h) => (
               <button key={h} type="button" aria-pressed={cfg.hair === h} className={chip(cfg.hair === h)} onClick={() => set({ hair: h })}>
                 {HAIR_LABEL[h]}
@@ -117,7 +120,29 @@ export default function StudentAvatar() {
               <button key={c} type="button" aria-label={`สีผม ${i + 1}`} aria-pressed={cfg.hairColor === i} className={swatch(cfg.hairColor === i)} style={{ background: c }} onClick={() => set({ hairColor: i })} />
             ))}
           </Group>
-          <Group label="อาชีพ">
+          <Group label="ผ้าคลุม / หมวก">
+            {HEADWEAR.map((h) => (
+              <button key={h} type="button" aria-pressed={cfg.headwear === h} className={chip(cfg.headwear === h)} onClick={() => set({ headwear: h })}>
+                {HEADWEAR_LABEL[h]}
+              </button>
+            ))}
+          </Group>
+          {cfg.headwear !== 'none' && (
+            <Group label="สีผ้าคลุม / หมวก">
+              {HEADWEAR_COLORS.map((c, i) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`สีผ้าคลุม ${i + 1}`}
+                  aria-pressed={cfg.headwearColor === i}
+                  className={swatch(cfg.headwearColor === i)}
+                  style={{ background: c }}
+                  onClick={() => set({ headwearColor: i })}
+                />
+              ))}
+            </Group>
+          )}
+          <Group label={`อาชีพ / ชุด (${JOB_IDS.length} แบบ)`}>
             {JOB_IDS.map((j) => (
               <button key={j} type="button" aria-pressed={cfg.job === j} className={chip(cfg.job === j)} onClick={() => set({ job: j })}>
                 {JOBS[j].label}
@@ -128,6 +153,11 @@ export default function StudentAvatar() {
             <button type="button" aria-pressed={cfg.glasses} className={chip(cfg.glasses)} onClick={() => set({ glasses: !cfg.glasses })}>
               👓 แว่นตา
             </button>
+            {cfg.gender === 'f' && (
+              <button type="button" aria-pressed={cfg.longSkirt} className={chip(cfg.longSkirt)} onClick={() => set({ longSkirt: !cfg.longSkirt })}>
+                👗 กระโปรงยาว
+              </button>
+            )}
           </Group>
         </Card>
         <ErrorBox message={error} />

@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, JOB_IDS, JOBS, SKINS } from '../src/shared/avatar'
+import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, JOB_IDS, JOBS, SKINS } from '../src/shared/avatar'
 import { getDb } from '../src/server/db/client'
 import { getJson, json, loginTeacher, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
@@ -37,6 +37,44 @@ describe('avatarPixels', () => {
     expect(astro.some((p) => p[2] === HAIR_COLORS[4])).toBe(false)
     expect(at(avatarPixels({ ...DEFAULT_AVATAR, glasses: true }), 5, 5)).toBe('#333333')
   })
+  it('ทุกอาชีพ × ผ้าคลุม/หมวก × กระโปรงยาว อยู่ในกรอบ ไม่ซ้ำช่อง', () => {
+    for (const job of JOB_IDS)
+      for (const headwear of HEADWEAR)
+        for (const [gender, longSkirt] of [['m', false], ['f', false], ['f', true]] as const) {
+          const px = avatarPixels({ ...DEFAULT_AVATAR, job, headwear, gender, longSkirt, glasses: true })
+          expect(px.every(([x, y]) => x >= 0 && x < AVATAR_W && y >= 0 && y < AVATAR_H)).toBe(true)
+          expect(new Set(px.map(([x, y]) => `${x},${y}`)).size).toBe(px.length)
+        }
+    expect(JOB_IDS.length).toBe(26)
+  })
+  it('ผ้าคลุมซ่อนผมและหมวกอาชีพ เห็นใบหน้า · ไม่มีแก้มแดงทับผ้า · หมวกกะปิเยาะยังเห็นผมข้าง', () => {
+    const c = HEADWEAR_COLORS[3]
+    const px = avatarPixels({ ...DEFAULT_AVATAR, gender: 'f', hairColor: 4, hair: 'long', headwear: 'hijab', headwearColor: 3, job: 'police' })
+    expect(px.some((p) => p[2] === HAIR_COLORS[4])).toBe(false)
+    expect(at(px, 5, 1)).toBe(c)
+    expect(at(px, 3, 6)).toBe(c)
+    expect(at(px, 5, 8)).toBe(c)
+    expect(at(px, 5, 6)).toBe(SKINS[0])
+    expect(at(px, 4, 5)).toBe('#1E1B2E')
+    const long = avatarPixels({ ...DEFAULT_AVATAR, headwear: 'hijab_long', headwearColor: 3 })
+    expect(at(long, 5, 10)).toBe(c)
+    const kopiah = avatarPixels({ ...DEFAULT_AVATAR, headwear: 'kopiah', headwearColor: 0, hairColor: 4 })
+    expect(at(kopiah, 5, 1)).toBe(HEADWEAR_COLORS[0])
+    expect(at(kopiah, 3, 4)).toBe(HAIR_COLORS[4])
+  })
+  it('กระโปรงยาวไม่เห็นขา · ชุดโต๊บของชายเป็นชุดยาว', () => {
+    const f = avatarPixels({ ...DEFAULT_AVATAR, gender: 'f', longSkirt: true })
+    expect(at(f, 4, 16)).toBe(JOBS.student.pants)
+    expect(at(f, 2, 17)).toBe(JOBS.student.pants)
+    const t = avatarPixels({ ...DEFAULT_AVATAR, job: 'thobe' })
+    expect(at(t, 5, 15)).toBe(JOBS.thobe.pants)
+  })
+  it('ตัวละครที่บันทึกก่อนมีผ้าคลุม (ไม่มีฟิลด์ใหม่) ยังอ่านได้ และได้ค่าเริ่มต้น', () => {
+    const { headwear: _h, headwearColor: _c, longSkirt: _l, ...old } = DEFAULT_AVATAR
+    const r = avatarConfigSchema.safeParse(old)
+    expect(r.success && r.data).toEqual(expect.objectContaining({ headwear: 'none', headwearColor: 0, longSkirt: false }))
+    expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, headwear: 'cap' }).success).toBe(false)
+  })
   it('ตรวจค่าที่ไม่มีในรายการ', () => {
     expect(avatarConfigSchema.safeParse(DEFAULT_AVATAR).success).toBe(true)
     expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, skin: 9 }).success).toBe(false)
@@ -48,14 +86,19 @@ describe('API ตัวละคร', () => {
   const db = () => getDb(env)
   beforeEach(resetDb)
   const CFG = { gender: 'f', skin: 2, hair: 'ponytail', hairColor: 3, job: 'astronaut', glasses: true }
+  // ส่งแบบเดิม (ไม่มีฟิลด์ผ้าคลุม) ได้ค่าเริ่มต้นกลับมา
+  const SAVED = { ...CFG, headwear: 'none', headwearColor: 0, longSkirt: false }
 
   it('ค่าเริ่มต้น → บันทึก → อ่านกลับ', async () => {
     const { classId } = await seedClass(db())
     const c = await studentCookie((await seedStudent(db(), classId)).id)
     expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: '', config: DEFAULT_AVATAR, isDefault: true })
     expect((await putJson('/api/student/avatar', { nickname: '  ฟ้าใส  ', config: CFG }, c)).status).toBe(200)
-    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: CFG, isDefault: false })
+    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: SAVED, isDefault: false })
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้า', config: { ...CFG, job: 'hacker' } }, c)).status).toBe(400)
+    const hijab = { ...CFG, headwear: 'hijab_long', headwearColor: 4, longSkirt: true, job: 'nurse' }
+    expect((await putJson('/api/student/avatar', { nickname: 'ฟ้าใส', config: hijab }, c)).status).toBe(200)
+    expect((await json(await getJson('/api/student/avatar', c))).config).toEqual(hijab)
     expect((await putJson('/api/student/avatar', { nickname: 'ก'.repeat(21), config: CFG }, c)).status).toBe(400)
     expect((await getJson('/api/student/avatar')).status).toBe(401)
     expect((await putJson('/api/student/avatar', { nickname: '', config: CFG }, await loginTeacher())).status).toBe(401)
@@ -70,7 +113,7 @@ describe('API ตัวละคร', () => {
     const ca = await studentCookie(a.id)
     await putJson('/api/student/avatar', { nickname: 'เทพฟิสิกส์', config: CFG }, ca)
     const board = await json(await getJson('/api/student/leaderboard', await studentCookie(b.id)))
-    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual(CFG)
+    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual(SAVED)
     expect(board.find((r: { firstName: string }) => r.firstName === 'ปิติ').avatar).toEqual(DEFAULT_AVATAR)
     expect(JSON.stringify(board)).not.toContain('เทพฟิสิกส์')
   })
