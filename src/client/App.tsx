@@ -6,6 +6,7 @@ import StudentProgress from './pages/StudentProgress'
 import StudentScores from './pages/StudentScores'
 import StudentVideos from './pages/StudentVideos'
 import StudentMaterials from './pages/StudentMaterials'
+import StudentStats from './pages/StudentStats'
 import StudentVideo from './pages/StudentVideo'
 import StudentFees from './pages/StudentFees'
 import StudentAvatar from './pages/StudentAvatar'
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/me/scores" element={<StudentScores />} />
         <Route path="/me/videos" element={<StudentVideos />} />
         <Route path="/me/materials" element={<StudentMaterials />} />
+        <Route path="/me/stats" element={<StudentStats />} />
         <Route path="/me/videos/:id" element={<StudentVideo />} />
         <Route path="/me/fees" element={<StudentFees />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />

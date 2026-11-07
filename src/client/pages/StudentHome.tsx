@@ -27,6 +27,7 @@ export default function StudentHome() {
   const [items, setItems] = useState<StudentAssignment[] | null>(null)
   const [tab, setTab] = useState<Tab>('pending')
   const [feeOwed, setFeeOwed] = useState(0)
+  const [exp, setExp] = useState<{ exp: number; level: number; nextLevelAt: number } | null>(null)
   const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean } | null>(null)
 
   useEffect(() => {
@@ -38,6 +39,9 @@ export default function StudentHome() {
       .catch(() => setItems([]))
     api<{ nickname: string; config: AvatarConfig; isDefault: boolean }>('/api/student/avatar')
       .then(setAvatar)
+      .catch(() => {})
+    api<{ exp: number; level: number; nextLevelAt: number }>('/api/student/exp')
+      .then(setExp)
       .catch(() => {})
     api<StudentFee[]>('/api/student/fees')
       .then((fs) => setFeeOwed(fs.reduce((n, f) => n + f.outstanding, 0)))
@@ -58,22 +62,42 @@ export default function StudentHome() {
 
   return (
     <main className="min-h-screen max-w-md mx-auto pb-8">
-      <header className="bg-board text-white px-5 pt-6 pb-6 rounded-b-3xl">
-        <div className="flex items-center gap-3">
-          {avatar && (
-            <Link to="/me/avatar" aria-label="แต่งตัวละคร" className="relative shrink-0 rounded-2xl bg-white/15 p-1.5">
-              <AvatarArt config={avatar.config} size={4} />
-              <span className="absolute -bottom-1 -right-1 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold px-1.5">แต่ง</span>
-            </Link>
+      <header className="relative overflow-hidden bg-gradient-to-b from-board to-[#2c7a5c] text-white px-5 pt-5 pb-5 rounded-b-3xl">
+        {avatar && (
+          <Link to="/me/avatar" aria-label="แต่งตัวละคร" className="absolute top-4 right-4 z-10 rounded-full bg-amber-400 text-amber-950 px-3 py-1 text-xs font-extrabold shadow">
+            ✏️ แต่งตัว
+          </Link>
+        )}
+        {/* เวทีตัวละคร: ตัวใหญ่ มีเงาใต้เท้าและประกาย */}
+        <Link to="/me/avatar" tabIndex={-1} aria-hidden className="relative flex h-56 items-end justify-center" data-testid="avatar-stage">
+          <span className="absolute bottom-1 left-1/2 h-6 w-40 -translate-x-1/2 rounded-[50%] bg-black/25" />
+          <span className="absolute left-[22%] top-6 text-amber-200 animate-pulse">✦</span>
+          <span className="absolute right-[24%] top-16 text-amber-200 animate-pulse [animation-delay:600ms]">✧</span>
+          <span className="absolute left-[30%] top-32 text-amber-100/70">·</span>
+          {avatar ? (
+            <span className="relative drop-shadow-[0_4px_0_rgba(0,0,0,0.15)] animate-hop-slow">
+              <AvatarArt config={avatar.config} size={11} label="ตัวละครของฉัน" />
+            </span>
+          ) : (
+            <span className="h-48" />
           )}
-          <div>
-            <h1 className="text-xl font-extrabold">สวัสดี {s.firstName} 👋</h1>
-            {avatar?.nickname && <p className="text-sm font-semibold text-amber-200">“{avatar.nickname}”</p>}
-            <p className="text-sm opacity-85">
-              {s.className} · รหัส {s.zipgradeId}
-            </p>
-          </div>
-        </div>
+        </Link>
+        <h1 className="mt-2 text-center text-2xl font-extrabold">สวัสดี {s.firstName} 👋</h1>
+        {avatar?.nickname && <p className="text-center font-bold text-amber-200">“{avatar.nickname}”</p>}
+        <p className="text-center text-sm opacity-85">
+          {s.className} · รหัส {s.zipgradeId}
+        </p>
+        {exp && (
+          <Link to="/me/progress" className="mt-3 flex items-center gap-2 text-xs" aria-label={`เลเวล ${exp.level} · ${exp.exp} EXP`}>
+            <span className="rounded-lg bg-amber-400 px-2 py-0.5 font-extrabold text-amber-950">Lv {exp.level}</span>
+            <span className="h-3 flex-1 overflow-hidden rounded-full bg-white/25">
+              <span className="block h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, Math.max(0, exp.exp - (exp.nextLevelAt - 100)))}%` }} />
+            </span>
+            <span className="tabular-nums">
+              {Math.max(0, exp.exp - (exp.nextLevelAt - 100))}/100 EXP
+            </span>
+          </Link>
+        )}
         {avatar?.isDefault && (
           <Link to="/me/avatar" className="mt-3 block rounded-xl bg-amber-400 text-amber-950 px-3 py-2 text-sm font-bold">
             ✨ แต่งตัวละครของคุณเองได้แล้ว! แตะเพื่อเริ่ม
@@ -94,6 +118,9 @@ export default function StudentHome() {
           </Link>
           <Link to="/me/fees" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             🧾 ค่าเอกสาร
+          </Link>
+          <Link to="/me/stats" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+            📈 สถิติของฉัน
           </Link>
         </div>
       </header>

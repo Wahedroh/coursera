@@ -1,15 +1,17 @@
 import { and, eq, isNull } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { PIN_RE, studentLookupSchema, studentPinSchema } from '../../shared/schemas'
+import { changePinSchema } from '../../shared/stats'
+import { requireStudent } from './middleware'
 import { canonicalZipgradeId } from '../../shared/zipgrade'
 import { getDb, now, type Db } from '../db/client'
 import { classes, students } from '../db/schema'
-import type { AppEnv } from '../env'
+import type { AppEnv, SessionInfo } from '../env'
 import { apiError, getClientIp, parseBody } from '../http'
 import { hashSecret, PIN_ITERATIONS, verifySecret } from './crypto'
 import { clearLoginAttempts, lockStudent, reserveLoginAttempt } from './pin-attempts'
 import { hitRateLimit, refundRateLimit } from './rate-limit'
-import { createSession, setSessionCookie } from './sessions'
+import { createSession, revokeStudentSessions, setSessionCookie } from './sessions'
 
 const MAX_FAILS = 5
 const LOCK_MS = 15 * 60 * 1000
@@ -112,4 +114,35 @@ studentAuthRoutes.post('/login', async (c) => {
   const { token, flaggedNewDevice } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
   setSessionCookie(c, token, 'student')
   return c.json({ ok: true, flaggedNewDevice })
+})
+
+/** นักเรียนเปลี่ยน PIN เอง: ต้องใส่ PIN เดิมถูก (นับครั้งผิด/ล็อกเหมือนตอนเข้าสู่ระบบ) · เปลี่ยนแล้วออกจากระบบเครื่องอื่นทั้งหมด */
+studentAuthRoutes.post('/change-pin', requireStudent, async (c) => {
+  const { currentPin, newPin } = await parseBody(c, changePinSchema)
+  checkPinFormat(newPin)
+  if (newPin === currentPin) throw apiError('same_pin', 'PIN ใหม่ต้องไม่ซ้ำกับ PIN เดิม', 400)
+  const db = getDb(c.env)
+  const me = c.get('session') as Extract<SessionInfo, { kind: 'student' }>
+  const [s] = await db.select({ id: students.id, pinHash: students.pinHash, lockedUntil: students.lockedUntil }).from(students).where(eq(students.id, me.studentId))
+  if (!s?.pinHash) throw apiError('pin_not_set', 'ยังไม่ได้ตั้ง PIN', 409)
+  if (s.lockedUntil && s.lockedUntil > now()) throw lockedError(s.lockedUntil)
+  const t = now()
+  const attempt = await reserveLoginAttempt(db, s.id, t)
+  if (attempt === null || attempt > MAX_FAILS) {
+    await lockStudent(db, s.id, t + LOCK_MS)
+    throw lockedError(t + LOCK_MS)
+  }
+  if (!PIN_RE.test(currentPin) || !(await verifySecret(currentPin, s.pinHash))) {
+    if (attempt >= MAX_FAILS) {
+      await lockStudent(db, s.id, t + LOCK_MS)
+      throw lockedError(t + LOCK_MS)
+    }
+    throw apiError('invalid_pin', `PIN เดิมไม่ถูกต้อง (เหลืออีก ${MAX_FAILS - attempt} ครั้ง)`, 401)
+  }
+  await clearLoginAttempts(db, s.id, t)
+  await db.update(students).set({ pinHash: await hashSecret(newPin, PIN_ITERATIONS), updatedAt: t }).where(eq(students.id, s.id))
+  await revokeStudentSessions(db, s.id)
+  const { token } = await createSession(db, { kind: 'student', studentId: s.id }, c.req.header('user-agent') ?? '', c.env.SESSION_SECRET)
+  setSessionCookie(c, token, 'student')
+  return c.json({ ok: true })
 })
