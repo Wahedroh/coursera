@@ -1,3 +1,4 @@
+import { EXP_RULES } from '../../shared/points'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
@@ -40,7 +41,7 @@ export default function StudentVideos() {
                 <div className="flex justify-between items-start gap-2">
                   <h3 className="font-bold">{v.title}</h3>
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${v.rewarded ? 'bg-board-soft text-board' : 'bg-amber-100 text-amber-800'}`}>
-                    {v.rewarded ? '✓ ได้ EXP แล้ว' : '+3 EXP'}
+                    {v.rewarded ? '✓ ได้ EXP แล้ว' : `+${EXP_RULES.video} EXP`}
                   </span>
                 </div>
                 {v.description && <p className="text-sm text-stone-500 line-clamp-2">{v.description}</p>}
