@@ -26,11 +26,11 @@ it('ครูบันทึกส่งกระดาษพร้อมคะ�
   const ca = await studentCookie(a.id)
   const mine = await json(await getJson(`/api/student/assignments/${asg}`, ca))
   expect(mine).toEqual(expect.objectContaining({ status: 'graded', submission: expect.objectContaining({ score: 8, onPaper: true, comment: 'เรียบร้อยดี' }) }))
-  expect(await exp(ca)).toBe(10)
+  expect(await exp(ca)).toBe(30)
   // แก้คะแนนซ้ำ ไม่ได้ EXP เพิ่ม
   await putJson(`/api/teacher/assignments/${asg}/paper/${a.id}`, { score: 9, late: false, comment: '' }, cookie)
   expect((await cell(classId, a.id, asg, cookie)).score).toBe(9)
-  expect(await exp(ca)).toBe(10)
+  expect(await exp(ca)).toBe(30)
 })
 
 it('ส่งกระดาษแบบยังไม่ให้คะแนน → รอตรวจ (ส่งช้า) แล้วตรวจทีหลังได้ · ยกเลิกได้ และหัก EXP คืน', async () => {
@@ -39,7 +39,7 @@ it('ส่งกระดาษแบบยังไม่ให้คะแน�
   expect(await cell(classId, a.id, asg, cookie)).toEqual(expect.objectContaining({ status: 'late', score: null, onPaper: true }))
   expect((await postJson(`/api/teacher/submissions/${submissionId}/grade`, { score: 6, comment: '', annotatedKeys: [] }, { cookie })).status).toBe(200)
   const ca = await studentCookie(a.id)
-  expect(await exp(ca)).toBe(5)
+  expect(await exp(ca)).toBe(15)
   expect((await del(`/api/teacher/submissions/${submissionId}/paper`, cookie)).status).toBe(200)
   expect((await cell(classId, a.id, asg, cookie)).status).toBe('missing')
   expect(await exp(ca)).toBe(0)

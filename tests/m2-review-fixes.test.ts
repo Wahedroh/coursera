@@ -10,12 +10,12 @@ const db = () => getDb(env)
 beforeEach(resetDb)
 const exp = async (id: string) => (await db().select().from(pointEvents).where(eq(pointEvents.studentId, id))).reduce((n, p) => n + p.delta, 0)
 
-// I1: เปิดวันพร้อมกัน 2 ครั้งต้องได้ +2 ครั้งเดียว และหักคืนได้เมื่อขาด
-it('openDay พร้อมกันได้ +2 ครั้งเดียว และเปลี่ยนเป็นขาดแล้วเหลือ 0', async () => {
+// I1: เปิดวันพร้อมกัน 2 ครั้งต้องได้ +5 ครั้งเดียว และหักคืนได้เมื่อขาด
+it('openDay พร้อมกันได้ +5 ครั้งเดียว และเปลี่ยนเป็นขาดแล้วเหลือ 0', async () => {
   const { classId } = await seedClass(db())
   const s = await seedStudent(db(), classId)
   const [a] = await Promise.all([openDay(db(), classId, '2026-10-20'), openDay(db(), classId, '2026-10-20')])
-  expect(await exp(s.id)).toBe(2)
+  expect(await exp(s.id)).toBe(5)
   await setStatus(db(), a.day!.id, s.id, 'absent', 'teacher')
   expect(await exp(s.id)).toBe(0)
 })
@@ -31,7 +31,7 @@ it('GET วันที่ยังไม่เริ่มคืน day=null �
   const started = await postJson(`/api/teacher/classes/${classId}/attendance`, { date: '2026-10-20' }, { cookie })
   expect(started.status).toBe(200)
   expect((await json(started)).records).toHaveLength(1)
-  expect(await exp(s.id)).toBe(2)
+  expect(await exp(s.id)).toBe(5)
 })
 
 it('เริ่มเช็กชื่อวันอนาคต / วันที่เป็นไปไม่ได้ / ปีแปลก → 400', async () => {

@@ -1,5 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { ASSIGNMENT_EXP, type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
+import { type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
+import { lateExp } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { assignments, classes, pointEvents, students, submissions } from '../db/schema'
 import { apiError } from '../http'
@@ -225,7 +226,7 @@ export async function gradeSubmission(
       .values({
         id: newId(),
         studentId: submission.studentId,
-        delta: late ? ASSIGNMENT_EXP.late : ASSIGNMENT_EXP.onTime,
+        delta: late ? lateExp(assignment.expReward) : assignment.expReward,
         reason: `ส่งงาน: ${assignment.title}`,
         source: 'assignment',
         refId: id,
@@ -272,7 +273,7 @@ export async function recordPaper(db: Db, assignmentId: string, studentId: strin
   if (input.score !== null) {
     await db
       .insert(pointEvents)
-      .values({ id: newId(), studentId, delta: late ? ASSIGNMENT_EXP.late : ASSIGNMENT_EXP.onTime, reason: `ส่งงาน: ${a.title}`, source: 'assignment', refId: id, createdAt: t })
+      .values({ id: newId(), studentId, delta: late ? lateExp(a.expReward) : a.expReward, reason: `ส่งงาน: ${a.title}`, source: 'assignment', refId: id, createdAt: t })
       .onConflictDoNothing()
   }
   return { submissionId: id }

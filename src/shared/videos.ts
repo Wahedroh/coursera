@@ -32,4 +32,6 @@ export const createVideosSchema = videoInputSchema.extend({ classIds: z.array(z.
 export const videoPublishSchema = z.object({ published: z.boolean() })
 
 export type TeacherVideo = { id: string; title: string; description: string; youtubeId: string; published: boolean; createdAt: number }
-export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number }
+export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number; rewarded: boolean }
+/** ดูคลิปแล้ว: วินาทีที่ดูจริง (ไม่นับซ้ำ) และความยาวคลิป */
+export const videoWatchSchema = z.object({ watchedSeconds: z.number().min(0).max(86400), durationSeconds: z.number().positive().max(86400) })

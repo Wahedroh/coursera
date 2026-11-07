@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import type { SubmitMode } from '../../shared/assignments'
+import { DEFAULT_ASSIGNMENT_EXP, lateExp } from '../../shared/points'
 import { epochToLocal, localToEpoch } from '../lib/format'
 import { resizeImage } from '../lib/image'
 import { fileUrl, uploadImage } from '../lib/upload'
@@ -10,7 +11,7 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
-type Existing = { classId: string; title: string; instructions: string; attachmentKeys: string[]; dueAt: number | null; maxScore: number; submitMode: SubmitMode }
+type Existing = { classId: string; title: string; instructions: string; attachmentKeys: string[]; dueAt: number | null; maxScore: number; submitMode: SubmitMode; expReward: number }
 
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
 
@@ -26,6 +27,7 @@ export default function TeacherAssignmentForm() {
   const [attachmentKeys, setAttachmentKeys] = useState<string[]>([])
   const [due, setDue] = useState('')
   const [maxScore, setMaxScore] = useState('10')
+  const [expReward, setExpReward] = useState(String(DEFAULT_ASSIGNMENT_EXP))
   const [submitMode, setSubmitMode] = useState<SubmitMode>('both')
   const [existingClass, setExistingClass] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +45,7 @@ export default function TeacherAssignmentForm() {
           setAttachmentKeys(a.attachmentKeys)
           setDue(epochToLocal(a.dueAt))
           setMaxScore(String(a.maxScore))
+          setExpReward(String(a.expReward))
           setSubmitMode(a.submitMode)
         })
         .catch((e) => setError(handle(e)))
@@ -63,7 +66,7 @@ export default function TeacherAssignmentForm() {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const body = { title, instructions, attachmentKeys, dueAt: localToEpoch(due), maxScore: Number(maxScore), submitMode }
+    const body = { title, instructions, attachmentKeys, dueAt: localToEpoch(due), maxScore: Number(maxScore), submitMode, expReward: Number(expReward) }
     try {
       if (id) {
         await api(`/api/teacher/assignments/${id}`, { method: 'PUT', body })
@@ -143,6 +146,11 @@ export default function TeacherAssignmentForm() {
               <option value="image">รูปเท่านั้น</option>
               <option value="text">ข้อความเท่านั้น</option>
             </select>
+          </label>
+          <label className="text-sm font-semibold">
+            ⭐ EXP เมื่อส่งตรงเวลา <span className="font-normal text-stone-500">(ตั้งให้อัตโนมัติ {DEFAULT_ASSIGNMENT_EXP} · แก้ได้)</span>
+            <input type="number" min={0} max={200} step={1} required className={input} value={expReward} onChange={(e) => setExpReward(e.target.value)} aria-label="EXP เมื่อส่งตรงเวลา" />
+            <span className="block text-xs font-normal text-stone-500">ส่งสายได้ {lateExp(Number(expReward) || 0)} EXP · นักเรียนได้ตอนครูให้คะแนน · งานใหญ่ให้มากขึ้นได้ งานเล็กลดลงได้</span>
           </label>
         </Card>
         <Card className="p-4 flex flex-col gap-2">

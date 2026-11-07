@@ -1,3 +1,4 @@
+import { DEFAULT_ASSIGNMENT_EXP, lateExp } from '../../shared/points'
 import { createRef, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
@@ -196,7 +197,7 @@ export default function TeacherGrade() {
               บันทึก & ถัดไป
             </Button>
           </div>
-          <p className="text-xs text-stone-500 text-center">บันทึกครั้งแรกนักเรียนได้ EXP อัตโนมัติ (+10 ตรงเวลา / +5 สาย)</p>
+          <p className="text-xs text-stone-500 text-center">บันทึกครั้งแรกนักเรียนได้ EXP อัตโนมัติตามที่ตั้งไว้ในงาน (ค่าตั้งต้น +{DEFAULT_ASSIGNMENT_EXP} ตรงเวลา / +{lateExp(DEFAULT_ASSIGNMENT_EXP)} สาย)</p>
         </div>
       </div>
     </TeacherLayout>

@@ -48,11 +48,7 @@ test('เช็กชื่อ + QR เช็กอิน + แจกแต้�
   await teacher.getByRole('button', { name: 'ตอบคำถาม' }).click()
   await teacher.getByRole('button', { name: '+5' }).click()
   await expect(teacher.getByText('ให้ +5 แต้ม: มานี')).toBeVisible()
-  // เติม EXP ให้ถึงเลเวล 1 (M1 +10, มาเรียน +2, +5 = 17)
-  for (let i = 0; i < 9; i++) {
-    const r = await teacher.request.post('/api/teacher/points', { data: { studentIds: [await studentIdOf(teacher, '3')], delta: 10, reason: 'ช่วยเพื่อน' } })
-    expect(r.ok()).toBeTruthy()
-  }
+  // ครบเลเวล 1 พอดี: ส่งงาน M1 +30 · มาเรียน +5 · แจก +5 = 40 EXP
 
   await student.goto('/me/progress')
   await expect(student.getByText('LV 1', { exact: true })).toBeVisible()
@@ -61,14 +57,3 @@ test('เช็กชื่อ + QR เช็กอิน + แจกแต้�
   await expect(student.getByText(/ได้ตัวละคร/)).toBeVisible()
   await expect(student.getByText('คอลเลกชัน (1/16)')).toBeVisible()
 })
-
-async function studentIdOf(teacher: Page, zipgradeId: string): Promise<string> {
-  const schools = await (await teacher.request.get('/api/teacher/classes')).json()
-  for (const s of schools)
-    for (const c of s.classes) {
-      const data = await (await teacher.request.get(`/api/teacher/classes/${c.id}/students`)).json()
-      const st = data.students.find((x: { zipgradeId: string }) => x.zipgradeId === zipgradeId)
-      if (st) return st.id
-    }
-  throw new Error('student not found')
-}

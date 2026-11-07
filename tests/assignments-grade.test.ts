@@ -20,19 +20,19 @@ async function setup(submittedAt: number, dueAt = 10_000) {
   return { cookie, classId, a, s, id, grade, points }
 }
 
-it('ให้คะแนนแล้วสถานะ graded และ EXP +10', async () => {
+it('ให้คะแนนแล้วสถานะ graded และ EXP +30 (ค่าตั้งต้นของงาน)', async () => {
   const { id, grade, points } = await setup(5_000)
   const res = await grade({ score: 8, comment: 'ดีมาก', annotatedKeys: [`ann/${id}/x.png`] })
   expect(res.status).toBe(200)
   const [row] = await db().select().from(submissions).where(eq(submissions.id, id))
   expect(row).toMatchObject({ status: 'graded', score: 8, comment: 'ดีมาก', annotatedKeys: [`ann/${id}/x.png`] })
-  expect((await points()).map((p) => [p.delta, p.reason, p.source, p.refId])).toEqual([[10, 'ส่งงาน: ใบงาน 4', 'assignment', id]])
+  expect((await points()).map((p) => [p.delta, p.reason, p.source, p.refId])).toEqual([[30, 'ส่งงาน: ใบงาน 4', 'assignment', id]])
 })
 
-it('ส่งสายได้ +5', async () => {
+it('ส่งสายได้ครึ่งหนึ่ง +15', async () => {
   const { grade, points } = await setup(20_000)
   await grade({ score: 5, comment: '', annotatedKeys: [] })
-  expect((await points()).map((p) => p.delta)).toEqual([5])
+  expect((await points()).map((p) => p.delta)).toEqual([15])
 })
 
 it('ตรวจซ้ำ EXP ไม่เพิ่ม', async () => {

@@ -18,7 +18,7 @@ async function setup(n = 2) {
   return { cookie, classId, ss }
 }
 
-it('เปิดวันแล้วทุกคนเป็น present และได้ +2', async () => {
+it('เปิดวันแล้วทุกคนเป็น present และได้ +5', async () => {
   const { cookie, classId, ss } = await setup()
   await seedStudent(db(), classId, { active: false })
   const res = await postJson(`/api/teacher/classes/${classId}/attendance`, { date: '2026-10-26' }, { cookie })
@@ -26,7 +26,7 @@ it('เปิดวันแล้วทุกคนเป็น present แล�
   const body = await json(res)
   expect(body.day).toMatchObject({ date: '2026-10-26', selfCheckinOpen: false })
   expect(body.records.map((r: { status: string }) => r.status)).toEqual(['present', 'present'])
-  expect(await exp(ss[0].id)).toBe(2)
+  expect(await exp(ss[0].id)).toBe(5)
 })
 
 it('เปิดวันซ้ำไม่สร้างซ้ำ และ EXP ไม่เพิ่ม', async () => {
@@ -35,10 +35,10 @@ it('เปิดวันซ้ำไม่สร้างซ้ำ และ EX
   const b = await json(await postJson(`/api/teacher/classes/${classId}/attendance`, { date: '2026-10-26' }, { cookie }))
   expect(b.day.id).toBe(a.day.id)
   expect(b.records).toHaveLength(2)
-  expect(await exp(ss[0].id)).toBe(2)
+  expect(await exp(ss[0].id)).toBe(5)
 })
 
-it('มา→ขาด→มา EXP เหลือ +2 และสาย = +2', async () => {
+it('มา→ขาด→มา EXP เหลือ +5 และสาย = +5', async () => {
   const { cookie, classId, ss } = await setup()
   const { day } = await json(await postJson(`/api/teacher/classes/${classId}/attendance`, { date: '2026-10-26' }, { cookie }))
   const put = (status: string) => putJson(`/api/teacher/attendance/${day.id}/records/${ss[0].id}`, { status }, cookie)
@@ -46,7 +46,7 @@ it('มา→ขาด→มา EXP เหลือ +2 และสาย = +2',
   expect(await exp(ss[0].id)).toBe(0)
   await put('present')
   await put('late')
-  expect(await exp(ss[0].id)).toBe(2)
+  expect(await exp(ss[0].id)).toBe(5)
   const again = await json(await postJson(`/api/teacher/classes/${classId}/attendance`, { date: '2026-10-26' }, { cookie }))
   expect(again.records[0]).toMatchObject({ studentId: ss[0].id, status: 'late', source: 'teacher' })
 })

@@ -34,8 +34,8 @@ it('สถิติของฉัน: มาเรียน · ส่งงา�
   expect(s.assignments).toEqual({ total: 4, onTime: 1, late: 1, missing: 1, notDue: 1 })
   expect(s.exams).toEqual([{ title: 'บท 1', takenOn: '2026-10-01', pct: 75, absent: false }])
   expect(JSON.stringify(s)).not.toContain('ห้ามเห็น')
-  expect(s).toEqual(expect.objectContaining({ exp: 2, level: 0, nextLevelAt: 100 }))
-  expect(await json(await getJson('/api/student/exp', ca))).toEqual({ exp: 2, level: 0, nextLevelAt: 100 })
+  expect(s).toEqual(expect.objectContaining({ exp: 5, level: 0, nextLevelAt: 40 }))
+  expect(await json(await getJson('/api/student/exp', ca))).toEqual({ exp: 5, level: 0, nextLevelAt: 40 })
   expect((await getJson('/api/student/stats')).status).toBe(401)
 })
 

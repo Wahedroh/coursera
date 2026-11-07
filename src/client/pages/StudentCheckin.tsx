@@ -1,3 +1,4 @@
+import { EXP_RULES } from '../../shared/points'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api, ApiClientError, type Me } from '../api'
@@ -33,7 +34,7 @@ export default function StudentCheckin() {
       <Card className={`p-6 text-center ${result.ok ? 'bg-board-soft border-green-200' : 'bg-red-50 border-red-200'}`}>
         <p className={`text-2xl font-extrabold ${result.ok ? 'text-board' : 'text-red-700'}`}>{result.ok ? 'เช็กชื่อแล้ว ✓' : 'เช็กชื่อไม่สำเร็จ'}</p>
         <p className="text-sm mt-2">{result.text}</p>
-        {result.exp && <p className="text-sm text-board mt-1">+2 EXP</p>}
+        {result.exp && <p className="text-sm text-board mt-1">+{EXP_RULES.attendance} EXP</p>}
       </Card>
       <Link to="/me" className="text-center underline text-sm">
         ไปหน้างานของฉัน

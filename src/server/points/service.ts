@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { CHARACTERS, RARITY_WEIGHTS } from '../../shared/characters'
 import { EXP_PER_LEVEL, levelOf } from '../../shared/points'
@@ -62,18 +62,23 @@ export async function saveSeating(db: Db, classId: string, layout: Layout): Prom
     .onConflictDoUpdate({ target: seating.classId, set: { layout, updatedAt: now() } })
 }
 
-/** สุ่มตัวละครตามน้ำหนักความหายาก; rand ∈ [0,1) */
-export function rollCharacter(rand: () => number): string {
-  let r = rand() * 100
-  let rarity = RARITY_WEIGHTS[0][0]
-  for (const [k, w] of RARITY_WEIGHTS) {
+/** สุ่มตัวละครตามน้ำหนักความหายาก; rand ∈ [0,1)
+ *  ไม่ซ้ำกับตัวที่มีแล้ว จนกว่าจะครบ 16 ตัว (ระดับที่ครบแล้วถูกตัดออก แล้วเฉลี่ยน้ำหนักระดับที่เหลือ) · ครบแล้วสุ่มได้ทุกตัว */
+export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = new Set()): string {
+  const left = CHARACTERS.filter((c) => !owned.has(c.id))
+  const pool0 = left.length ? left : CHARACTERS
+  const tiers = RARITY_WEIGHTS.filter(([k]) => pool0.some((c) => c.rarity === k))
+  const total = tiers.reduce((n, [, w]) => n + w, 0)
+  let r = rand() * total
+  let rarity = tiers[0][0]
+  for (const [k, w] of tiers) {
     if (r < w) {
       rarity = k
       break
     }
     r -= w
   }
-  const pool = CHARACTERS.filter((c) => c.rarity === rarity)
+  const pool = pool0.filter((c) => c.rarity === rarity)
   return pool[Math.floor(rand() * pool.length) % pool.length].id
 }
 
@@ -116,7 +121,10 @@ export async function progress(db: Db, studentId: string) {
 export async function openEgg(db: Db, studentId: string, eggId: string, rand = secureRandom): Promise<{ characterId: string }> {
   const [egg] = await db.select({ id: eggs.id }).from(eggs).where(and(eq(eggs.id, eggId), eq(eggs.studentId, studentId)))
   if (!egg) throw apiError('egg_not_found', 'ไม่พบไข่ใบนี้', 404)
-  const characterId = rollCharacter(rand)
+  const owned = new Set(
+    (await db.select({ c: eggs.characterId }).from(eggs).where(and(eq(eggs.studentId, studentId), isNotNull(eggs.characterId)))).map((e) => e.c!),
+  )
+  const characterId = rollCharacter(rand, owned)
   const res = await db
     .update(eggs)
     .set({ characterId, openedAt: now() })

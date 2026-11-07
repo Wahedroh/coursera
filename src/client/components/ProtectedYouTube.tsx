@@ -52,7 +52,11 @@ const RATES = [0.75, 1, 1.25, 1.5, 2]
  * ไม่มีปุ่มของ YouTube (controls=0) + ชั้นโปร่งใสทับทั้งคลิป → คลิกชื่อคลิป/โลโก้/แชร์/"ดูบน YouTube" ไม่ได้
  * ตอนหยุด/จบมีฉากบังคลิปแนะนำ · ปุ่มควบคุมเป็นของเราเอง · เต็มจอทั้งกรอบของเรา (ไม่ใช่ของ YouTube)
  */
-export default function ProtectedYouTube({ videoId, title }: { videoId: string; title: string }) {
+/** onWatch: เรียกทุกครึ่งวินาทีระหว่างเล่น ด้วยจำนวนวินาทีของคลิปที่ดูจริง (ไม่นับช่วงที่ข้าม/ดูซ้ำ) และความยาวคลิป */
+export default function ProtectedYouTube({ videoId, title, onWatch }: { videoId: string; title: string; onWatch?: (watchedSeconds: number, durationSeconds: number) => void }) {
+  const seen = useRef(new Set<number>())
+  const onWatchRef = useRef(onWatch)
+  onWatchRef.current = onWatch
   const wrapRef = useRef<HTMLDivElement>(null)
   const mountRef = useRef<HTMLDivElement>(null)
   const playerRef = useRef<any>(null)
@@ -82,6 +86,7 @@ export default function ProtectedYouTube({ videoId, title }: { videoId: string; 
     setMuted(false)
     setRate(1)
     setNeedTap(false)
+    seen.current = new Set()
     const fail = () => !cancelled && setError('โหลดตัวเล่นคลิปไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วกด "ลองใหม่"')
     loadYouTubeApi()
       .then((YT) => {
@@ -132,7 +137,13 @@ export default function ProtectedYouTube({ videoId, title }: { videoId: string; 
 
   useEffect(() => {
     if (state !== 'playing') return
-    const t = setInterval(() => setTime(playerRef.current?.getCurrentTime?.() ?? 0), 500)
+    const t = setInterval(() => {
+      const now = playerRef.current?.getCurrentTime?.() ?? 0
+      setTime(now)
+      seen.current.add(Math.floor(now))
+      const d = playerRef.current?.getDuration?.() ?? 0
+      if (d > 0) onWatchRef.current?.(seen.current.size, d)
+    }, 500)
     return () => clearInterval(t)
   }, [state])
 
