@@ -5,6 +5,7 @@ import { avatarInputSchema } from '../../shared/avatar'
 import { parseBody } from '../http'
 import type { AppEnv, SessionInfo } from '../env'
 import { getAvatar, leaderboard, openEgg, progress, saveAvatar } from './service'
+import { expSummary, studentStats } from './stats'
 
 // ตรวจสิทธิ์ราย route — router นี้ mount ที่ /api/student ร่วมกับหน้าล็อกอินซึ่งต้องเข้าได้โดยไม่ล็อกอิน
 export const studentPointsRoutes = new Hono<AppEnv>()
@@ -19,3 +20,5 @@ studentPointsRoutes.put('/avatar', requireStudent, async (c) => {
   await saveAvatar(getDb(c.env), me(c).studentId, nickname, config, now())
   return c.json({ ok: true })
 })
+studentPointsRoutes.get('/exp', requireStudent, async (c) => c.json(await expSummary(getDb(c.env), me(c).studentId)))
+studentPointsRoutes.get('/stats', requireStudent, async (c) => c.json(await studentStats(getDb(c.env), me(c).studentId, me(c).classId, now())))
