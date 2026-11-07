@@ -1,7 +1,8 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, like } from 'drizzle-orm'
+import { EXP_RULES, VIDEO_WATCH_RATIO } from '../../shared/points'
 import { parseYouTubeId, type StudentVideo, type TeacherVideo, type VideoInput } from '../../shared/videos'
 import { newId, type Db } from '../db/client'
-import { classes, videos } from '../db/schema'
+import { classes, pointEvents, videos } from '../db/schema'
 import { apiError } from '../http'
 
 export const videoNotFound = () => apiError('video_not_found', 'ไม่พบคลิปนี้', 404)
@@ -49,12 +50,35 @@ export async function deleteVideo(db: Db, id: string): Promise<void> {
 const visible = (classId: string) => and(eq(videos.classId, classId), eq(videos.published, true))
 const studentCols = { id: videos.id, title: videos.title, description: videos.description, youtubeId: videos.youtubeId, createdAt: videos.createdAt }
 
-export async function videosForStudent(db: Db, classId: string): Promise<StudentVideo[]> {
-  return db.select(studentCols).from(videos).where(visible(classId)).orderBy(desc(videos.createdAt))
+const refOf = (videoId: string, studentId: string) => `${videoId}:${studentId}`
+
+async function rewardedSet(db: Db, studentId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ ref: pointEvents.refId })
+    .from(pointEvents)
+    .where(and(eq(pointEvents.source, 'video'), eq(pointEvents.studentId, studentId), like(pointEvents.refId, `%:${studentId}`)))
+  return new Set(rows.map((r) => (r.ref ?? '').split(':')[0]))
 }
 
-export async function videoForStudent(db: Db, id: string, classId: string): Promise<StudentVideo> {
+export async function videosForStudent(db: Db, classId: string, studentId: string): Promise<StudentVideo[]> {
+  const got = await rewardedSet(db, studentId)
+  return (await db.select(studentCols).from(videos).where(visible(classId)).orderBy(desc(videos.createdAt))).map((v) => ({ ...v, rewarded: got.has(v.id) }))
+}
+
+export async function videoForStudent(db: Db, id: string, classId: string, studentId: string): Promise<StudentVideo> {
   const [v] = await db.select(studentCols).from(videos).where(and(eq(videos.id, id), visible(classId)))
   if (!v) throw videoNotFound()
-  return v
+  return { ...v, rewarded: (await rewardedSet(db, studentId)).has(v.id) }
+}
+
+/** ทบทวนคลิปถึง 70% ของความยาว → +3 EXP (คลิปละครั้งต่อคน) */
+export async function recordWatch(db: Db, id: string, classId: string, studentId: string, w: { watchedSeconds: number; durationSeconds: number }, t: number) {
+  const v = await videoForStudent(db, id, classId, studentId)
+  if (w.watchedSeconds + 1 < w.durationSeconds * VIDEO_WATCH_RATIO) throw apiError('not_enough', `ต้องดูอย่างน้อย ${Math.round(VIDEO_WATCH_RATIO * 100)}% ของคลิป`, 400)
+  const res = await db
+    .insert(pointEvents)
+    .values({ id: newId(), studentId, delta: EXP_RULES.video, reason: `ทบทวนคลิป: ${v.title}`, source: 'video', refId: refOf(id, studentId), createdAt: t })
+    .onConflictDoNothing()
+    .returning({ id: pointEvents.id })
+  return { awarded: res.length > 0, exp: EXP_RULES.video }
 }

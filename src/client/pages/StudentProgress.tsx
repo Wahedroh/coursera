@@ -1,3 +1,4 @@
+import { EXP_PER_LEVEL } from '../../shared/points'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
@@ -49,7 +50,7 @@ export default function StudentProgress() {
   if (!p) return error ? <ErrorBox message={error} /> : <Loading />
   const owned = new Set(p.eggs.flatMap((e) => (e.characterId ? [e.characterId] : [])))
   const pending = p.eggs.filter((e) => !e.characterId)
-  const prev = p.level * 100
+  const prev = p.level * EXP_PER_LEVEL
   const pct = Math.max(0, Math.min(100, ((p.exp - prev) / (p.nextLevelAt - prev)) * 100))
   const got = opened ? characterById(opened) : null
 

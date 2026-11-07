@@ -22,11 +22,11 @@ it('progress รวม EXP/เลเวล และสร้างไข่ต�
   const { a, ac, give } = await setup()
   await give(a.id, 21)
   const p = await json(await getJson('/api/student/progress', ac))
-  expect(p).toMatchObject({ exp: 210, level: 2, nextLevelAt: 300 })
-  expect(p.eggs.map((e: { level: number; characterId: null }) => [e.level, e.characterId])).toEqual([[1, null], [2, null]])
+  expect(p).toMatchObject({ exp: 210, level: 5, nextLevelAt: 240 })
+  expect(p.eggs.map((e: { level: number; characterId: null }) => [e.level, e.characterId])).toEqual([1, 2, 3, 4, 5].map((l) => [l, null]))
   expect(p.history[0]).toMatchObject({ delta: 10, reason: 'ตอบคำถาม' })
   const again = await json(await getJson('/api/student/progress', ac))
-  expect(again.eggs).toHaveLength(2)
+  expect(again.eggs).toHaveLength(5)
 })
 
 it('เปิดไข่ได้ตัวละครจากแคตตาล็อก และเปิดพร้อมกันได้ครั้งเดียว', async () => {

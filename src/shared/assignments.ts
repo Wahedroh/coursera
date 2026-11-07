@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DEFAULT_ASSIGNMENT_EXP } from './points'
 
 export type SubmitMode = 'text' | 'image' | 'both'
 export type SubmissionStatus = 'submitted' | 'late' | 'graded' | 'returned'
@@ -11,6 +12,8 @@ export const assignmentInputSchema = z.object({
   dueAt: z.number().int().nullable(),
   maxScore: z.number().positive().max(1000),
   submitMode: z.enum(['text', 'image', 'both']),
+  /** EXP เมื่อส่งตรงเวลา (ตั้งให้อัตโนมัติ ครูแก้ได้) */
+  expReward: z.number().int().min(0).max(200).default(DEFAULT_ASSIGNMENT_EXP),
 })
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>
 
@@ -71,4 +74,3 @@ export const returnInputSchema = z.object({ comment: z.string().max(2000) })
 /** ครูบันทึกว่านักเรียนส่งงานเป็นกระดาษ · score = null คือยังไม่ให้คะแนน (ตรวจทีหลังได้) */
 export const paperInputSchema = z.object({ score: z.number().nullable(), late: z.boolean(), comment: z.string().max(2000) })
 
-export const ASSIGNMENT_EXP = { onTime: 10, late: 5 } as const

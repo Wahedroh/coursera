@@ -5,6 +5,7 @@ import type { StudentAssignment, StudentStatus } from '../../shared/assignments'
 import { baht, type StudentFee } from '../../shared/fees'
 import type { AvatarConfig } from '../../shared/avatar'
 import { AvatarArt } from '../components/PixelArt'
+import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
@@ -91,10 +92,10 @@ export default function StudentHome() {
           <Link to="/me/progress" className="mt-3 flex items-center gap-2 text-xs" aria-label={`เลเวล ${exp.level} · ${exp.exp} EXP`}>
             <span className="rounded-lg bg-amber-400 px-2 py-0.5 font-extrabold text-amber-950">Lv {exp.level}</span>
             <span className="h-3 flex-1 overflow-hidden rounded-full bg-white/25">
-              <span className="block h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, Math.max(0, exp.exp - (exp.nextLevelAt - 100)))}%` }} />
+              <span className="block h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, Math.max(0, ((exp.exp - (exp.nextLevelAt - EXP_PER_LEVEL)) / EXP_PER_LEVEL) * 100))}%` }} />
             </span>
             <span className="tabular-nums">
-              {Math.max(0, exp.exp - (exp.nextLevelAt - 100))}/100 EXP
+              {Math.max(0, exp.exp - (exp.nextLevelAt - EXP_PER_LEVEL))}/{EXP_PER_LEVEL} EXP
             </span>
           </Link>
         )}

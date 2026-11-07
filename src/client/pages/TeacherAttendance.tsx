@@ -1,3 +1,4 @@
+import { EXP_RULES } from '../../shared/points'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -153,7 +154,7 @@ export default function TeacherAttendance() {
           ⬇ Excel เช็กชื่อ
         </button>
       </Card>
-      <p className="text-xs text-stone-500">ทุกคนเริ่มต้นเป็น "มา" แตะเพื่อเปลี่ยน · บันทึกอัตโนมัติ · มาหรือสายได้ +2 EXP</p>
+      <p className="text-xs text-stone-500">ทุกคนเริ่มต้นเป็น "มา" แตะเพื่อเปลี่ยน · บันทึกอัตโนมัติ · มาหรือสายได้ +{EXP_RULES.attendance} EXP</p>
     </TeacherLayout>
   )
 }
