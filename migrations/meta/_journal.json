@@ -99,6 +99,13 @@
       "when": 1794238850502,
       "tag": "0013_terms_seasons_quiz",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794241082402,
+      "tag": "0014_current_term_2_2569",
+      "breakpoints": true
     }
   ]
 }

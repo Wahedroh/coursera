@@ -110,7 +110,7 @@ export default function TermCard() {
                 className="border-2 border-line rounded-xl px-3 py-1.5 bg-white w-32"
                 required
                 maxLength={30}
-                placeholder="2/2569"
+                placeholder="1/2570"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
