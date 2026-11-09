@@ -12,4 +12,4 @@ export type ClassFees = {
   charges: { itemId: string; studentId: string; amount: number; paid: number }[]
 }
 /** ข้อมูลทั้งหมดของห้องสำหรับส่งออก (ดึงทีละห้อง ไม่ให้เกินเพดานคำสั่งต่อคำขอของ D1) */
-export type ClassExport = { gradebook: Gradebook; scoreBook: ScoreBook; grades: ClassGrades; attendance: AttendanceRange; fees: ClassFees; from: string; to: string }
+export type ClassExport = { gradebook: Gradebook; scoreBook: ScoreBook; grades: ClassGrades; attendance: AttendanceRange; fees: ClassFees; from: string; to: string; term: string }

@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { api } from '../api'
 import { Card, ErrorBox, Loading } from '../ui'
 import ClassMenu from '../components/ClassMenu'
+import TeacherToday from '../components/TeacherToday'
+import TermCard from '../components/TermCard'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -71,6 +73,7 @@ export default function TeacherHome() {
           </Card>
         </Link>
       )}
+      {classCount > 0 && <TeacherToday />}
       {selected && (
         <Card className="p-4 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -121,6 +124,7 @@ export default function TeacherHome() {
           </Card>
         ))}
       </div>
+      {classCount > 0 && <TermCard />}
     </TeacherLayout>
   )
 }

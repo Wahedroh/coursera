@@ -1,9 +1,14 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
 import { lateExp } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { assignments, classes, pointEvents, students, submissions } from '../db/schema'
 import { apiError } from '../http'
+import { termWindow } from '../terms/service'
+import type { TermWindow } from '../../shared/terms'
+
+/** งานของเทอม = งานที่สร้างในช่วงเทอมนั้น */
+const asgInTerm = (w: TermWindow) => and(gte(assignments.createdAt, w.start), lt(assignments.createdAt, w.end))
 
 export const assignmentNotFound = () => apiError('assignment_not_found', 'ไม่พบงานนี้', 404)
 
@@ -17,7 +22,8 @@ export async function createAssignments(db: Db, classIds: string[], input: Assig
   return rows.map((r) => r.id)
 }
 
-export async function listForClass(db: Db, classId: string): Promise<AssignmentSummary[]> {
+export async function listForClass(db: Db, classId: string, win?: TermWindow): Promise<AssignmentSummary[]> {
+  const w = win ?? (await termWindow(db))
   const rows = await db
     .select({
       id: assignments.id,
@@ -28,7 +34,7 @@ export async function listForClass(db: Db, classId: string): Promise<AssignmentS
       createdAt: assignments.createdAt,
     })
     .from(assignments)
-    .where(eq(assignments.classId, classId))
+    .where(and(eq(assignments.classId, classId), asgInTerm(w)))
   if (rows.length === 0) return []
   const counts = await db
     .select({ assignmentId: submissions.assignmentId, status: submissions.status, n: sql<number>`count(*)` })
@@ -36,7 +42,7 @@ export async function listForClass(db: Db, classId: string): Promise<AssignmentS
     .innerJoin(students, eq(submissions.studentId, students.id))
     .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
     // กรองด้วยห้อง ไม่ใช่ list ของ id — D1 รับตัวแปรได้ไม่เกิน 100 ตัวต่อคำสั่ง
-    .where(and(eq(assignments.classId, classId), eq(students.classId, classId), eq(students.active, true)))
+    .where(and(eq(assignments.classId, classId), asgInTerm(w), eq(students.classId, classId), eq(students.active, true)))
     .groupBy(submissions.assignmentId, submissions.status)
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)` })
@@ -72,12 +78,14 @@ export async function deleteAssignment(db: Db, id: string): Promise<void> {
 
 const PENDING: StudentStatus[] = ['missing', 'returned']
 
+/** งานของเทอมปัจจุบัน (งานเทอมก่อนไม่แสดงในรายการ) */
 export async function listForStudent(db: Db, studentId: string, classId: string): Promise<StudentAssignment[]> {
+  const w = await termWindow(db)
   const rows = await db
     .select({ a: assignments, s: submissions })
     .from(assignments)
     .leftJoin(submissions, and(eq(submissions.assignmentId, assignments.id), eq(submissions.studentId, studentId)))
-    .where(and(eq(assignments.classId, classId), eq(assignments.published, true)))
+    .where(and(eq(assignments.classId, classId), eq(assignments.published, true), asgInTerm(w)))
   return rows
     .map(({ a, s }) => toStudentAssignment(a, s))
     .sort((x, y) => {
@@ -146,10 +154,11 @@ export async function upsertSubmission(
   return getForStudent(db, p.assignmentId, p.studentId, p.classId)
 }
 
-export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
+export async function gradebook(db: Db, classId: string, win?: TermWindow): Promise<Gradebook> {
   const [cls] = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.id, classId))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
-  const list = (await listForClass(db, classId)).map(({ id, title, dueAt, maxScore }) => ({ id, title, dueAt, maxScore }))
+  const w = win ?? (await termWindow(db))
+  const list = (await listForClass(db, classId, w)).map(({ id, title, dueAt, maxScore }) => ({ id, title, dueAt, maxScore }))
   const roster = await db
     .select({ id: students.id, zipgradeId: students.zipgradeId, title: students.title, firstName: students.firstName, lastName: students.lastName })
     .from(students)
@@ -160,7 +169,7 @@ export async function gradebook(db: Db, classId: string): Promise<Gradebook> {
         .select({ id: submissions.id, assignmentId: submissions.assignmentId, studentId: submissions.studentId, status: submissions.status, score: submissions.score, onPaper: submissions.onPaper })
         .from(submissions)
         .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-        .where(eq(assignments.classId, classId))
+        .where(and(eq(assignments.classId, classId), asgInTerm(w)))
     : []
   const byKey = new Map(subs.map((s) => [`${s.studentId}|${s.assignmentId}`, s]))
   return {

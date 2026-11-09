@@ -1,10 +1,15 @@
-import { and, asc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type { ScoreImportInput, ScoreImportResult } from '../../shared/zipgrade-results'
 import { canonicalZipgradeId } from '../../shared/zipgrade'
 import { validScore, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
 import { newId, now, type Db } from '../db/client'
 import { classes, scoreItems, scores, students } from '../db/schema'
 import { apiError } from '../http'
+import { termWindow } from '../terms/service'
+import type { TermWindow } from '../../shared/terms'
+
+/** รายการคะแนนของเทอม = รายการที่สร้างในช่วงเทอมนั้น */
+const itemInTerm = (w: TermWindow) => and(gte(scoreItems.createdAt, w.start), lt(scoreItems.createdAt, w.end))
 
 export const scoreItemNotFound = () => apiError('score_item_not_found', 'ไม่พบรายการคะแนนนี้', 404)
 const classNotFound = () => apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
@@ -24,6 +29,7 @@ export async function createScoreItems(db: Db, classIds: string[], input: ScoreI
 const activeIn = (classId: string) => and(eq(students.classId, classId), eq(students.active, true))
 
 export async function listScoreItems(db: Db, classId: string): Promise<ScoreItemSummary[]> {
+  const w = await termWindow(db)
   const items = await db
     .select({
       id: scoreItems.id,
@@ -34,7 +40,7 @@ export async function listScoreItems(db: Db, classId: string): Promise<ScoreItem
       published: scoreItems.published,
     })
     .from(scoreItems)
-    .where(eq(scoreItems.classId, classId))
+    .where(and(eq(scoreItems.classId, classId), itemInTerm(w)))
     .orderBy(asc(scoreItems.takenOn), asc(scoreItems.createdAt))
   if (items.length === 0) return []
   const counts = await db
@@ -42,7 +48,7 @@ export async function listScoreItems(db: Db, classId: string): Promise<ScoreItem
     .from(scores)
     .innerJoin(students, eq(scores.studentId, students.id))
     .innerJoin(scoreItems, eq(scores.itemId, scoreItems.id))
-    .where(and(eq(scoreItems.classId, classId), activeIn(classId), or(isNotNull(scores.score), eq(scores.absent, true))))
+    .where(and(eq(scoreItems.classId, classId), itemInTerm(w), activeIn(classId), or(isNotNull(scores.score), eq(scores.absent, true))))
     .groupBy(scores.itemId)
   const [{ total }] = await db.select({ total: sql<number>`count(*)` }).from(students).where(activeIn(classId))
   return items.map((i) => ({ ...i, filled: counts.find((c) => c.itemId === i.id)?.n ?? 0, total }))
@@ -121,11 +127,12 @@ export async function saveScore(db: Db, itemId: string, studentId: string, input
 }
 
 export async function scoresForStudent(db: Db, studentId: string, classId: string): Promise<StudentScore[]> {
+  const w = await termWindow(db)
   const rows = await db
     .select({ i: scoreItems, s: scores })
     .from(scoreItems)
     .leftJoin(scores, and(eq(scores.itemId, scoreItems.id), eq(scores.studentId, studentId)))
-    .where(and(eq(scoreItems.classId, classId), eq(scoreItems.published, true)))
+    .where(and(eq(scoreItems.classId, classId), eq(scoreItems.published, true), itemInTerm(w)))
     .orderBy(asc(scoreItems.takenOn), asc(scoreItems.createdAt))
   return rows.map(({ i, s }) => ({
     id: i.id,
@@ -138,18 +145,19 @@ export async function scoresForStudent(db: Db, studentId: string, classId: strin
   }))
 }
 
-export async function scoreBook(db: Db, classId: string): Promise<ScoreBook> {
+export async function scoreBook(db: Db, classId: string, win?: TermWindow): Promise<ScoreBook> {
+  const w = win ?? (await termWindow(db))
   const items = await db
     .select({ id: scoreItems.id, title: scoreItems.title, maxScore: scoreItems.maxScore, takenOn: scoreItems.takenOn })
     .from(scoreItems)
-    .where(eq(scoreItems.classId, classId))
+    .where(and(eq(scoreItems.classId, classId), itemInTerm(w)))
     .orderBy(asc(scoreItems.takenOn), asc(scoreItems.createdAt))
   const rows = items.length
     ? await db
         .select({ itemId: scores.itemId, studentId: scores.studentId, score: scores.score, absent: scores.absent })
         .from(scores)
         .innerJoin(scoreItems, eq(scores.itemId, scoreItems.id))
-        .where(eq(scoreItems.classId, classId))
+        .where(and(eq(scoreItems.classId, classId), itemInTerm(w)))
     : []
   const cells: ScoreBook['cells'] = {}
   for (const r of rows) (cells[r.studentId] ??= {})[r.itemId] = { score: r.score, absent: r.absent }

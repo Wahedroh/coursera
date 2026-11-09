@@ -92,6 +92,13 @@
       "when": 1794063093006,
       "tag": "0012_video_exp_5",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794238850502,
+      "tag": "0013_terms_seasons_quiz",
+      "breakpoints": true
     }
   ]
 }

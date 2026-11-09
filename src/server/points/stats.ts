@@ -1,11 +1,12 @@
 import { sql } from 'drizzle-orm'
-import { ATTENDANCE_STATUSES, type AttendanceStatus } from '../../shared/attendance'
+import { ATTENDANCE_STATUSES, todayBangkok, type AttendanceStatus } from '../../shared/attendance'
 import { EXP_PER_LEVEL, levelOf } from '../../shared/points'
 import type { StudentStats } from '../../shared/stats'
 import { listForStudent } from '../assignments/service'
 import type { Db } from '../db/client'
 import { scoresForStudent } from '../scores/service'
 import { studentExp } from './service'
+import { termWindow } from '../terms/service'
 
 export async function expSummary(db: Db, studentId: string) {
   const exp = await studentExp(db, studentId)
@@ -14,10 +15,12 @@ export async function expSummary(db: Db, studentId: string) {
 }
 
 /** มาเรียน · ส่งงาน · คะแนนสอบที่เผยแพร่แล้ว (เป็น %) — ใช้ข้อมูลที่มีอยู่ ไม่มีของเพื่อน */
+/** สถิติของเทอมปัจจุบัน (เช็กชื่อนับวันที่ตั้งแต่วันเปิดเทอม) */
 export async function studentStats(db: Db, studentId: string, classId: string, t: number): Promise<StudentStats> {
+  const { start } = await termWindow(db)
   const rows = await db.all<{ status: AttendanceStatus; n: number }>(sql`
     SELECT r.status AS status, count(*) AS n FROM attendance_records r JOIN attendance_days d ON d.id = r.day_id
-    WHERE r.student_id = ${studentId} AND d.class_id = ${classId} GROUP BY r.status`)
+    WHERE r.student_id = ${studentId} AND d.class_id = ${classId} AND d.date >= ${todayBangkok(start)} GROUP BY r.status`)
   const attendance = Object.fromEntries(ATTENDANCE_STATUSES.map((s) => [s, 0])) as Record<AttendanceStatus, number>
   for (const r of rows) attendance[r.status] = r.n
   const asg = await listForStudent(db, studentId, classId)

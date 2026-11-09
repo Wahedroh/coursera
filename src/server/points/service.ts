@@ -1,9 +1,11 @@
-import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
-import { CHARACTERS, RARITY_WEIGHTS } from '../../shared/characters'
+import { charactersOfSeason, RARITY_WEIGHTS, type Character } from '../../shared/characters'
 import { EXP_PER_LEVEL, levelOf } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
-import { classes, eggs, pointEvents, seating, settings, studentAvatars, students } from '../db/schema'
+import { classes, eggs, pointEvents, seating, settings, studentAvatars, students, terms } from '../db/schema'
+import { termWindow } from '../terms/service'
+import type { TermWindow } from '../../shared/terms'
 import { apiError } from '../http'
 
 export type Layout = { cols: number; seats: (string | null)[] }
@@ -18,11 +20,15 @@ export async function givePoints(db: Db, studentIds: string[], delta: number, re
   for (let i = 0; i < rows.length; i += 10) await db.insert(pointEvents).values(rows.slice(i, i + 10))
 }
 
+/** แต้มของนักเรียนที่อยู่ในช่วงเทอม (EXP เริ่มนับใหม่ทุกเทอม) */
+const inTerm = (w: TermWindow) => and(gte(pointEvents.createdAt, w.start), lt(pointEvents.createdAt, w.end))
+
 export async function classPoints(db: Db, classId: string): Promise<{ studentId: string; exp: number; level: number; avatar: AvatarConfig }[]> {
+  const w = await termWindow(db)
   const rows = await db
     .select({ studentId: students.id, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
     .from(students)
-    .leftJoin(pointEvents, eq(pointEvents.studentId, students.id))
+    .leftJoin(pointEvents, and(eq(pointEvents.studentId, students.id), inTerm(w)))
     .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)
@@ -62,11 +68,11 @@ export async function saveSeating(db: Db, classId: string, layout: Layout): Prom
     .onConflictDoUpdate({ target: seating.classId, set: { layout, updatedAt: now() } })
 }
 
-/** สุ่มตัวละครตามน้ำหนักความหายาก; rand ∈ [0,1)
- *  ไม่ซ้ำกับตัวที่มีแล้ว จนกว่าจะครบ 16 ตัว (ระดับที่ครบแล้วถูกตัดออก แล้วเฉลี่ยน้ำหนักระดับที่เหลือ) · ครบแล้วสุ่มได้ทุกตัว */
-export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = new Set()): string {
-  const left = CHARACTERS.filter((c) => !owned.has(c.id))
-  const pool0 = left.length ? left : CHARACTERS
+/** สุ่มตัวละครตามน้ำหนักความหายาก จากชุดของซีซัน; rand ∈ [0,1)
+ *  ไม่ซ้ำกับตัวที่มีแล้ว จนกว่าจะครบทั้งชุด (ระดับที่ครบแล้วถูกตัดออก แล้วเฉลี่ยน้ำหนักระดับที่เหลือ) · ครบแล้วสุ่มได้ทุกตัวในชุด */
+export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = new Set(), set: Character[] = charactersOfSeason(1)): string {
+  const left = set.filter((c) => !owned.has(c.id))
+  const pool0 = left.length ? left : set
   const tiers = RARITY_WEIGHTS.filter(([k]) => pool0.some((c) => c.rarity === k))
   const total = tiers.reduce((n, [, w]) => n + w, 0)
   let r = rand() * total
@@ -84,47 +90,59 @@ export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = n
 
 export const secureRandom = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32
 
-export async function studentExp(db: Db, studentId: string): Promise<number> {
+/** EXP ของเทอม (ไม่ระบุ = เทอมปัจจุบัน) */
+export async function studentExp(db: Db, studentId: string, w?: TermWindow): Promise<number> {
+  const win = w ?? (await termWindow(db))
   const [{ exp }] = await db
     .select({ exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)` })
     .from(pointEvents)
-    .where(eq(pointEvents.studentId, studentId))
+    .where(and(eq(pointEvents.studentId, studentId), inTerm(win)))
   return exp
 }
 
 export async function progress(db: Db, studentId: string) {
-  const exp = await studentExp(db, studentId)
+  const w = await termWindow(db)
+  const exp = await studentExp(db, studentId, w)
   const level = levelOf(exp)
   const t = now()
-  const have = new Set((await db.select({ level: eggs.level }).from(eggs).where(eq(eggs.studentId, studentId))).map((e) => e.level))
+  // ไข่ของเทอมนี้ = 1 ใบต่อเลเวล (เลเวลนับใหม่ทุกเทอม)
+  const have = new Set(
+    (await db.select({ level: eggs.level }).from(eggs).where(and(eq(eggs.studentId, studentId), eq(eggs.termId, w.term.id)))).map((e) => e.level),
+  )
   const missing = Array.from({ length: level }, (_, i) => i + 1).filter((l) => !have.has(l))
   for (let i = 0; i < missing.length; i += 10) {
     await db
       .insert(eggs)
-      .values(missing.slice(i, i + 10).map((l) => ({ id: newId(), studentId, level: l, createdAt: t })))
+      .values(missing.slice(i, i + 10).map((l) => ({ id: newId(), studentId, termId: w.term.id, level: l, createdAt: t })))
       .onConflictDoNothing()
   }
+  // ไข่ทุกเทอม (ไข่เทอมก่อนที่ยังไม่เปิดยังเปิดได้ และได้ตัวละครของซีซันเทอมนั้น)
   const myEggs = await db
-    .select({ id: eggs.id, level: eggs.level, characterId: eggs.characterId, openedAt: eggs.openedAt })
+    .select({ id: eggs.id, level: eggs.level, characterId: eggs.characterId, openedAt: eggs.openedAt, season: sql<number>`coalesce(${terms.season}, 1)`, termName: terms.name })
     .from(eggs)
+    .leftJoin(terms, eq(terms.id, eggs.termId))
     .where(eq(eggs.studentId, studentId))
-    .orderBy(eggs.level)
+    .orderBy(eggs.createdAt, eggs.level)
   const history = await db
     .select({ delta: pointEvents.delta, reason: pointEvents.reason, createdAt: pointEvents.createdAt })
     .from(pointEvents)
-    .where(eq(pointEvents.studentId, studentId))
+    .where(and(eq(pointEvents.studentId, studentId), inTerm(w)))
     .orderBy(desc(pointEvents.createdAt))
     .limit(30)
-  return { exp, level, nextLevelAt: (level + 1) * EXP_PER_LEVEL, eggs: myEggs, history }
+  return { exp, level, nextLevelAt: (level + 1) * EXP_PER_LEVEL, term: { name: w.term.name, season: w.term.season }, eggs: myEggs, history }
 }
 
 export async function openEgg(db: Db, studentId: string, eggId: string, rand = secureRandom): Promise<{ characterId: string }> {
-  const [egg] = await db.select({ id: eggs.id }).from(eggs).where(and(eq(eggs.id, eggId), eq(eggs.studentId, studentId)))
+  const [egg] = await db
+    .select({ id: eggs.id, season: sql<number>`coalesce(${terms.season}, 1)` })
+    .from(eggs)
+    .leftJoin(terms, eq(terms.id, eggs.termId))
+    .where(and(eq(eggs.id, eggId), eq(eggs.studentId, studentId)))
   if (!egg) throw apiError('egg_not_found', 'ไม่พบไข่ใบนี้', 404)
   const owned = new Set(
     (await db.select({ c: eggs.characterId }).from(eggs).where(and(eq(eggs.studentId, studentId), isNotNull(eggs.characterId)))).map((e) => e.c!),
   )
-  const characterId = rollCharacter(rand, owned)
+  const characterId = rollCharacter(rand, owned, charactersOfSeason(egg.season))
   const res = await db
     .update(eggs)
     .set({ characterId, openedAt: now() })
@@ -148,10 +166,11 @@ export async function setLeaderboard(db: Db, classId: string, enabled: boolean):
 
 export async function leaderboard(db: Db, classId: string, studentId: string) {
   if (!(await leaderboardEnabled(db, classId))) throw apiError('leaderboard_disabled', 'ครูยังไม่เปิดกระดานจัดอันดับ', 403)
+  const w = await termWindow(db)
   const rows = await db
     .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
     .from(students)
-    .leftJoin(pointEvents, eq(pointEvents.studentId, students.id))
+    .leftJoin(pointEvents, and(eq(pointEvents.studentId, students.id), inTerm(w)))
     .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)

@@ -3,10 +3,12 @@ import { todayBangkok } from '../../shared/attendance'
 import type { WatchReason, Watchlist, WatchlistQuery, WatchStudent } from '../../shared/watchlist'
 import type { Db } from '../db/client'
 import { allClassGrades } from '../grades/service'
+import { termWindow } from '../terms/service'
 
 /** นักเรียนที่ต้องติดตาม ทุกห้อง — ค้างงานที่เลยกำหนด (รวมงานที่ครูส่งกลับให้แก้) · ขาดเรียนในช่วง N วัน · เกรดคาดการณ์ต่ำ · ยังไม่ตั้ง PIN */
 export async function watchlist(db: Db, q: WatchlistQuery, t: number): Promise<Watchlist> {
   const from = todayBangkok(t - (q.days - 1) * 86400_000)
+  const { start } = await termWindow(db)
   const cls = await db.all<{ id: string; name: string }>(sql`SELECT id, name FROM classes ORDER BY name`)
   const roster = await db.all<{ id: string; classId: string; zipgradeId: string; title: string | null; firstName: string; lastName: string; hasPin: number }>(sql`
     SELECT id, class_id AS classId, zipgrade_id AS zipgradeId, title, first_name AS firstName, last_name AS lastName, pin_hash IS NOT NULL AS hasPin
@@ -15,7 +17,7 @@ export async function watchlist(db: Db, q: WatchlistQuery, t: number): Promise<W
     SELECT st.id AS studentId, a.title AS title FROM students st
     JOIN assignments a ON a.class_id = st.class_id
     LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = st.id
-    WHERE st.active = 1 AND a.due_at IS NOT NULL AND a.due_at < ${t} AND (s.id IS NULL OR s.status = 'returned')
+    WHERE st.active = 1 AND a.created_at >= ${start} AND a.due_at IS NOT NULL AND a.due_at < ${t} AND (s.id IS NULL OR s.status = 'returned')
     ORDER BY a.due_at`)
   const att = await db.all<{ studentId: string; absent: number; late: number }>(sql`
     SELECT r.student_id AS studentId, sum(r.status = 'absent') AS absent, sum(r.status = 'late') AS late

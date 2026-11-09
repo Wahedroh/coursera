@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
 import { rollCharacter } from '../src/server/points/service'
-import { CHARACTERS } from '../src/shared/characters'
+import { CHARACTERS, charactersOfSeason } from '../src/shared/characters'
 import { getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
 const db = () => getDb(env)
@@ -53,8 +53,12 @@ it('rollCharacter ตามน้ำหนัก 60/25/12/3', () => {
   expect(rarity(0.61)).toBe('rare')
   expect(rarity(0.86)).toBe('epic')
   expect(rarity(0.98)).toBe('legendary')
-  expect(CHARACTERS.filter((c) => c.rarity === 'common')).toHaveLength(8)
-  expect(CHARACTERS).toHaveLength(16)
+  for (const s of [1, 2]) {
+    expect(charactersOfSeason(s).filter((c) => c.rarity === 'common')).toHaveLength(8)
+    expect(charactersOfSeason(s).filter((c) => c.rarity === 'legendary')).toHaveLength(1)
+    expect(charactersOfSeason(s)).toHaveLength(16)
+  }
+  expect(new Set(CHARACTERS.map((c) => c.id)).size).toBe(32)
 })
 
 it('leaderboard ปิด 403 / เปิดแล้วเรียงถูก', async () => {

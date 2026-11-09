@@ -3,6 +3,8 @@ import { assignGrades, DEFAULT_GRADING, gradingSchema, type ClassGrades, type Gr
 import type { Db } from '../db/client'
 import { classes, settings, students } from '../db/schema'
 import { apiError } from '../http'
+import { termWindow } from '../terms/service'
+import type { TermWindow } from '../../shared/terms'
 
 const key = (classId: string) => `grading:${classId}`
 
@@ -25,7 +27,8 @@ export async function saveGrading(db: Db, classId: string, g: GradingSettings): 
  * คะแนนเต็มสะสม = รวมคะแนนเต็มของงาน/รายการสอบที่มีการให้คะแนนแล้วอย่างน้อย 1 คน
  * จัดอันดับเฉพาะนักเรียนที่ยังอยู่ในห้อง (active)
  */
-export async function classGrades(db: Db, classId: string): Promise<ClassGrades> {
+export async function classGrades(db: Db, classId: string, win?: TermWindow): Promise<ClassGrades> {
+  const { start, end } = win ?? (await termWindow(db))
   const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
   if (!c) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const roster = await db
@@ -35,16 +38,16 @@ export async function classGrades(db: Db, classId: string): Promise<ClassGrades>
     .orderBy(students.sortOrder, students.zipgradeId)
   const asg = await db.all<{ studentId: string; total: number }>(sql`
     SELECT s.student_id AS studentId, sum(s.score) AS total FROM submissions s JOIN assignments a ON a.id = s.assignment_id
-    WHERE a.class_id = ${classId} AND s.status = 'graded' AND s.score IS NOT NULL GROUP BY s.student_id`)
+    WHERE a.class_id = ${classId} AND a.created_at >= ${start} AND a.created_at < ${end} AND s.status = 'graded' AND s.score IS NOT NULL GROUP BY s.student_id`)
   const exam = await db.all<{ studentId: string; total: number }>(sql`
     SELECT sc.student_id AS studentId, sum(coalesce(sc.score, 0)) AS total FROM scores sc JOIN score_items i ON i.id = sc.item_id
-    WHERE i.class_id = ${classId} GROUP BY sc.student_id`)
+    WHERE i.class_id = ${classId} AND i.created_at >= ${start} AND i.created_at < ${end} GROUP BY sc.student_id`)
   const [maxAsg] = await db.all<{ max: number; n: number }>(sql`
     SELECT coalesce(sum(a.max_score), 0) AS max, count(*) AS n FROM assignments a
-    WHERE a.class_id = ${classId} AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'graded')`)
+    WHERE a.class_id = ${classId} AND a.created_at >= ${start} AND a.created_at < ${end} AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'graded')`)
   const [maxExam] = await db.all<{ max: number; n: number }>(sql`
     SELECT coalesce(sum(i.max_score), 0) AS max, count(*) AS n FROM score_items i
-    WHERE i.class_id = ${classId} AND EXISTS (SELECT 1 FROM scores sc WHERE sc.item_id = i.id AND (sc.score IS NOT NULL OR sc.absent = 1))`)
+    WHERE i.class_id = ${classId} AND i.created_at >= ${start} AND i.created_at < ${end} AND EXISTS (SELECT 1 FROM scores sc WHERE sc.item_id = i.id AND (sc.score IS NOT NULL OR sc.absent = 1))`)
   const settings = await getGrading(db, classId)
   const maxTotal = Math.round((maxAsg.max + maxExam.max) * 100) / 100
   const a = new Map(asg.map((r) => [r.studentId, r.total]))
@@ -74,17 +77,19 @@ export async function gradeForStudent(db: Db, studentId: string, classId: string
 
 /** เกรดคาดการณ์ทุกห้องในคำสั่งไม่กี่ครั้ง (D1 แพ็กเกจฟรีจำกัด 50 คำสั่งต่อคำขอ) — วิธีคิดเดียวกับ classGrades */
 export async function allClassGrades(db: Db): Promise<Map<string, Map<string, string | null>>> {
+  const { start } = await termWindow(db)
   const roster = await db.all<{ id: string; classId: string }>(sql`SELECT id, class_id AS classId FROM students WHERE active = 1`)
   const asg = await db.all<{ studentId: string; total: number }>(sql`
     SELECT s.student_id AS studentId, sum(s.score) AS total FROM submissions s JOIN assignments a ON a.id = s.assignment_id
-    WHERE s.status = 'graded' AND s.score IS NOT NULL GROUP BY s.student_id`)
+    WHERE a.created_at >= ${start} AND s.status = 'graded' AND s.score IS NOT NULL GROUP BY s.student_id`)
   const exam = await db.all<{ studentId: string; total: number }>(sql`
-    SELECT sc.student_id AS studentId, sum(coalesce(sc.score, 0)) AS total FROM scores sc GROUP BY sc.student_id`)
+    SELECT sc.student_id AS studentId, sum(coalesce(sc.score, 0)) AS total FROM scores sc JOIN score_items i ON i.id = sc.item_id
+    WHERE i.created_at >= ${start} GROUP BY sc.student_id`)
   const maxes = await db.all<{ classId: string; max: number }>(sql`
     SELECT class_id AS classId, sum(max) AS max FROM (
-      SELECT a.class_id, a.max_score AS max FROM assignments a WHERE EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'graded')
+      SELECT a.class_id, a.max_score AS max FROM assignments a WHERE a.created_at >= ${start} AND EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.status = 'graded')
       UNION ALL
-      SELECT i.class_id, i.max_score FROM score_items i WHERE EXISTS (SELECT 1 FROM scores sc WHERE sc.item_id = i.id AND (sc.score IS NOT NULL OR sc.absent = 1))
+      SELECT i.class_id, i.max_score FROM score_items i WHERE i.created_at >= ${start} AND EXISTS (SELECT 1 FROM scores sc WHERE sc.item_id = i.id AND (sc.score IS NOT NULL OR sc.absent = 1))
     ) GROUP BY class_id`)
   const settingRows = await db.all<{ key: string; value: string }>(sql`SELECT key, value FROM settings WHERE key LIKE 'grading:%'`)
   const bandsOf = new Map(
