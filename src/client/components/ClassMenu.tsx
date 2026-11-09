@@ -8,6 +8,7 @@ export const CLASS_MENU: { label: string; path: (id: string) => string; primary?
   { label: 'ผังห้อง & แต้ม', path: (id) => `/teacher/classes/${id}/seating` },
   { label: 'คะแนนสอบ', path: (id) => `/teacher/classes/${id}/scores` },
   { label: 'เกรด', path: (id) => `/teacher/classes/${id}/grades` },
+  { label: 'กราฟ', path: (id) => `/teacher/insights?class=${id}` },
   { label: 'คลิปย้อนหลัง', path: (id) => `/teacher/classes/${id}/videos` },
   { label: 'ประกาศ', path: (id) => `/teacher/classes/${id}/announcements` },
   { label: 'เอกสารเรียน', path: (id) => `/teacher/classes/${id}/materials` },

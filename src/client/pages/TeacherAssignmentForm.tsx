@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { api } from '../api'
+import { api, ApiClientError } from '../api'
 import type { SubmitMode } from '../../shared/assignments'
 import { DEFAULT_ASSIGNMENT_EXP, lateExp } from '../../shared/points'
 import { epochToLocal, localToEpoch } from '../lib/format'
@@ -87,10 +87,22 @@ export default function TeacherAssignmentForm() {
 
   async function remove() {
     if (!id || !window.confirm('ลบงานนี้?')) return
+    const done = (n: number) => navigate(`/teacher/classes/${existingClass}/gradebook`, { state: { flash: n ? `ลบงานแล้ว พร้อมงานที่นักเรียนส่ง ${n} คน` : 'ลบงานแล้ว' } })
     try {
-      await api(`/api/teacher/assignments/${id}`, { method: 'DELETE' })
-      navigate(`/teacher/classes/${existingClass}/gradebook`, { state: { flash: 'ลบงานแล้ว' } })
+      const r = await api<{ removedSubmissions: number }>(`/api/teacher/assignments/${id}`, { method: 'DELETE' })
+      done(r.removedSubmissions)
     } catch (e) {
+      // มีคนส่งแล้ว: ยืนยันอีกครั้งก่อนลบงานที่ส่ง คะแนน และ EXP
+      if (e instanceof ApiClientError && e.code === 'has_submissions') {
+        if (!window.confirm(`${e.message}\n\nลบงานนี้พร้อมงานที่นักเรียนส่ง รูป คะแนน และ EXP ที่ได้จากงานนี้ด้วย?\nกู้คืนไม่ได้`)) return
+        try {
+          const r = await api<{ removedSubmissions: number }>(`/api/teacher/assignments/${id}?force=1`, { method: 'DELETE' })
+          done(r.removedSubmissions)
+        } catch (e2) {
+          setError(handle(e2))
+        }
+        return
+      }
       setError(handle(e))
     }
   }

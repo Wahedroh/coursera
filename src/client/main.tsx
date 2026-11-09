@@ -8,3 +8,10 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
+
+// ติดตั้งเป็นแอป + รับการแจ้งเตือน (ไม่มีผลกับการใช้งานปกติถ้าเบราว์เซอร์ไม่รองรับ)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

@@ -22,5 +22,7 @@
     // สำรองฐานข้อมูลรายสัปดาห์ (เขียนโดย GitHub Actions: .github/workflows/backup.yml) — Worker อ่านอย่างเดียว
     { "binding": "BACKUPS", "bucket_name": "classroom-backups" }
   ],
-  "vars": {}
+  "vars": {},
+  // ทุก 30 นาที: เตือนงานใกล้ครบกำหนด + ส่งการแจ้งเตือนที่ค้าง (src/server/push/cron.ts)
+  "triggers": { "crons": ["*/30 * * * *"] }
 }

@@ -326,3 +326,37 @@ export const storageStats = sqliteTable('storage_stats', {
   files: integer('files').notNull().default(0),
   syncedAt: integer('synced_at'),
 })
+
+/** อุปกรณ์ของนักเรียนที่เปิดรับการแจ้งเตือน (Web Push) */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    endpoint: text('endpoint').notNull().unique(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('push_subscriptions_student_idx').on(t.studentId)],
+)
+
+/** การแจ้งเตือนถึงนักเรียน — ส่ง push เปล่า (ไม่มีข้อมูลในตัว) แล้ว service worker มาดึงข้อความจากตารางนี้ */
+export const notifications = sqliteTable(
+  'notifications',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    url: text('url').notNull().default('/me'),
+    /** กันแจ้งซ้ำ เช่น due:<งาน>:<นักเรียน> */
+    dedupeKey: text('dedupe_key').unique(),
+    createdAt: integer('created_at').notNull(),
+    pushedAt: integer('pushed_at'),
+    shownAt: integer('shown_at'),
+  },
+  (t) => [index('notifications_student_idx').on(t.studentId), index('notifications_pushed_idx').on(t.pushedAt)],
+)

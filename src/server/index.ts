@@ -26,6 +26,10 @@ import { teacherScoreRoutes } from './scores/teacher-routes'
 import { teacherTermRoutes } from './terms/routes'
 import { teacherTodayRoutes } from './today/routes'
 import { studentQuestRoutes } from './quests/routes'
+import { studentPushRoutes } from './push/routes'
+import { teacherInsightRoutes } from './insights/routes'
+import { runCron } from './push/cron'
+import type { Env } from './env'
 import { apiError, onError } from './http'
 
 const app = new Hono<AppEnv>()
@@ -49,6 +53,7 @@ app.route('/api/teacher', teacherStorageRoutes)
 app.route('/api/teacher', teacherGradeRoutes)
 app.route('/api/teacher', teacherTermRoutes)
 app.route('/api/teacher', teacherTodayRoutes)
+app.route('/api/teacher', teacherInsightRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)
@@ -58,6 +63,7 @@ app.route('/api/student/materials', studentMaterialRoutes)
 app.route('/api/student/announcements', studentAnnouncementRoutes)
 app.route('/api/student/fees', studentFeeRoutes)
 app.route('/api/student/quests', studentQuestRoutes)
+app.route('/api/student/push', studentPushRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)
@@ -68,4 +74,10 @@ app.all('/api/*', () => {
 
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
 
-export default app
+export default {
+  fetch: app.fetch,
+  /** ทุก 30 นาที: เตือนงานใกล้ครบกำหนด + ส่งการแจ้งเตือนที่ค้าง */
+  scheduled: (_e: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(runCron(env, Date.now()).then((r) => console.log('cron', JSON.stringify(r))))
+  },
+} satisfies ExportedHandler<Env>

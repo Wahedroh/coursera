@@ -4,6 +4,8 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
+import { enqueue, enqueueForClasses } from '../push/service'
+import { pushInBackground } from '../push/routes'
 import {
   createAssignments,
   deleteAssignment,
@@ -23,7 +25,9 @@ teacherAssignmentRoutes.use('*', requireTeacher)
 
 teacherAssignmentRoutes.post('/assignments', async (c) => {
   const { classIds, ...input } = await parseBody(c, createAssignmentsSchema)
-  return c.json({ ids: await createAssignments(getDb(c.env), classIds, input) })
+  const ids = await createAssignments(getDb(c.env), classIds, input)
+  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: '📝 งานใหม่', body: input.title, url: '/me' }, now()))
+  return c.json({ ids })
 })
 
 teacherAssignmentRoutes.get('/classes/:id/assignments', async (c) => c.json(await listForClass(getDb(c.env), c.req.param('id'))))
@@ -36,8 +40,7 @@ teacherAssignmentRoutes.put('/assignments/:id', async (c) => {
 })
 
 teacherAssignmentRoutes.delete('/assignments/:id', async (c) => {
-  await deleteAssignment(getDb(c.env), c.req.param('id'))
-  return c.json({ ok: true })
+  return c.json(await deleteAssignment(getDb(c.env), c.env.BUCKET, c.req.param('id'), c.req.query('force') === '1'))
 })
 
 teacherAssignmentRoutes.get('/classes/:id/gradebook', async (c) => c.json(await gradebook(getDb(c.env), c.req.param('id'))))
@@ -52,6 +55,10 @@ teacherAssignmentRoutes.post('/submissions/:id/grade', async (c) => {
 teacherAssignmentRoutes.post('/submissions/:id/return', async (c) => {
   const { comment } = await parseBody(c, returnInputSchema)
   await returnSubmission(getDb(c.env), c.req.param('id'), comment, now())
+  const { submission, assignment } = await getSubmission(getDb(c.env), c.req.param('id'))
+  await pushInBackground(c, (db) =>
+    enqueue(db, [{ studentId: submission.studentId, title: '↩️ ครูส่งงานกลับให้แก้', body: comment ? `${assignment.title}: ${comment}` : assignment.title, url: `/me/assignments/${assignment.id}` }], now()),
+  )
   return c.json({ ok: true })
 })
 

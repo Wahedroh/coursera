@@ -4,6 +4,8 @@ import { requireStudent, requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
 import { parseBody } from '../http'
+import { enqueueForClasses } from '../push/service'
+import { pushInBackground } from '../push/routes'
 import { announcementsForStudent, createAnnouncements, deleteAnnouncement, listAnnouncements, markRead, updateAnnouncement } from './service'
 
 export const teacherAnnouncementRoutes = new Hono<AppEnv>()
@@ -11,7 +13,9 @@ teacherAnnouncementRoutes.use('*', requireTeacher)
 
 teacherAnnouncementRoutes.post('/announcements', async (c) => {
   const { classIds, ...input } = await parseBody(c, createAnnouncementsSchema)
-  return c.json({ ids: await createAnnouncements(getDb(c.env), classIds, input, now()) })
+  const ids = await createAnnouncements(getDb(c.env), classIds, input, now())
+  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: `📢 ${input.title}`, body: input.body, url: '/me' }, now()))
+  return c.json({ ids })
 })
 teacherAnnouncementRoutes.get('/classes/:id/announcements', async (c) => c.json(await listAnnouncements(getDb(c.env), c.req.param('id'), now())))
 teacherAnnouncementRoutes.put('/announcements/:id', async (c) => {
