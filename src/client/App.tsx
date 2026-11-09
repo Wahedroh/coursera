@@ -27,6 +27,7 @@ import TeacherScoreEntry from './pages/TeacherScoreEntry'
 import TeacherScores from './pages/TeacherScores'
 import TeacherGrade from './pages/TeacherGrade'
 import TeacherGradebook from './pages/TeacherGradebook'
+import TeacherInsights from './pages/TeacherInsights'
 import TeacherHome from './pages/TeacherHome'
 import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/teacher/classes/:id/announcements" element={<TeacherAnnouncements />} />
         <Route path="/teacher/watchlist" element={<TeacherWatchlist />} />
         <Route path="/teacher/export" element={<TeacherExport />} />
+        <Route path="/teacher/insights" element={<TeacherInsights />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />

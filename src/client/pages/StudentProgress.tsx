@@ -6,6 +6,8 @@ import { characterById, charactersOfSeason, RARITY_LABEL, SEASONS } from '../../
 import { AvatarArt, CharacterArt, EggArt } from '../components/PixelArt'
 import type { AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
+import BadgeGrid from '../components/BadgeGrid'
+import type { StudentBadge } from '../../shared/badges'
 
 type Progress = {
   exp: number
@@ -21,6 +23,7 @@ export default function StudentProgress() {
   const navigate = useNavigate()
   const [p, setP] = useState<Progress | null>(null)
   const [board, setBoard] = useState<Rank[] | null>(null)
+  const [badges, setBadges] = useState<StudentBadge[] | null>(null)
   const [opened, setOpened] = useState<string | null>(null)
   // กันกดรัว (กดซ้ำระหว่างรอจะได้ 409)
   const [opening, setOpening] = useState<string | null>(null)
@@ -31,6 +34,7 @@ export default function StudentProgress() {
       .then(setP)
       .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
     api<Rank[]>('/api/student/leaderboard').then(setBoard).catch(() => setBoard(null))
+    api<StudentBadge[]>('/api/student/badges').then(setBadges).catch(() => {})
   }, [navigate])
   useEffect(load, [load])
 
@@ -102,6 +106,7 @@ export default function StudentProgress() {
             </Button>
           </Card>
         ))}
+        {badges && <BadgeGrid badges={badges} />}
         {[...SEASONS]
           // ซีซันของเทอมนี้ขึ้นก่อน
           .sort((a, b) => (b.season === p.term.season ? 1 : 0) - (a.season === p.term.season ? 1 : 0))

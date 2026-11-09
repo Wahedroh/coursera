@@ -8,6 +8,8 @@ import { AvatarArt } from '../components/PixelArt'
 import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
+import AppSetupCard from '../components/AppSetupCard'
+import type { StudentBadge } from '../../shared/badges'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
 import { Button, Card, Chip, Loading } from '../ui'
@@ -30,6 +32,7 @@ export default function StudentHome() {
   const [tab, setTab] = useState<Tab>('pending')
   const [feeOwed, setFeeOwed] = useState(0)
   const [exp, setExp] = useState<{ exp: number; level: number; nextLevelAt: number } | null>(null)
+  const [badges, setBadges] = useState<StudentBadge[]>([])
   const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean } | null>(null)
 
   useEffect(() => {
@@ -43,6 +46,9 @@ export default function StudentHome() {
       .then(setAvatar)
       .catch(() => {})
     loadExp()
+    api<StudentBadge[]>('/api/student/badges')
+      .then((b) => setBadges(b.filter((x) => x.earned)))
+      .catch(() => {})
     api<StudentFee[]>('/api/student/fees')
       .then((fs) => setFeeOwed(fs.reduce((n, f) => n + f.outstanding, 0)))
       .catch(() => {})
@@ -104,6 +110,15 @@ export default function StudentHome() {
             </span>
           </Link>
         )}
+        {badges.length > 0 && (
+          <Link to="/me/progress" className="mt-2 flex items-center justify-center gap-1" aria-label={`เหรียญตรา ${badges.length} เหรียญ`} data-testid="home-badges">
+            {badges.map((b) => (
+              <span key={b.id} title={b.title} className="rounded-full bg-white/20 w-8 h-8 flex items-center justify-center text-lg">
+                {b.icon}
+              </span>
+            ))}
+          </Link>
+        )}
         {avatar?.isDefault && (
           <Link to="/me/avatar" className="mt-3 block rounded-xl bg-amber-400 text-amber-950 px-3 py-2 text-sm font-bold">
             ✨ แต่งตัวละครของคุณเองได้แล้ว! แตะเพื่อเริ่ม
@@ -133,6 +148,7 @@ export default function StudentHome() {
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
         <WeeklyQuests onClaimed={loadExp} />
+        <AppSetupCard />
         {feeOwed > 0 && (
           <Link to="/me/fees" className="block">
             <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">

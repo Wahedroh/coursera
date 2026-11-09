@@ -1,0 +1,16 @@
+{
+  "name": "ผู้ช่วยครู · Change Classroom",
+  "short_name": "ผู้ช่วยครู",
+  "description": "ส่งงาน เช็กชื่อ คะแนน และตัวละครสะสมของห้องเรียน Change",
+  "lang": "th",
+  "start_url": "/me",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf7f0",
+  "theme_color": "#1f5e46",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
