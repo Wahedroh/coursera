@@ -24,7 +24,7 @@ test('หน้าแรกครู: สรุปวันนี้ (รอต�
   const today = t.getByTestId('teacher-today')
   await expect(today.getByRole('heading', { name: '📋 สรุปวันนี้' })).toBeVisible()
   for (const name of ['งานรอตรวจ', 'ขาดเรียนวันนี้', 'ใกล้ครบกำหนด']) await expect(today.getByRole('region', { name })).toBeVisible()
-  await expect(t.getByTestId('term-card').getByRole('heading', { name: '🗓️ เทอม 1/2569' })).toBeVisible()
+  await expect(t.getByTestId('term-card').getByRole('heading', { name: '🗓️ เทอม 2/2569' })).toBeVisible()
   await expect(t.getByTestId('term-card').getByText(/คอลเลกชันซีซัน 1/)).toBeVisible()
 })
 
@@ -54,7 +54,7 @@ test('นักเรียน: ภารกิจสัปดาห์นี้
   await expect(q.getByRole('heading', { name: '🎯 ภารกิจสัปดาห์นี้' })).toBeVisible()
   for (const name of ['มาเรียน 3 คาบ', 'ส่งงานตรงเวลา 1 ชิ้น', 'ทบทวนคลิป 1 คลิป']) await expect(q.getByText(name)).toBeVisible()
   await s.getByRole('link', { name: '⭐ ตัวละครและแต้มของฉัน' }).click()
-  await expect(s.getByText('เทอม 1/2569')).toBeVisible()
+  await expect(s.getByText('เทอม 2/2569')).toBeVisible()
   await expect(s.getByTestId('collection-s1').getByRole('heading', { name: /ซีซัน 1 · สัตว์วิเศษ/ })).toContainText('เทอมนี้')
   await expect(s.getByTestId('collection-s2').getByRole('heading', { name: /ซีซัน 2 · เพื่อนป่าหิมะ \(0\/16\)/ })).toContainText('เริ่มสะสมได้เทอมหน้า')
 })

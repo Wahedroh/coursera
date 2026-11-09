@@ -27,26 +27,26 @@ async function setup() {
 describe('เทอม', () => {
   it('มีเทอมแรกจาก migration · เปิดเทอมใหม่ได้ ชื่อซ้ำไม่ได้ · ต้องเป็นครู', async () => {
     const { teacher, sa } = await setup()
-    expect(await json(await getJson('/api/teacher/terms', teacher))).toMatchObject([{ id: 'term-1', name: '1/2569', season: 1 }])
-    expect((await postJson('/api/teacher/terms', { name: '2/2569' }, { cookie: sa })).status).toBe(401)
-    const t2 = await json(await postJson('/api/teacher/terms', { name: '2/2569' }, { cookie: teacher }))
-    expect(t2).toMatchObject({ name: '2/2569', season: 2 })
-    expect((await postJson('/api/teacher/terms', { name: '2/2569' }, { cookie: teacher })).status).toBe(409)
+    expect(await json(await getJson('/api/teacher/terms', teacher))).toMatchObject([{ id: 'term-1', name: '2/2569', season: 1 }])
+    expect((await postJson('/api/teacher/terms', { name: '1/2570' }, { cookie: sa })).status).toBe(401)
+    const t2 = await json(await postJson('/api/teacher/terms', { name: '1/2570' }, { cookie: teacher }))
+    expect(t2).toMatchObject({ name: '1/2570', season: 2 })
+    expect((await postJson('/api/teacher/terms', { name: '1/2570' }, { cookie: teacher })).status).toBe(409)
     expect((await postJson('/api/teacher/terms', { name: ' ' }, { cookie: teacher })).status).toBe(400)
     const list = await json(await getJson('/api/teacher/terms', teacher))
-    expect(list.map((t: { name: string }) => t.name)).toEqual(['2/2569', '1/2569'])
+    expect(list.map((t: { name: string }) => t.name)).toEqual(['1/2570', '2/2569'])
   })
 
   it('EXP/เลเวลเริ่มใหม่ · ไข่เทอมก่อนยังเปิดได้ (ซีซัน 1) · ไข่เทอมใหม่ได้ตัวซีซัน 2', async () => {
     const { teacher, classId, sa, give } = await setup()
     await give(4) // 40 EXP = LV 1
     const p1 = await json(await getJson('/api/student/progress', sa))
-    expect(p1).toMatchObject({ exp: 40, level: 1, term: { name: '1/2569', season: 1 } })
+    expect(p1).toMatchObject({ exp: 40, level: 1, term: { name: '2/2569', season: 1 } })
     const oldEgg = p1.eggs[0]
     await tick()
-    await postJson('/api/teacher/terms', { name: '2/2569' }, { cookie: teacher })
+    await postJson('/api/teacher/terms', { name: '1/2570' }, { cookie: teacher })
     const p2 = await json(await getJson('/api/student/progress', sa))
-    expect(p2).toMatchObject({ exp: 0, level: 0, history: [], term: { name: '2/2569', season: 2 } })
+    expect(p2).toMatchObject({ exp: 0, level: 0, history: [], term: { name: '1/2570', season: 2 } })
     expect(p2.eggs).toHaveLength(1) // ไข่ที่ยังไม่เปิดจากเทอม 1
     expect(await json(await getJson('/api/student/exp', sa))).toMatchObject({ exp: 0, level: 0 })
     expect((await json(await getJson(`/api/teacher/classes/${classId}/points`, teacher)))[0].exp).toBe(0)
@@ -56,7 +56,7 @@ describe('เทอม', () => {
     expect(p3).toMatchObject({ exp: 40, level: 1 })
     expect(p3.eggs).toHaveLength(2)
     const newEgg = p3.eggs.find((e: { id: string }) => e.id !== oldEgg.id)
-    expect(newEgg).toMatchObject({ level: 1, season: 2, termName: '2/2569' })
+    expect(newEgg).toMatchObject({ level: 1, season: 2, termName: '1/2570' })
     const s1 = charactersOfSeason(1).map((c) => c.id)
     const s2 = charactersOfSeason(2).map((c) => c.id)
     expect(s1).toContain((await json(await postJson(`/api/student/eggs/${oldEgg.id}/open`, {}, { cookie: sa }))).characterId)
@@ -69,7 +69,7 @@ describe('เทอม', () => {
     await postJson('/api/teacher/score-items', { ...ITEM, classIds: [classId] }, { cookie: teacher })
     await putJson(`/api/student/assignments/${old}/submission`, { text: 'ตอบ', imageKeys: [], clientRequestId: 'r1' }, sa)
     await tick()
-    await postJson('/api/teacher/terms', { name: '2/2569' }, { cookie: teacher })
+    await postJson('/api/teacher/terms', { name: '1/2570' }, { cookie: teacher })
     await tick()
     await seedAssignment(classId, { title: 'งานเทอม 2' })
 
@@ -79,10 +79,10 @@ describe('เทอม', () => {
     expect(await json(await getJson(`/api/teacher/classes/${classId}/score-items`, teacher))).toEqual([])
 
     const now = await json(await getJson(`/api/teacher/classes/${classId}/export`, teacher))
-    expect(now.term).toBe('2/2569')
+    expect(now.term).toBe('1/2570')
     expect(titles(now.gradebook.assignments)).toEqual(['งานเทอม 2'])
     const past = await json(await getJson(`/api/teacher/classes/${classId}/export?term=term-1`, teacher))
-    expect(past.term).toBe('1/2569')
+    expect(past.term).toBe('2/2569')
     expect(titles(past.gradebook.assignments)).toEqual(['งานเทอม 1'])
     expect(past.gradebook.students.find((s: { id: string }) => s.id === a.id).cells[old].status).toBe('submitted')
     expect(past.scoreBook.items).toHaveLength(1)
@@ -192,7 +192,7 @@ describe('สรุปวันนี้ของครู', () => {
     await putJson(`/api/teacher/attendance/${day.id}/records/${b.id}`, { status: 'absent' }, teacher)
 
     const t = await json(await getJson('/api/teacher/today', teacher))
-    expect(t.term).toBe('1/2569')
+    expect(t.term).toBe('2/2569')
     expect(t.toGrade).toHaveLength(1)
     expect(t.toGrade[0]).toMatchObject({ assignmentId: soon, title: 'ใกล้ส่ง', waiting: 1 })
     const sub = await json(await getJson(`/api/teacher/submissions/${t.toGrade[0].firstSubmissionId}`, teacher))
