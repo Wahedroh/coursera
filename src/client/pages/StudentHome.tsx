@@ -7,6 +7,7 @@ import type { AvatarConfig } from '../../shared/avatar'
 import { AvatarArt } from '../components/PixelArt'
 import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
+import WeeklyQuests from '../components/WeeklyQuests'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
 import { Button, Card, Chip, Loading } from '../ui'
@@ -41,13 +42,17 @@ export default function StudentHome() {
     api<{ nickname: string; config: AvatarConfig; isDefault: boolean }>('/api/student/avatar')
       .then(setAvatar)
       .catch(() => {})
-    api<{ exp: number; level: number; nextLevelAt: number }>('/api/student/exp')
-      .then(setExp)
-      .catch(() => {})
+    loadExp()
     api<StudentFee[]>('/api/student/fees')
       .then((fs) => setFeeOwed(fs.reduce((n, f) => n + f.outstanding, 0)))
       .catch(() => {})
   }, [navigate])
+
+  function loadExp() {
+    api<{ exp: number; level: number; nextLevelAt: number }>('/api/student/exp')
+      .then(setExp)
+      .catch(() => {})
+  }
 
   async function logout() {
     await api('/api/logout', { body: {} }).catch(() => {})
@@ -127,6 +132,7 @@ export default function StudentHome() {
       </header>
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
+        <WeeklyQuests onClaimed={loadExp} />
         {feeOwed > 0 && (
           <Link to="/me/fees" className="block">
             <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">

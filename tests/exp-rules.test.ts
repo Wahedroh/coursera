@@ -54,7 +54,7 @@ it('EXP ของงานตั้งอัตโนมัติ 30 · คร�
   expect((await postJson('/api/teacher/assignments', { ...base, title: 'เกิน', dueAt: null, expReward: 500 }, { cookie })).status).toBe(400)
 })
 
-it('ทบทวนคลิปถึง 70% ได้ +3 EXP คลิปละครั้ง · ดูไม่ถึงไม่ได้ · ห้องอื่นไม่ได้', async () => {
+it('ทบทวนคลิปถึง 70% ได้ +5 EXP คลิปละครั้ง · ดูไม่ถึงไม่ได้ · ห้องอื่นไม่ได้', async () => {
   const cookie = await loginTeacher()
   const { classId } = await seedClass(db())
   const other = (await seedClass(db())).classId
@@ -65,11 +65,11 @@ it('ทบทวนคลิปถึง 70% ได้ +3 EXP คลิปละ
   const v = ids[0]
   expect((await json(await getJson('/api/student/videos', ca)))[0].rewarded).toBe(false)
   expect((await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 60, durationSeconds: 100 }, { cookie: ca })).status).toBe(400)
-  expect(await json(await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 70, durationSeconds: 100 }, { cookie: ca }))).toEqual({ awarded: true, exp: 3 })
-  expect(await json(await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 100, durationSeconds: 100 }, { cookie: ca }))).toEqual({ awarded: false, exp: 3 })
-  expect((await json(await getJson('/api/student/exp', ca))).exp).toBe(3)
+  expect(await json(await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 70, durationSeconds: 100 }, { cookie: ca }))).toEqual({ awarded: true, exp: 5 })
+  expect(await json(await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 100, durationSeconds: 100 }, { cookie: ca }))).toEqual({ awarded: false, exp: 5 })
+  expect((await json(await getJson('/api/student/exp', ca))).exp).toBe(5)
   expect((await json(await getJson(`/api/student/videos/${v}`, ca))).rewarded).toBe(true)
   expect((await postJson(`/api/student/videos/${v}/watched`, { watchedSeconds: 100, durationSeconds: 100 }, { cookie: cb })).status).toBe(404)
   const hist = (await json(await getJson('/api/student/progress', ca))).history
-  expect(hist[0]).toMatchObject({ delta: 3, reason: 'ทบทวนคลิป: ทบทวนบท 1' })
+  expect(hist[0]).toMatchObject({ delta: 5, reason: 'ทบทวนคลิป: ทบทวนบท 1' })
 })

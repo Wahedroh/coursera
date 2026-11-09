@@ -23,6 +23,9 @@ import { teacherVideoRoutes } from './videos/teacher-routes'
 import { studentFeeRoutes } from './fees/student-routes'
 import { teacherFeeRoutes } from './fees/teacher-routes'
 import { teacherScoreRoutes } from './scores/teacher-routes'
+import { teacherTermRoutes } from './terms/routes'
+import { teacherTodayRoutes } from './today/routes'
+import { studentQuestRoutes } from './quests/routes'
 import { apiError, onError } from './http'
 
 const app = new Hono<AppEnv>()
@@ -44,6 +47,8 @@ app.route('/api/teacher', teacherExportRoutes)
 app.route('/api/teacher', teacherFeeRoutes)
 app.route('/api/teacher', teacherStorageRoutes)
 app.route('/api/teacher', teacherGradeRoutes)
+app.route('/api/teacher', teacherTermRoutes)
+app.route('/api/teacher', teacherTodayRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)
@@ -52,6 +57,7 @@ app.route('/api/student/videos', studentVideoRoutes)
 app.route('/api/student/materials', studentMaterialRoutes)
 app.route('/api/student/announcements', studentAnnouncementRoutes)
 app.route('/api/student/fees', studentFeeRoutes)
+app.route('/api/student/quests', studentQuestRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)

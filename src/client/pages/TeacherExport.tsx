@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { todayBangkok } from '../../shared/attendance'
 import { EXPORT_KINDS, EXPORT_LABEL, type ClassExport, type ExportKind } from '../../shared/export'
+import type { Term } from '../../shared/terms'
 import { attendanceSheet, classFeesSheet, exportWorkbook, gradebookSheet, gradesSheet } from '../lib/excel'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
@@ -19,6 +20,8 @@ export default function TeacherExport() {
   const [kinds, setKinds] = useState<ExportKind[]>([...EXPORT_KINDS])
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [terms, setTerms] = useState<Term[]>([])
+  const [termId, setTermId] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -30,6 +33,12 @@ export default function TeacherExport() {
         if (s[0]) pickSchool(s[0])
       })
       .catch((e) => setError(handle(e)))
+    api<Term[]>('/api/teacher/terms')
+      .then((t) => {
+        setTerms(t)
+        setTermId(t[0]?.id ?? '')
+      })
+      .catch(() => {})
   }, [handle])
 
   function pickSchool(s: School) {
@@ -49,7 +58,7 @@ export default function TeacherExport() {
       const data: { cls: School['classes'][number]; x: ClassExport }[] = []
       for (const [i, cls] of chosen.entries()) {
         setBusy(`กำลังดึงข้อมูล ${i + 1}/${chosen.length}`)
-        const qs = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })
+        const qs = new URLSearchParams({ ...(termId ? { term: termId } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) })
         data.push({ cls, x: await api<ClassExport>(`/api/teacher/classes/${cls.id}/export?${qs}`) })
       }
       setBusy('กำลังสร้างไฟล์')
@@ -61,7 +70,8 @@ export default function TeacherExport() {
         })),
       )
       const scope = one ? chosen[0].name : chosen.length === school.classes.length ? `${school.schoolName}-ทั้งโรงเรียน` : `${school.schoolName}-${chosen.map(short).join('-')}`
-      await exportWorkbook(sheets, `${scope}-${todayBangkok()}.xlsx`)
+      const termName = data[0]?.x.term
+      await exportWorkbook(sheets, `${scope}${termName ? `-เทอม${termName.replace(/\//g, '-')}` : ''}-${todayBangkok()}.xlsx`)
       setFlash(`ส่งออกแล้ว ${chosen.length} ห้อง · ${sheets.length} ชีต`)
     } catch (e) {
       setError(handle(e))
@@ -88,6 +98,19 @@ export default function TeacherExport() {
               ))}
             </select>
           </label>
+          {terms.length > 1 && (
+            <label className="text-sm font-semibold flex flex-col gap-1">
+              เทอม
+              <select aria-label="เทอม" className={input} value={termId} onChange={(e) => setTermId(e.target.value)}>
+                {terms.map((t, i) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                    {i === 0 ? ' (ปัจจุบัน)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {school && (
             <fieldset className="flex flex-col gap-1">
               <legend className="text-sm font-semibold mb-1">
@@ -128,7 +151,7 @@ export default function TeacherExport() {
                 ถึง
                 <input type="date" className={input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label="เช็กชื่อถึง" />
               </label>
-              <span className="text-xs text-stone-500 pb-2">เว้นว่าง = ทั้งหมดจนถึงวันนี้</span>
+              <span className="text-xs text-stone-500 pb-2">เว้นว่าง = ทั้งเทอม</span>
             </div>
           )}
           <Button type="button" onClick={() => void run()} disabled={busy !== null || classIds.length === 0 || kinds.length === 0}>

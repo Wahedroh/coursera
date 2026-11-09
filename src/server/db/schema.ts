@@ -115,7 +115,7 @@ export const pointEvents = sqliteTable(
       .references(() => students.id),
     delta: integer('delta').notNull(),
     reason: text('reason').notNull(),
-    source: text('source', { enum: ['manual', 'assignment', 'attendance', 'live', 'video'] }).notNull(),
+    source: text('source', { enum: ['manual', 'assignment', 'attendance', 'live', 'video', 'quest'] }).notNull(),
     refId: text('ref_id'),
     createdAt: integer('created_at').notNull(),
   },
@@ -168,13 +168,25 @@ export const eggs = sqliteTable(
     studentId: text('student_id')
       .notNull()
       .references(() => students.id),
+    /** ไข่ของเทอมไหน (เลเวลนับใหม่ทุกเทอม) — ตัวละครที่สุ่มได้มาจากซีซันของเทอมนั้น */
+    termId: text('term_id').notNull().default('term-1'),
     level: integer('level').notNull(),
     characterId: text('character_id'),
     openedAt: integer('opened_at'),
     createdAt: integer('created_at').notNull(),
   },
-  (t) => [uniqueIndex('eggs_student_level_unique').on(t.studentId, t.level)],
+  (t) => [uniqueIndex('eggs_student_term_level_unique').on(t.studentId, t.termId, t.level)],
 )
+
+/** ภาคเรียน — เทอมปัจจุบัน = แถวที่ started_at ล่าสุด · ข้อมูลของเทอม = สิ่งที่สร้างในช่วง [started_at, เทอมถัดไป) */
+export const terms = sqliteTable('terms', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  startedAt: integer('started_at').notNull(),
+  /** ชุดตัวละครที่ไข่ของเทอมนี้สุ่มออกมา */
+  season: integer('season').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
 
 export const scoreItems = sqliteTable('score_items', {
   id: text('id').primaryKey(),
@@ -217,6 +229,8 @@ export const videos = sqliteTable('videos', {
   title: text('title').notNull(),
   description: text('description').notNull().default(''),
   youtubeId: text('youtube_id').notNull(),
+  /** คำถามท้ายคลิป (ต้องตอบถูกทุกข้อจึงได้ EXP) */
+  questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number }[]>().notNull().default(sql`'[]'`),
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('videos_class_idx').on(t.classId)])

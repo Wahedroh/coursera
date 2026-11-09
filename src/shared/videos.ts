@@ -22,16 +22,34 @@ export function parseYouTubeId(input: string): string | null {
   return id && ID_RE.test(id) ? id : null
 }
 
+/** คำถามท้ายคลิป: ตัวเลือก 2–4 ข้อ · answer = ลำดับตัวเลือกที่ถูก (เริ่ม 0) */
+export const videoQuestionSchema = z
+  .object({
+    q: z.string().trim().min(1).max(300),
+    choices: z.array(z.string().trim().min(1).max(150)).min(2).max(4),
+    answer: z.number().int().min(0).max(3),
+  })
+  .refine((x) => x.answer < x.choices.length)
+export type VideoQuestion = z.infer<typeof videoQuestionSchema>
+export const MAX_VIDEO_QUESTIONS = 3
+
 export const videoInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(2000),
   url: z.string().max(500).refine((u) => parseYouTubeId(u) !== null),
+  questions: z.array(videoQuestionSchema).max(MAX_VIDEO_QUESTIONS).default([]),
 })
 export type VideoInput = z.infer<typeof videoInputSchema>
 export const createVideosSchema = videoInputSchema.extend({ classIds: z.array(z.string()).min(1).max(50) })
 export const videoPublishSchema = z.object({ published: z.boolean() })
 
-export type TeacherVideo = { id: string; title: string; description: string; youtubeId: string; published: boolean; createdAt: number }
-export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number; rewarded: boolean }
-/** ดูคลิปแล้ว: วินาทีที่ดูจริง (ไม่นับซ้ำ) และความยาวคลิป */
-export const videoWatchSchema = z.object({ watchedSeconds: z.number().min(0).max(86400), durationSeconds: z.number().positive().max(86400) })
+export type TeacherVideo = { id: string; title: string; description: string; youtubeId: string; published: boolean; createdAt: number; questions: VideoQuestion[] }
+/** นักเรียนเห็นคำถามแต่ไม่เห็นเฉลย */
+export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number; rewarded: boolean; quiz: { q: string; choices: string[] }[] }
+/** ดูคลิปแล้ว: วินาทีที่ดูจริง (ไม่นับซ้ำ) และความยาวคลิป · answers = คำตอบคำถามท้ายคลิป (ถ้ามี) */
+export const videoWatchSchema = z.object({
+  watchedSeconds: z.number().min(0).max(86400),
+  durationSeconds: z.number().positive().max(86400),
+  answers: z.array(z.number().int().min(0).max(3)).max(MAX_VIDEO_QUESTIONS).default([]),
+})
+export type VideoWatchResult = { awarded: boolean; exp: number; correct?: number; total?: number }
