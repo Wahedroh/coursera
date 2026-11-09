@@ -41,3 +41,31 @@ test('นักเรียน: เหรียญตราในหน้าต
   expect((await res.json()).short_name).toBe('ผู้ช่วยครู')
   expect((await s.request.get('/sw.js')).ok()).toBe(true)
 })
+
+test('ครูลบงานที่มีนักเรียนส่งแล้ว: ยืนยัน 2 ครั้ง แล้วงานและงานที่ส่งหายไป', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  const classId = new URL(t.url()).pathname.split('/').pop()!
+  const { ids } = await (
+    await t.request.post('/api/teacher/assignments', { data: { title: 'งานจะลบทิ้ง', instructions: '', attachmentKeys: [], dueAt: null, maxScore: 10, submitMode: 'text', classIds: [classId] } })
+  ).json()
+  const s = await studentPage(browser)
+  expect((await s.request.put(`/api/student/assignments/${ids[0]}/submission`, { data: { text: 'ตอบ', imageKeys: [], clientRequestId: 'e2e-del' } })).ok()).toBe(true)
+
+  await t.goto(`/teacher/assignments/${ids[0]}/edit`)
+  const dialogs: string[] = []
+  t.on('dialog', (d) => {
+    dialogs.push(d.message())
+    void d.accept()
+  })
+  await t.getByRole('button', { name: 'ลบงาน' }).click()
+  await expect(t.getByText('ลบงานแล้ว พร้อมงานที่นักเรียนส่ง 1 คน')).toBeVisible()
+  expect(dialogs[0]).toBe('ลบงานนี้?')
+  expect(dialogs[1]).toContain('มีนักเรียนส่งงานนี้แล้ว 1 คน')
+  await expect(t.getByText('งานจะลบทิ้ง')).toHaveCount(0)
+  await s.goto('/me')
+  await expect(s.getByText('งานจะลบทิ้ง')).toHaveCount(0)
+})

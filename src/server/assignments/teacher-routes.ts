@@ -40,8 +40,7 @@ teacherAssignmentRoutes.put('/assignments/:id', async (c) => {
 })
 
 teacherAssignmentRoutes.delete('/assignments/:id', async (c) => {
-  await deleteAssignment(getDb(c.env), c.req.param('id'))
-  return c.json({ ok: true })
+  return c.json(await deleteAssignment(getDb(c.env), c.env.BUCKET, c.req.param('id'), c.req.query('force') === '1'))
 })
 
 teacherAssignmentRoutes.get('/classes/:id/gradebook', async (c) => c.json(await gradebook(getDb(c.env), c.req.param('id'))))

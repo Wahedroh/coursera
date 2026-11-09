@@ -2,7 +2,8 @@ import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
 import { lateExp } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
-import { assignments, classes, pointEvents, students, submissions } from '../db/schema'
+import { assignments, classes, notifications, pointEvents, students, submissions } from '../db/schema'
+import { removeFiles } from '../storage/service'
 import { apiError } from '../http'
 import { termWindow } from '../terms/service'
 import type { TermWindow } from '../../shared/terms'
@@ -69,11 +70,22 @@ export async function updateAssignment(db: Db, id: string, input: AssignmentInpu
   await db.update(assignments).set({ ...input, updatedAt: now() }).where(eq(assignments.id, id))
 }
 
-export async function deleteAssignment(db: Db, id: string): Promise<void> {
+/** ลบงาน — ถ้ามีนักเรียนส่งแล้วต้องยืนยัน (force) จึงลบพร้อมงานที่ส่ง รูป คะแนน และ EXP ที่ได้จากงานนี้ — กู้คืนไม่ได้ */
+export async function deleteAssignment(db: Db, bucket: R2Bucket, id: string, force = false): Promise<{ removedSubmissions: number }> {
   await getAssignment(db, id)
-  const [has] = await db.select({ id: submissions.id }).from(submissions).where(eq(submissions.assignmentId, id)).limit(1)
-  if (has) throw apiError('has_submissions', 'มีนักเรียนส่งงานแล้ว ลบไม่ได้', 409)
-  await db.delete(assignments).where(eq(assignments.id, id))
+  const subs = await db.select({ id: submissions.id, imageKeys: submissions.imageKeys, annotatedKeys: submissions.annotatedKeys }).from(submissions).where(eq(submissions.assignmentId, id))
+  if (subs.length && !force) throw apiError('has_submissions', `มีนักเรียนส่งงานนี้แล้ว ${subs.length} คน`, 409)
+  const ids = subs.map((x) => x.id)
+  for (let i = 0; i < ids.length; i += 90)
+    await db.delete(pointEvents).where(and(eq(pointEvents.source, 'assignment'), inArray(pointEvents.refId, ids.slice(i, i + 90))))
+  await db.batch([
+    db.delete(submissions).where(eq(submissions.assignmentId, id)),
+    db.delete(notifications).where(eq(notifications.url, `/me/assignments/${id}`)),
+    db.delete(assignments).where(eq(assignments.id, id)),
+  ])
+  // รูปงานที่ส่ง/รูปที่ครูเขียนทับ — ลบหลังลบข้อมูลแล้ว
+  await removeFiles(db, bucket, subs.flatMap((x) => [...x.imageKeys, ...x.annotatedKeys]))
+  return { removedSubmissions: subs.length }
 }
 
 const PENDING: StudentStatus[] = ['missing', 'returned']
