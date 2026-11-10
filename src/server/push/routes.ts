@@ -5,7 +5,7 @@ import { getDb, now, type Db } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
 import { parseBody } from '../http'
 import { pushSubscribeSchema } from '../../shared/push'
-import { drain, recentNotifications, subscribe, takeUnshown, unsubscribe } from './service'
+import { drain, inbox, markAllRead, subscribe, takeUnshown, unsubscribe } from './service'
 import { vapidKeys } from './vapid'
 
 export const studentPushRoutes = new Hono<AppEnv>()
@@ -25,7 +25,11 @@ studentPushRoutes.post('/unsubscribe', async (c) => {
 })
 /** service worker เรียกเมื่อได้ push */
 studentPushRoutes.post('/take', async (c) => c.json(await takeUnshown(getDb(c.env), me(c).studentId, now())))
-studentPushRoutes.get('/notifications', async (c) => c.json(await recentNotifications(getDb(c.env), me(c).studentId, now())))
+studentPushRoutes.get('/notifications', async (c) => c.json(await inbox(getDb(c.env), me(c).studentId, now())))
+studentPushRoutes.post('/notifications/read', async (c) => {
+  await markAllRead(getDb(c.env), me(c).studentId, now())
+  return c.json({ ok: true })
+})
 
 /** หลังสร้างการแจ้งเตือนในคำขอของครู: ส่ง push ต่อหลังตอบกลับแล้ว (ไม่ทำให้ครูรอ) */
 export function pushInBackground(c: Context<AppEnv>, work: (db: Db) => Promise<unknown>): Promise<void> {
