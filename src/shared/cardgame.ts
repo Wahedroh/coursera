@@ -23,13 +23,17 @@ export function answerFromAngle(deg: number): number {
   return 2
 }
 
+/** โจทย์เป็นข้อความ รูป หรือทั้งสองอย่าง (ต้องมีอย่างน้อย 1) · ตัวเลือกปล่อยว่างได้ถ้าอยู่ในรูปแล้ว (ใช้ A–D แทน) */
 export const cardQuestionSchema = z
   .object({
-    q: z.string().trim().min(1).max(300),
-    choices: z.array(z.string().trim().min(1).max(150)).min(2).max(4),
+    q: z.string().trim().max(300),
+    image: z.string().regex(/^quiz\/[A-Za-z0-9]+\.(jpg|png|webp)$/).optional(),
+    choices: z.array(z.string().trim().max(150)).min(2).max(4),
     answer: z.number().int().min(0).max(3),
   })
   .refine((x) => x.answer < x.choices.length)
+  .refine((x) => x.q.length > 0 || !!x.image, { message: 'ต้องมีโจทย์เป็นข้อความหรือรูป' })
+  .refine((x) => !!x.image || x.choices.every((c) => c.length > 0), { message: 'กรอกตัวเลือกให้ครบ (หรือใส่รูปโจทย์ที่มีตัวเลือกในรูป)' })
 export const cardQuizInputSchema = z.object({
   title: z.string().trim().min(1).max(120),
   questions: z.array(cardQuestionSchema).min(1).max(MAX_CARD_QUESTIONS),

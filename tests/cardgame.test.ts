@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
 import { answerFromAngle, cardPayload, parseCard } from '../src/shared/cardgame'
 import { todayBangkok } from '../src/shared/attendance'
-import { del, getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
+import { del, getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie, TINY_JPEG, uploadFile } from './helpers'
 
 const db = () => getDb(env)
 beforeEach(resetDb)
@@ -134,5 +134,29 @@ describe('เล่นเกม', () => {
     await postJson(`/api/teacher/card-games/${id}/end`, { attendance: true }, { cookie: teacher })
     const d = await json(await getJson(`/api/teacher/classes/${classId}/attendance?date=${todayBangkok()}`, teacher))
     expect(Object.fromEntries(d.records.map((x: { studentId: string; status: string }) => [x.studentId, x.status]))).toEqual({ [st[0].id]: 'present', [st[1].id]: 'present', [st[2].id]: 'sick' })
+  })
+})
+
+describe('รูปโจทย์', () => {
+  it('ครูอัปโหลดรูปโจทย์ได้ (นักเรียนไม่ได้) · โจทย์เป็นรูปอย่างเดียว ตัวเลือกว่างได้ · รูปไม่ถูกลบเป็นไฟล์ค้าง', async () => {
+    const { teacher, classId } = await setup()
+    const sc = await studentCookie((await seedStudent(db(), classId)).id)
+    expect((await uploadFile('kind=quiz', TINY_JPEG, 'image/jpeg', sc)).status).toBe(401)
+    const { key } = await json(await uploadFile('kind=quiz', TINY_JPEG, 'image/jpeg', teacher))
+    expect(key).toMatch(/^quiz\/.+\.jpg$/)
+    const res = await postJson('/api/teacher/card-quizzes', { title: 'จากหนังสือ', questions: [{ q: '', image: key, choices: ['', '', '', ''], answer: 2 }] }, { cookie: teacher })
+    expect(res.status).toBe(200)
+    const { id } = await json(res)
+    expect((await json(await getJson(`/api/teacher/card-quizzes/${id}`, teacher))).questions[0]).toMatchObject({ image: key, answer: 2 })
+    // ไม่มีทั้งข้อความและรูป / ไม่มีรูปแต่ตัวเลือกว่าง / key แปลกปลอม
+    const bad = (q: unknown) => postJson('/api/teacher/card-quizzes', { title: 'x', questions: [q] }, { cookie: teacher })
+    expect((await bad({ q: '', choices: ['ก', 'ข'], answer: 0 })).status).toBe(400)
+    expect((await bad({ q: 'ข้อ', choices: ['', ''], answer: 0 })).status).toBe(400)
+    expect((await bad({ q: 'ข้อ', image: 'sub/x/y.jpg', choices: ['ก', 'ข'], answer: 0 })).status).toBe(400)
+    // ลบไฟล์ค้าง: รูปโจทย์ที่ใช้อยู่ยังอยู่
+    const { purgeOrphans } = await import('../src/server/storage/service')
+    await purgeOrphans(db(), env.BUCKET, Date.now() + 3 * 86400_000)
+    expect(await env.BUCKET.get(key)).not.toBeNull()
+    expect((await getJson(`/api/files/${key}`, teacher)).status).toBe(200)
   })
 })

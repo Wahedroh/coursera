@@ -139,7 +139,7 @@ export function GameResults({ result, state }: { result: CardGameResult; state: 
           <b>ข้อที่ควรอธิบายซ้ำ:</b>
           {hardest.map((h) => (
             <div key={h.i}>
-              ข้อ {h.i + 1}. {state.questions[h.i].q} — ตอบถูก <b>{h.pct}%</b> (เฉลย {LETTERS[state.questions[h.i].answer]})
+              ข้อ {h.i + 1}. {state.questions[h.i].q || '(โจทย์เป็นรูป)'} — ตอบถูก <b>{h.pct}%</b> (เฉลย {LETTERS[state.questions[h.i].answer]})
             </div>
           ))}
         </div>

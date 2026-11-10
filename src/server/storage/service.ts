@@ -141,7 +141,11 @@ export async function purgeOrphans(db: Db, bucket: R2Bucket, t: number): Promise
     UNION SELECT j.value FROM submissions s, json_each(s.annotated_keys) j
     UNION SELECT j.value FROM assignments a, json_each(a.attachment_keys) j
     UNION SELECT m.file_key FROM materials m`)
-  const used = new Set(refs.map((r) => r.k))
+  // รูปโจทย์เกมการ์ด (D1 จำกัด UNION ไม่เกิน 5 ส่วน จึงแยกคำสั่ง)
+  const quiz = await db.all<{ k: string }>(sql`
+    SELECT (j.value ->> 'image') AS k FROM card_quizzes q, json_each(q.questions) j WHERE (j.value ->> 'image') IS NOT NULL
+    UNION SELECT (j.value ->> 'image') FROM card_games g, json_each(g.questions) j WHERE (j.value ->> 'image') IS NOT NULL`)
+  const used = new Set([...refs, ...quiz].map((r) => r.k))
   const orphans: { key: string; size: number }[] = []
   let cursor: string | undefined
   do {

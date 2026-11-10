@@ -182,8 +182,9 @@ export default function TeacherCardGame() {
               onChange={(questions) => setEditing({ ...editing, questions })}
               max={MAX_CARD_QUESTIONS}
               letters={LETTERS}
+              allowImage
               legend={`คำถาม (สูงสุด ${MAX_CARD_QUESTIONS} ข้อ · ตัวเลือก 2–4 ข้อ)`}
-              hint="ติ๊กวงกลมหน้าตัวเลือกที่ถูก · ตัวเลือก A–D ตรงกับด้านของการ์ด"
+              hint="ติ๊กวงกลมหน้าตัวเลือกที่ถูก · ตัวเลือก A–D ตรงกับด้านของการ์ด · ใส่รูปโจทย์ได้ (เช่น ถ่ายจากหนังสือ/สไลด์)"
             />
             <div className="flex gap-2">
               <Button type="submit" disabled={busy || !editing.title.trim() || editing.questions.length === 0}>
