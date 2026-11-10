@@ -134,6 +134,13 @@
       "when": 1794313037001,
       "tag": "0018_card_game",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1794322057538,
+      "tag": "0019_card_game_score_item",
+      "breakpoints": true
     }
   ]
 }

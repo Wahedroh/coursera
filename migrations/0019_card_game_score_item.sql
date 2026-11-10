@@ -1,0 +1,1 @@
+ALTER TABLE `card_games` ADD `score_item_id` text;

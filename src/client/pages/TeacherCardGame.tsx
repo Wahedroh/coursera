@@ -86,6 +86,16 @@ export default function TeacherCardGame() {
     }
   }
 
+  async function removeGame(g: Game) {
+    if (!window.confirm(`ลบเกม "${g.quizTitle}" (${g.className})?\n\nคำตอบ EXP ที่ได้จากเกม และคะแนนเก็บของเกมนี้จะถูกลบด้วย · กู้คืนไม่ได้`)) return
+    try {
+      await api(`/api/teacher/card-games/${g.id}`, { method: 'DELETE' })
+      load()
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
+
   async function remove(q: CardQuizSummary) {
     if (!window.confirm(`ลบชุดคำถาม "${q.title}"?`)) return
     try {
@@ -201,14 +211,19 @@ export default function TeacherCardGame() {
         <Card className="p-4 flex flex-col gap-1">
           <h2 className="font-bold">🕘 เกมล่าสุด</h2>
           {games.map((g) => (
-            <Link key={g.id} to={`/teacher/card-games/${g.id}`} className="flex justify-between gap-2 border-t border-stone-100 pt-1.5 text-sm hover:underline">
-              <span>
-                <b>{g.quizTitle}</b> · {g.className}
-              </span>
-              <span className="text-stone-500 text-xs">
-                {new Date(g.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} · {g.endedAt ? 'จบแล้ว' : 'กำลังเล่น'}
-              </span>
-            </Link>
+            <div key={g.id} className="flex items-center gap-2 border-t border-stone-100 pt-1.5 text-sm">
+              <Link to={`/teacher/card-games/${g.id}`} className="flex-1 flex flex-wrap justify-between gap-2 hover:underline">
+                <span>
+                  <b>{g.quizTitle}</b> · {g.className}
+                </span>
+                <span className="text-stone-500 text-xs">
+                  {new Date(g.createdAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} · {g.endedAt ? 'จบแล้ว' : 'กำลังเล่น'}
+                </span>
+              </Link>
+              <button type="button" aria-label={`ลบเกม ${g.quizTitle} ${g.className}`} className="rounded-lg border border-red-200 text-red-700 bg-white px-2 py-0.5 text-xs font-semibold" onClick={() => void removeGame(g)}>
+                ลบ
+              </button>
+            </div>
           ))}
         </Card>
       )}

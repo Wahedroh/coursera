@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, like, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import { CARD_EXP, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary } from '../../shared/cardgame'
 import { newId, type Db } from '../db/client'
@@ -171,6 +171,7 @@ export async function endGame(db: Db, id: string, opts: { saveScore: boolean; at
     await db.insert(scoreItems).values({ id: scoreItemId, classId: g.classId, title, category: 'other', maxScore: res.total, takenOn: todayBangkok(t), createdAt: t, updatedAt: t })
     const vals = res.players.map((p) => ({ id: newId(), itemId: scoreItemId!, studentId: p.id, score: p.answered ? p.correct : null, absent: p.answered === 0, note: '', updatedAt: t }))
     for (let i = 0; i < vals.length; i += 10) await db.insert(scores).values(vals.slice(i, i + 10))
+    await db.update(cardGames).set({ scoreItemId }).where(eq(cardGames.id, id))
   }
   let attendanceDate: string | null = null
   if (opts.attendance) {
@@ -197,3 +198,12 @@ export async function recentGames(db: Db, classId?: string) {
   return rows
 }
 
+
+/** ลบเกม: คำตอบ · EXP ที่ได้จากเกม · รายการคะแนนเก็บของเกม (การเช็กชื่อที่บันทึกไปแล้วไม่ย้อน) — กู้คืนไม่ได้ */
+export async function deleteGame(db: Db, id: string): Promise<{ removedExp: number; removedScoreItem: boolean }> {
+  const g = await getGame(db, id)
+  const ev = await db.delete(pointEvents).where(and(eq(pointEvents.source, 'live'), like(pointEvents.refId, `card:${id}:%`))).returning({ id: pointEvents.id })
+  if (g.scoreItemId) await db.batch([db.delete(scores).where(eq(scores.itemId, g.scoreItemId)), db.delete(scoreItems).where(eq(scoreItems.id, g.scoreItemId))])
+  await db.batch([db.delete(cardAnswers).where(eq(cardAnswers.gameId, id)), db.delete(cardGames).where(eq(cardGames.id, id))])
+  return { removedExp: ev.length, removedScoreItem: !!g.scoreItemId }
+}

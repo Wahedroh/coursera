@@ -407,6 +407,8 @@ export const cardGames = sqliteTable(
     current: integer('current').notNull().default(0),
     revealed: integer('revealed', { mode: 'boolean' }).notNull().default(false),
     endedAt: integer('ended_at'),
+    /** รายการคะแนนเก็บที่สร้างตอนจบเกม (ลบเกม = ลบรายการนี้ด้วย) */
+    scoreItemId: text('score_item_id'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('card_games_class_idx').on(t.classId)],

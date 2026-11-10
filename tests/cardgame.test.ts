@@ -160,3 +160,21 @@ describe('รูปโจทย์', () => {
     expect((await getJson(`/api/files/${key}`, teacher)).status).toBe(200)
   })
 })
+
+describe('ลบเกม', () => {
+  it('ลบเกมที่เล่นแล้ว: คำตอบ EXP และคะแนนเก็บหายไป · ชุดคำถามลบได้อีกครั้ง', async () => {
+    const { teacher, classId, st, quizId } = await setup()
+    const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/scans`, { qIndex: 0, scans: [{ zipgradeId: '34101', answer: 0 }] }, { cookie: teacher })
+    const r = await json(await postJson(`/api/teacher/card-games/${id}/end`, { saveScore: true }, { cookie: teacher }))
+    const sc = await studentCookie(st[0].id)
+    expect((await json(await getJson('/api/student/exp', sc))).exp).toBe(4)
+    expect(await json(await del(`/api/teacher/card-games/${id}`, teacher))).toEqual({ removedExp: 1, removedScoreItem: true })
+    expect((await json(await getJson('/api/student/exp', sc))).exp).toBe(0)
+    expect((await getJson(`/api/teacher/score-items/${r.saved.scoreItemId}`, teacher)).status).toBe(404)
+    expect((await getJson(`/api/teacher/card-games/${id}`, teacher)).status).toBe(404)
+    expect(await json(await getJson('/api/teacher/card-games', teacher))).toEqual([])
+    expect((await del(`/api/teacher/card-games/${id}`, teacher)).status).toBe(404)
+    expect((await del(`/api/teacher/card-quizzes/${quizId}`, teacher)).status).toBe(200)
+  })
+})
