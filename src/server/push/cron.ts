@@ -3,6 +3,7 @@ import { getDb } from '../db/client'
 import type { Env } from '../env'
 import { termWindow } from '../terms/service'
 import { drain, type PushSender } from './service'
+import { enqueueEventReminders } from '../calendar/service'
 
 const DAY = 86400_000
 
@@ -23,5 +24,6 @@ export async function enqueueDueReminders(env: Pick<Env, 'DB'>, t: number): Prom
 /** งานตามเวลา (ทุก 30 นาที): เตือนงานใกล้ครบกำหนด แล้วส่ง push ที่ค้าง */
 export async function runCron(env: Pick<Env, 'DB'>, t: number, send?: PushSender) {
   const reminders = await enqueueDueReminders(env, t)
-  return { reminders, ...(await drain(getDb(env), t, send)) }
+  const events = await enqueueEventReminders(getDb(env), t)
+  return { reminders, events, ...(await drain(getDb(env), t, send)) }
 }
