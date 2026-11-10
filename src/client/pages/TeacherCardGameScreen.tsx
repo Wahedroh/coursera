@@ -116,14 +116,15 @@ export default function TeacherCardGameScreen() {
             </div>
           ) : (
             <div>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))' }} data-testid="answered-grid">
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }} data-testid="answered-grid">
                 {state.roster.map((r) => (
-                  <div key={r.id} title={r.name} className={`h-11 rounded-lg flex items-center justify-center font-extrabold ${state.answers[r.id] !== undefined ? 'bg-green-400 text-green-950' : 'bg-white/10 text-white/60'}`}>
-                    {r.no}
+                  <div key={r.id} title={r.name} className={`h-11 rounded-lg px-2 flex items-center justify-center gap-1 font-bold text-sm truncate ${state.answers[r.id] !== undefined ? 'bg-green-400 text-green-950' : 'bg-white/10 text-white/60'}`}>
+                    {state.answers[r.id] !== undefined && '✓ '}
+                    {r.name.split(' ')[0]} <span className="font-normal opacity-80">({r.zipgradeId})</span>
                   </div>
                 ))}
               </div>
-              <p className="text-sm opacity-75 mt-2">ช่องเขียว = เลขที่ที่สแกนแล้ว (ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย)</p>
+              <p className="text-sm opacity-75 mt-2">ช่องเขียว = สแกนแล้ว (ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย)</p>
             </div>
           )}
           <GameControls state={state} reload={reload} onError={onError} onEnded={setResult} />

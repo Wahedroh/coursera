@@ -146,7 +146,7 @@ export default function TeacherCardScan() {
 
   const nameOf = useRef(new Map<string, string>())
   useEffect(() => {
-    if (state) nameOf.current = new Map(state.roster.map((r) => [r.zipgradeId.toUpperCase(), `${r.no} ${r.name.split(' ')[0]}`]))
+    if (state) nameOf.current = new Map(state.roster.map((r) => [r.zipgradeId.toUpperCase(), `${r.name.split(' ')[0]} (${r.zipgradeId})`]))
   }, [state])
 
   if (!state) return error ? <ErrorBox message={error} /> : <Loading />
@@ -182,7 +182,7 @@ export default function TeacherCardScan() {
         {!state.ended && <GameControls state={state} reload={reload} onError={onError} compact />}
         {!state.ended && missing.length > 0 && (
           <p className="text-sm">
-            <b>ยังไม่สแกน ({missing.length}):</b> {missing.map((r) => `${r.no} ${r.name.split(' ')[0]}`).join(', ')}
+            <b>ยังไม่สแกน ({missing.length}):</b> {missing.map((r) => `${r.name.split(' ')[0]} (${r.zipgradeId})`).join(', ')}
           </p>
         )}
         {unknown.length > 0 && <p className="text-xs text-red-700">พบการ์ดที่ไม่ใช่ของห้องนี้: {unknown.join(', ')}</p>}

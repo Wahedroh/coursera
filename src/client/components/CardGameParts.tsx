@@ -148,7 +148,7 @@ export function GameResults({ result, state }: { result: CardGameResult; state: 
         <table className="w-full text-sm bg-white rounded-xl">
           <thead>
             <tr className="text-left text-stone-500">
-              <th className="p-2">เลขที่</th>
+              <th className="p-2">ZipGrade ID</th>
               <th className="p-2">ชื่อ</th>
               <th className="p-2">ถูก</th>
               <th className="p-2">ตอบ</th>
@@ -158,7 +158,7 @@ export function GameResults({ result, state }: { result: CardGameResult; state: 
           <tbody>
             {result.players.map((p) => (
               <tr key={p.id} className="border-t border-stone-100">
-                <td className="p-2">{p.no}</td>
+                <td className="p-2">{state.roster.find((r) => r.id === p.id)?.zipgradeId ?? p.no}</td>
                 <td className="p-2">{p.name}</td>
                 <td className="p-2 tabular-nums">{p.answered ? `${p.correct}/${result.total}` : '–'}</td>
                 <td className="p-2 tabular-nums">{p.answered || 'ไม่ได้เล่น'}</td>

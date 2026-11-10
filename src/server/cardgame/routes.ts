@@ -5,7 +5,7 @@ import type { AppEnv } from '../env'
 import { parseBody } from '../http'
 import { cardQuizInputSchema, endGameSchema, scanBatchSchema, startGameSchema } from '../../shared/cardgame'
 import { z } from 'zod'
-import { classCards, createQuiz, deleteQuiz, endGame, gameResult, gameState, getQuiz, goTo, listQuizzes, recentGames, recordScans, reveal, startGame, updateQuiz } from './service'
+import { classCards, createQuiz, deleteGame, deleteQuiz, endGame, gameResult, gameState, getQuiz, goTo, listQuizzes, recentGames, recordScans, reveal, startGame, updateQuiz } from './service'
 
 export const teacherCardRoutes = new Hono<AppEnv>()
 teacherCardRoutes.use('*', requireTeacher)
@@ -42,5 +42,6 @@ teacherCardRoutes.post('/card-games/:id/goto', async (c) => {
   await goTo(getDb(c.env), c.req.param('id'), index)
   return c.json({ ok: true })
 })
+teacherCardRoutes.delete('/card-games/:id', async (c) => c.json(await deleteGame(getDb(c.env), c.req.param('id'))))
 teacherCardRoutes.get('/card-games/:id/result', async (c) => c.json(await gameResult(getDb(c.env), c.req.param('id'))))
 teacherCardRoutes.post('/card-games/:id/end', async (c) => c.json(await endGame(getDb(c.env), c.req.param('id'), await parseBody(c, endGameSchema), now())))
