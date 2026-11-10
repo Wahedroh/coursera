@@ -22,7 +22,7 @@ async function studentPage(browser: Browser, id: string, pin: string): Promise<P
 // ต่อจาก m3: ห้อง "โรงเรียนทดสอบ ชั้น 1" มี สมใจ, สมชาย, มานี (รหัส 3, PIN 1357)
 test('คลิปย้อนหลัง: ครูวางลิงก์ YouTube → นักเรียนดูในเว็บ ไม่มีลิงก์ออกไป YouTube', async ({ browser }) => {
   const teacher = await teacherPage(browser)
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await teacher.getByRole('link', { name: 'คลิปย้อนหลัง' }).click()
   await teacher.getByLabel('ลิงก์ YouTube').fill('https://vimeo.com/123')
   await expect(teacher.getByText('ไม่ใช่ลิงก์คลิป YouTube')).toBeVisible()
@@ -56,7 +56,7 @@ test('คลิปย้อนหลัง: ครูวางลิงก์ Yo
 
 test('ค่าเอกสาร: ครูเลือกบางคน → จ่ายบางส่วน → นักเรียนเห็นยอดค้างของตัวเอง', async ({ browser }) => {
   const teacher = await teacherPage(browser)
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await teacher.getByRole('link', { name: 'ค่าเอกสาร' }).click()
   await teacher.getByLabel('ชื่อรายการ').fill('ชีทบทที่ 1-3')
   await teacher.getByLabel('ราคา (บาท)').fill('45')

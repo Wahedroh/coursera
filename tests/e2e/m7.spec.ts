@@ -6,7 +6,7 @@ test('ครูดูเกรดอิงกลุ่ม ปรับเกณ�
   await teacher.goto('/teacher/login')
   await teacher.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await teacher.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await teacher.getByRole('link', { name: 'เกรด', exact: true }).click()
   await expect(teacher.getByRole('heading', { name: 'เกรด (อิงกลุ่ม)' })).toBeVisible()
   await expect(teacher.getByTestId('grade-3')).not.toHaveText('')

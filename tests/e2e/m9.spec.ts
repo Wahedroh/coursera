@@ -6,7 +6,7 @@ test('สุ่มชื่อไม่ซ้ำจนครบทุกคน �
   await page.goto('/teacher/login')
   await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await page.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await page.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await page.getByRole('link', { name: 'ผังห้อง & แต้ม' }).click()
   const counter = page.getByText(/สุ่มชื่อ \(เหลือ \d+ คน/)
   await expect(counter).not.toContainText('เหลือ 0 คน')

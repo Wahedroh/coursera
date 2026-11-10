@@ -381,3 +381,50 @@ export const calendarEvents = sqliteTable(
   },
   (t) => [index('calendar_events_class_date_idx').on(t.classId, t.date)],
 )
+
+/** ชุดคำถามของเกมการ์ด QR (ใช้ได้ทุกห้อง) */
+export const cardQuizzes = sqliteTable('card_quizzes', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number }[]>().notNull(),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+/** เกมการ์ด 1 รอบในห้องหนึ่ง */
+export const cardGames = sqliteTable(
+  'card_games',
+  {
+    id: text('id').primaryKey(),
+    quizId: text('quiz_id')
+      .notNull()
+      .references(() => cardQuizzes.id),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    /** สำเนาคำถาม ณ ตอนเริ่มเกม (แก้ชุดคำถามทีหลังไม่กระทบผล) */
+    questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number }[]>().notNull(),
+    current: integer('current').notNull().default(0),
+    revealed: integer('revealed', { mode: 'boolean' }).notNull().default(false),
+    endedAt: integer('ended_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('card_games_class_idx').on(t.classId)],
+)
+
+/** คำตอบที่สแกนได้ (สแกนซ้ำ = ทับคำตอบเดิม จนกว่าครูกดเฉลย) */
+export const cardAnswers = sqliteTable(
+  'card_answers',
+  {
+    gameId: text('game_id')
+      .notNull()
+      .references(() => cardGames.id),
+    qIndex: integer('q_index').notNull(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    answer: integer('answer').notNull(),
+    scannedAt: integer('scanned_at').notNull(),
+  },
+  (t) => [uniqueIndex('card_answers_unique').on(t.gameId, t.qIndex, t.studentId), index('card_answers_student_idx').on(t.studentId)],
+)

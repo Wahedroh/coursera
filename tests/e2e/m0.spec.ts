@@ -50,7 +50,7 @@ test('ครูนำเข้ารายชื่อ แล้วนักเ�
 
 test('ครูรีเซ็ต PIN แล้วนักเรียนต้องตั้งใหม่', async ({ browser }) => {
   const teacher = await teacherPage(browser)
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   const row = teacher.getByRole('row', { name: /สมใจ/ })
   await expect(row.getByText('ตั้งแล้ว')).toBeVisible()
   teacher.once('dialog', (d) => d.accept())
