@@ -14,6 +14,9 @@ test('นักเรียนแต่งตัวละคร บันทึ�
   await page.getByRole('button', { name: 'สีผม 5' }).click()
   await page.getByRole('button', { name: 'นักบินอวกาศ' }).click()
   await expect(page.getByRole('button', { name: 'นักบินอวกาศ' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'สีเสื้อ ม่วง' }).click()
+  await page.getByRole('button', { name: 'สีกระโปรง ชมพู' }).click()
+  await page.getByRole('button', { name: 'สีรองเท้า ขาว' }).click()
   await expect(page.getByTestId('avatar-preview')).toContainText('นักบินน้อย')
   await page.getByRole('button', { name: 'บันทึกตัวละคร' }).click()
   await expect(page.getByRole('button', { name: '✓ บันทึกแล้ว' })).toBeVisible()
@@ -24,6 +27,9 @@ test('นักเรียนแต่งตัวละคร บันทึ�
   await page.getByRole('link', { name: 'แต่งตัวละคร' }).click()
   await expect(page.getByRole('button', { name: 'นักบินอวกาศ' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByLabel('ชื่อในเกม')).toHaveValue('นักบินน้อย')
+  await expect(page.getByRole('button', { name: 'สีเสื้อ ม่วง' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'สีกระโปรง ชมพู' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'สีรองเท้า ขาว' })).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('ลิงก์ล็อกอินที่แอบพาไปเว็บอื่น (/\\evil.com) ถูกพากลับหน้าของเราเอง', async ({ page }) => {

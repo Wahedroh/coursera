@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, JOB_IDS, JOBS, SKINS } from '../src/shared/avatar'
+import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, JOB_IDS, JOBS, OUTFIT_COLORS, SKINS } from '../src/shared/avatar'
 import { getDb } from '../src/server/db/client'
 import { getJson, json, loginTeacher, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
@@ -80,6 +80,24 @@ describe('avatarPixels', () => {
     expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, skin: 9 }).success).toBe(false)
     expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, job: 'hacker' }).success).toBe(false)
   })
+  it('เลือกสีเสื้อ กางเกง/กระโปรง รองเท้าเองได้ · -1 = ตามชุดอาชีพ · ค่าเก่าที่ไม่มีช่องนี้ = ตามชุด', () => {
+    const base = avatarPixels({ ...DEFAULT_AVATAR, job: 'student' })
+    expect(at(base, 4, 10)).toBe(JOBS.student.shirt)
+    expect(at(base, 3, 15)).toBe(JOBS.student.pants)
+    const px = avatarPixels({ ...DEFAULT_AVATAR, job: 'student', shirtColor: 10, pantsColor: 1, shoesColor: 0 })
+    expect(at(px, 4, 10)).toBe(OUTFIT_COLORS[10])
+    expect(at(px, 2, 9)).toBe(OUTFIT_COLORS[10]) // แขนเสื้อ
+    expect(at(px, 3, 15)).toBe(OUTFIT_COLORS[1])
+    expect(at(px, 3, 18)).toBe(OUTFIT_COLORS[0])
+    // กระโปรงยาวก็เปลี่ยนสีได้ · ลวดลายของอาชีพยังอยู่ (แถบสีกลางเสื้อแพทย์)
+    const f = avatarPixels({ ...DEFAULT_AVATAR, gender: 'f', longSkirt: true, pantsColor: 13 })
+    expect(at(f, 2, 16)).toBe(OUTFIT_COLORS[13])
+    expect(at(avatarPixels({ ...DEFAULT_AVATAR, job: 'doctor', shirtColor: 1 }), 5, 10)).toBe(JOBS.doctor.accent)
+    const { shirtColor: _s, pantsColor: _p, shoesColor: _h, ...old } = DEFAULT_AVATAR
+    expect(avatarConfigSchema.parse(old)).toMatchObject({ shirtColor: -1, pantsColor: -1, shoesColor: -1 })
+    expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, shirtColor: OUTFIT_COLORS.length }).success).toBe(false)
+    expect(avatarConfigSchema.safeParse({ ...DEFAULT_AVATAR, shoesColor: -2 }).success).toBe(false)
+  })
 })
 
 describe('API ตัวละคร', () => {
@@ -87,7 +105,7 @@ describe('API ตัวละคร', () => {
   beforeEach(resetDb)
   const CFG = { gender: 'f', skin: 2, hair: 'ponytail', hairColor: 3, job: 'astronaut', glasses: true }
   // ส่งแบบเดิม (ไม่มีฟิลด์ผ้าคลุม) ได้ค่าเริ่มต้นกลับมา
-  const SAVED = { ...CFG, headwear: 'none', headwearColor: 0, longSkirt: false }
+  const SAVED = { ...CFG, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1 }
 
   it('ค่าเริ่มต้น → บันทึก → อ่านกลับ', async () => {
     const { classId } = await seedClass(db())
@@ -96,7 +114,7 @@ describe('API ตัวละคร', () => {
     expect((await putJson('/api/student/avatar', { nickname: '  ฟ้าใส  ', config: CFG }, c)).status).toBe(200)
     expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: SAVED, isDefault: false })
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้า', config: { ...CFG, job: 'hacker' } }, c)).status).toBe(400)
-    const hijab = { ...CFG, headwear: 'hijab_long', headwearColor: 4, longSkirt: true, job: 'nurse' }
+    const hijab = { ...CFG, headwear: 'hijab_long', headwearColor: 4, longSkirt: true, job: 'nurse', shirtColor: 12, pantsColor: 2, shoesColor: -1 }
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้าใส', config: hijab }, c)).status).toBe(200)
     expect((await json(await getJson('/api/student/avatar', c))).config).toEqual(hijab)
     expect((await putJson('/api/student/avatar', { nickname: 'ก'.repeat(21), config: CFG }, c)).status).toBe(400)
