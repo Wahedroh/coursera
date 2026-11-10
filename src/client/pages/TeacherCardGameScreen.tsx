@@ -4,6 +4,7 @@ import { api } from '../api'
 import { GameControls, GameResults, useCardGame } from '../components/CardGameParts'
 import { qrSvg } from '../components/QrCard'
 import { LETTERS, type CardGameResult } from '../../shared/cardgame'
+import { fileUrl } from '../lib/upload'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -73,6 +74,7 @@ export default function TeacherCardGameScreen() {
         <>
           <div className="rounded-2xl bg-white text-stone-900 p-5 text-2xl sm:text-3xl font-extrabold" data-testid="game-question">
             {q.q}
+            {q.image && <img src={fileUrl(q.image)} alt={`รูปโจทย์ข้อ ${state.current + 1}`} className={`max-h-[55vh] mx-auto rounded-xl ${q.q ? 'mt-3' : ''}`} />}
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             {q.choices.map((c, k) => {
@@ -80,7 +82,7 @@ export default function TeacherCardGameScreen() {
               return (
                 <div key={k} className={`rounded-2xl p-4 text-xl font-bold flex gap-3 items-center ${right ? 'bg-green-400 text-green-950' : state.revealed ? 'bg-white/10 opacity-70' : 'bg-white/15'}`}>
                   <span className="w-10 h-10 rounded-xl bg-white/90 text-stone-900 flex items-center justify-center text-2xl font-extrabold shrink-0">{LETTERS[k]}</span>
-                  <span className="flex-1">{c}</span>
+                  <span className="flex-1">{c || <span className="opacity-60">ตัวเลือก {LETTERS[k]} (ในรูป)</span>}</span>
                   {state.revealed && <span className="text-lg tabular-nums">{counts[k]} คน</span>}
                   {right && '✓'}
                 </div>

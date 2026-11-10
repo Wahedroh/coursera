@@ -32,6 +32,10 @@ fileRoutes.post('/', async (c) => {
   } else if (kind === 'attachment') {
     if (s.kind !== 'teacher') throw unauthorized()
     key = `asg/${newId()}.${EXT[type]}`
+  } else if (kind === 'quiz') {
+    // รูปโจทย์เกมการ์ด (ครูเห็นบนจอหน้าห้องเท่านั้น)
+    if (s.kind !== 'teacher') throw unauthorized()
+    key = `quiz/${newId()}.${EXT[type]}`
   } else if (kind === 'annotation') {
     if (s.kind !== 'teacher') throw unauthorized()
     const submissionId = c.req.query('submissionId') ?? ''
