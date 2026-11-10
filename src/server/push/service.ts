@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { newId, type Db } from '../db/client'
 import { notifications, pushSubscriptions, students } from '../db/schema'
 import { apiError } from '../http'
-import type { StudentNotification } from '../../shared/push'
+import type { NotificationInbox, StudentNotification } from '../../shared/push'
 import { isPushEndpoint, vapidAuthorization, vapidKeys } from './vapid'
 
 /** ส่ง push 1 ครั้งไปที่ endpoint — คืนสถานะ HTTP (แยกออกมาเพื่อให้เทสต์แทนที่ได้) */
@@ -110,12 +110,22 @@ export async function takeUnshown(db: Db, studentId: string, t: number): Promise
   return rows
 }
 
-/** การแจ้งเตือนล่าสุดของนักเรียน (แสดงในแอป) */
-export async function recentNotifications(db: Db, studentId: string, t: number): Promise<StudentNotification[]> {
-  return db
-    .select({ id: notifications.id, title: notifications.title, body: notifications.body, url: notifications.url, createdAt: notifications.createdAt })
+/** การแจ้งเตือน 14 วันล่าสุดของนักเรียน (แสดงในแอป) + จำนวนที่ยังไม่อ่าน */
+export async function inbox(db: Db, studentId: string, t: number): Promise<NotificationInbox> {
+  const rows = await db
+    .select({ id: notifications.id, title: notifications.title, body: notifications.body, url: notifications.url, createdAt: notifications.createdAt, readAt: notifications.readAt })
     .from(notifications)
     .where(and(eq(notifications.studentId, studentId), gte(notifications.createdAt, t - 14 * 86400_000)))
-    .orderBy(sql`${notifications.createdAt} DESC`)
-    .limit(20)
+    .orderBy(sql`${notifications.createdAt} DESC, ${notifications.id} DESC`)
+    .limit(30)
+  const items = rows.map(({ readAt, ...r }) => ({ ...r, read: readAt !== null }))
+  return { unread: items.filter((x) => !x.read).length, items }
+}
+
+/** เปิดดูรายการแจ้งเตือนแล้ว = อ่านทั้งหมด */
+export async function markAllRead(db: Db, studentId: string, t: number): Promise<void> {
+  await db
+    .update(notifications)
+    .set({ readAt: t })
+    .where(and(eq(notifications.studentId, studentId), isNull(notifications.readAt)))
 }

@@ -75,7 +75,12 @@ describe('การแจ้งเตือน (Web Push)', () => {
     ])
     expect(await json(await postJson('/api/student/push/take', {}, { cookie: sa }))).toEqual([])
     expect(await json(await postJson('/api/student/push/take', {}, { cookie: sb }))).toHaveLength(2)
-    expect(await json(await getJson('/api/student/push/notifications', sa))).toHaveLength(2)
+    expect((await json(await getJson('/api/student/push/notifications', sa))).unread).toBe(2)
+    await postJson('/api/student/push/notifications/read', {}, { cookie: sa })
+    const inbox = await json(await getJson('/api/student/push/notifications', sa))
+    expect(inbox.unread).toBe(0)
+    expect(inbox.items.map((n: { title: string; read: boolean }) => [n.title, n.read])).toEqual([['📢 พรุ่งนี้สอบ', true], ['📝 งานใหม่', true]])
+    expect((await json(await getJson('/api/student/push/notifications', sb))).unread).toBe(2)
   })
 
   it('ครูส่งงานกลับ → แจ้งเฉพาะเจ้าของงาน พร้อมลิงก์ไปงานนั้น', async () => {

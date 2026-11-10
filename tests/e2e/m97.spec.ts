@@ -69,3 +69,24 @@ test('ครูลบงานที่มีนักเรียนส่ง�
   await s.goto('/me')
   await expect(s.getByText('งานจะลบทิ้ง')).toHaveCount(0)
 })
+
+test('นักเรียน: กระดิ่งแจ้งเตือนบนหน้าแรก แสดงประกาศใหม่ เปิดดูแล้วตัวเลขหาย', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  const classId = new URL(t.url()).pathname.split('/').pop()!
+  await t.request.post('/api/teacher/announcements', { data: { title: 'ประกาศทดสอบกระดิ่ง', body: 'พกเครื่องคิดเลข', pinned: false, expiresOn: null, classIds: [classId] } })
+
+  const s = await studentPage(browser)
+  const bell = s.getByTestId('notice-bell')
+  await expect(bell).toHaveAccessibleName(/ยังไม่อ่าน \d+ รายการ/)
+  await bell.click()
+  const panel = s.getByTestId('notice-panel')
+  await expect(panel.getByText('📢 ประกาศทดสอบกระดิ่ง')).toBeVisible()
+  await expect(panel.getByText('พกเครื่องคิดเลข')).toBeVisible()
+  await panel.getByRole('button', { name: 'ปิด' }).click()
+  await s.reload()
+  await expect(s.getByTestId('notice-bell')).toHaveAccessibleName('การแจ้งเตือน')
+})

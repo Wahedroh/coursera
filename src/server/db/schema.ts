@@ -357,6 +357,8 @@ export const notifications = sqliteTable(
     createdAt: integer('created_at').notNull(),
     pushedAt: integer('pushed_at'),
     shownAt: integer('shown_at'),
+    /** นักเรียนเปิดดูในหน้าแอปแล้ว */
+    readAt: integer('read_at'),
   },
   (t) => [index('notifications_student_idx').on(t.studentId), index('notifications_pushed_idx').on(t.pushedAt)],
 )

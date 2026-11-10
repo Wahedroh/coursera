@@ -9,6 +9,7 @@ import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
 import AppSetupCard from '../components/AppSetupCard'
+import NotificationBell from '../components/NotificationBell'
 import type { StudentBadge } from '../../shared/badges'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
@@ -75,6 +76,7 @@ export default function StudentHome() {
   return (
     <main className="min-h-screen max-w-md mx-auto pb-8">
       <header className="relative overflow-hidden bg-gradient-to-b from-board to-[#2c7a5c] text-white px-5 pt-5 pb-5 rounded-b-3xl">
+        <NotificationBell />
         {avatar && (
           <Link to="/me/avatar" aria-label="แต่งตัวละคร" className="absolute top-4 right-4 z-10 rounded-full bg-amber-400 text-amber-950 px-3 py-1 text-xs font-extrabold shadow">
             ✏️ แต่งตัว
