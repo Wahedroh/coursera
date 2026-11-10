@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { AvatarArt } from '../components/PixelArt'
-import { DEFAULT_AVATAR, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, JOB_IDS, JOBS, SKINS, type AvatarConfig } from '../../shared/avatar'
+import { DEFAULT_AVATAR, OUTFIT_COLORS, OUTFIT_COLOR_NAMES, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, JOB_IDS, JOBS, SKINS, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
@@ -66,6 +66,9 @@ export default function StudentAvatar() {
       headwear: Math.random() < 0.5 ? 'none' : pick(HEADWEAR),
       headwearColor: Math.floor(Math.random() * HEADWEAR_COLORS.length),
       longSkirt: Math.random() < 0.5,
+      shirtColor: -1,
+      pantsColor: -1,
+      shoesColor: -1,
     })
   }
 
@@ -149,6 +152,22 @@ export default function StudentAvatar() {
               </button>
             ))}
           </Group>
+          {(
+            [
+              ['shirtColor', 'สีเสื้อ'],
+              ['pantsColor', cfg.gender === 'f' ? 'สีกระโปรง' : cfg.job === 'thobe' ? 'สีชุดยาว' : 'สีกางเกง'],
+              ['shoesColor', 'สีรองเท้า'],
+            ] as const
+          ).map(([k, label]) => (
+            <Group key={k} label={label}>
+              <button type="button" aria-pressed={(cfg[k] ?? -1) < 0} className={chip((cfg[k] ?? -1) < 0)} onClick={() => set({ [k]: -1 })}>
+                ตามชุด
+              </button>
+              {OUTFIT_COLORS.map((c, i) => (
+                <button key={c} type="button" aria-label={`${label} ${OUTFIT_COLOR_NAMES[i]}`} aria-pressed={cfg[k] === i} className={swatch(cfg[k] === i)} style={{ background: c }} onClick={() => set({ [k]: i })} />
+              ))}
+            </Group>
+          ))}
           <Group label="เครื่องประดับ">
             <button type="button" aria-pressed={cfg.glasses} className={chip(cfg.glasses)} onClick={() => set({ glasses: !cfg.glasses })}>
               👓 แว่นตา

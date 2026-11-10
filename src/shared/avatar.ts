@@ -27,6 +27,14 @@ export const HEADWEAR_LABEL: Record<Headwear, string> = {
 }
 export const HEADWEAR_COLORS = ['#F7F7F7', '#1E1B2E', '#26335E', '#7B1F3A', '#E58FB7', '#9B5DE5', '#4F7FE8', '#2E7D5B', '#C9A15B', '#8D8D8D'] as const
 
+/** สีเสื้อ/กางเกง(กระโปรง)/รองเท้าที่นักเรียนเลือกเอง · -1 = ใช้สีตามชุดอาชีพ */
+export const OUTFIT_COLORS = [
+  '#F7F7F7', '#1E1E1E', '#26335E', '#2F5C9E', '#4F7FE8', '#7FC8E8', '#2E7D5B', '#6A994E',
+  '#F2C14E', '#F28C28', '#E53935', '#B8435A', '#E58FB7', '#9B5DE5', '#8B5E3C', '#C9A15B', '#8D8D8D',
+] as const
+export const OUTFIT_COLOR_NAMES = ['ขาว', 'ดำ', 'กรมท่า', 'น้ำเงิน', 'ฟ้า', 'ฟ้าอ่อน', 'เขียว', 'เขียวใบไม้', 'เหลือง', 'ส้ม', 'แดง', 'แดงเลือดหมู', 'ชมพู', 'ม่วง', 'น้ำตาล', 'กากี', 'เทา'] as const
+const outfit = (i: number | undefined) => (i !== undefined && i >= 0 ? OUTFIT_COLORS[i] : undefined)
+
 const row = (y: number, x0: number, x1: number, c: string): Px[] => Array.from({ length: x1 - x0 + 1 }, (_, i) => [x0 + i, y, c])
 const col = (x: number, y0: number, y1: number, c: string): Px[] => Array.from({ length: y1 - y0 + 1 }, (_, i) => [x, y0 + i, c])
 
@@ -105,11 +113,14 @@ export const avatarConfigSchema = z.object({
   headwear: z.enum(HEADWEAR).default('none'),
   headwearColor: z.number().int().min(0).max(HEADWEAR_COLORS.length - 1).default(0),
   longSkirt: z.boolean().default(false),
+  shirtColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
+  pantsColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
+  shoesColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
 })
 export type AvatarConfig = z.infer<typeof avatarConfigSchema>
 export const avatarInputSchema = z.object({ nickname: z.string().trim().max(20), config: avatarConfigSchema })
 
-export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false }
+export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1 }
 
 function headwearPixels(h: Headwear, c: string): Px[] {
   switch (h) {
@@ -157,8 +168,10 @@ function hairPixels(style: HairStyle, c: string): Px[] {
 export function avatarPixels(cfg: AvatarConfig): Px[] {
   const skin = SKINS[cfg.skin]
   const hair = HAIR_COLORS[cfg.hairColor]
-  const job: Job = JOBS[cfg.job]
-  const shoes = job.shoes ?? '#1E1B2E'
+  const base: Job = JOBS[cfg.job]
+  // สีที่เลือกเองแทนสีของชุดอาชีพ (ลวดลาย/อุปกรณ์ของอาชีพยังอยู่)
+  const job: Job = { ...base, shirt: outfit(cfg.shirtColor) ?? base.shirt, pants: outfit(cfg.pantsColor) ?? base.pants }
+  const shoes = outfit(cfg.shoesColor) ?? base.shoes ?? '#1E1B2E'
   const px: Px[] = []
   // ใบหน้า + มือ
   for (let y = 3; y <= 7; y++) px.push(...row(y, 3, 8, skin))
