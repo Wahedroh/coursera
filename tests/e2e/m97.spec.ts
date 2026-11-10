@@ -47,7 +47,7 @@ test('ครูลบงานที่มีนักเรียนส่ง�
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   const classId = new URL(t.url()).pathname.split('/').pop()!
   const { ids } = await (
     await t.request.post('/api/teacher/assignments', { data: { title: 'งานจะลบทิ้ง', instructions: '', attachmentKeys: [], dueAt: null, maxScore: 10, submitMode: 'text', classIds: [classId] } })
@@ -75,7 +75,7 @@ test('นักเรียน: กระดิ่งแจ้งเตือน
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   const classId = new URL(t.url()).pathname.split('/').pop()!
   await t.request.post('/api/teacher/announcements', { data: { title: 'ประกาศทดสอบกระดิ่ง', body: 'พกเครื่องคิดเลข', pinned: false, expiresOn: null, classIds: [classId] } })
 
@@ -117,4 +117,85 @@ test('ปฏิทิน: ครูเพิ่มวันสอบ (พร้�
   await s.goto('/me')
   await s.getByTestId('notice-bell').click()
   await expect(s.getByTestId('notice-panel').getByText(/📅 สอบ: สอบย่อยปฏิทิน/)).toBeVisible()
+})
+
+test('เกมการ์ด QR: สร้างชุดคำถาม → เริ่มเกม → กล้องมือถือครูอ่านการ์ด 3 ใบ (A/B/C ตามด้านที่หันขึ้น) → เฉลย → จบเกม', async ({ browser }, testInfo) => {
+  const { chromium } = await import('@playwright/test')
+  const { execFileSync } = await import('node:child_process')
+  const qrcode = (await import('qrcode-generator')).default
+
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: 'เกมการ์ด QR' }).click()
+  await t.getByRole('button', { name: '+ สร้างชุดคำถาม' }).click()
+  await t.getByLabel('ชื่อชุด').fill('ทบทวนนิวตัน')
+  await t.getByLabel('คำถามข้อ 1', { exact: true }).fill('แรงลัพธ์ศูนย์ วัตถุจะ?')
+  for (const [k, c] of ['คงสภาพเดิม', 'เร่งขึ้น', 'ช้าลง', 'หมุน'].entries()) await t.getByLabel(`ข้อ 1 ตัวเลือก ${'ABCD'[k]}`, { exact: true }).fill(c)
+  await t.getByRole('button', { name: 'บันทึกชุดคำถาม' }).click()
+  await t.getByLabel('ห้องที่เล่น').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
+  await t.getByLabel('ห้องที่พิมพ์การ์ด').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
+  // หน้าพิมพ์การ์ด
+  await t.getByRole('link', { name: 'เปิดหน้าพิมพ์การ์ด' }).click()
+  await expect(t.getByTestId('qr-card').first()).toBeVisible()
+  const classId = new URL(t.url()).pathname.split('/')[3]
+  const cards = await (await t.request.get(`/api/teacher/classes/${classId}/cards`)).json()
+  await t.goBack()
+  await t.getByLabel('ห้องที่เล่น').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
+  await t.getByRole('button', { name: 'เริ่มเกม' }).click()
+  await expect(t.getByTestId('game-question')).toHaveText('แรงลัพธ์ศูนย์ วัตถุจะ?')
+  const gameId = new URL(t.url()).pathname.split('/').pop()!
+
+  // ภาพจากกล้อง: การ์ด 3 ใบ หมุน 0° (A) · ขอบขวาขึ้น (B) · กลับหัว (C)
+  const three = cards.students.slice(0, 3) as { id: string; zipgradeId: string }[]
+  const svg = (text: string) => {
+    const q = qrcode(0, 'L')
+    q.addData(text, 'Alphanumeric')
+    q.make()
+    const n = q.getModuleCount()
+    let d = ''
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (q.isDark(y, x)) d += `M${x + 2} ${y + 2}h1v1h-1z`
+    return `<svg viewBox="0 0 ${n + 4} ${n + 4}" width="230" height="230" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${d}"/></svg>`
+  }
+  const img = await (await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, isMobile: false })).newPage()
+  await img.setContent(
+    `<body style="margin:0;background:#8a8f8c;display:flex;gap:120px;align-items:center;justify-content:center;height:720px">${three
+      .map((s, k) => `<div style="transform:rotate(${[0, -90, 180][k]}deg)">${svg(`CC:${s.zipgradeId.toUpperCase()}`)}</div>`)
+      .join('')}</body>`,
+  )
+  // Chrome อ่านไฟล์กล้องปลอมจาก path ภาษาไทยไม่ได้ → ใช้โฟลเดอร์ชั่วคราวของระบบ
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const base = join(tmpdir(), `cc-cards-${testInfo.workerIndex}-${Date.now()}`)
+  const png = `${base}.png`
+  const y4m = `${base}.y4m`
+  await img.screenshot({ path: png })
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-loop', '1', '-i', png, '-t', '1', '-r', '5', '-pix_fmt', 'yuv420p', y4m])
+
+  const cam = await chromium.launch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${y4m}`] })
+  try {
+    const ctx = await cam.newContext({ baseURL: testInfo.project.use.baseURL, viewport: { width: 412, height: 900 }, permissions: ['camera'] })
+    await ctx.addCookies((await t.context().cookies()).map((c) => ({ ...c })))
+    const phone = await ctx.newPage()
+    await phone.goto(`/teacher/card-games/${gameId}/scan`)
+    await expect(phone.getByTestId('scan-status')).toContainText('สแกนแล้ว 3/', { timeout: 30_000 })
+    // ระบบได้รับคำตอบ
+    await expect
+      .poll(async () => {
+        const s = await (await t.request.get(`/api/teacher/card-games/${gameId}`)).json()
+        return three.map((x) => s.answers[x.id])
+      })
+      .toEqual([0, 1, 2])
+    await expect(t.getByTestId('scanned-count')).toContainText('3 /')
+    await phone.getByRole('button', { name: 'เฉลย' }).click()
+  } finally {
+    await cam.close()
+  }
+  await expect(t.getByTestId('game-reveal')).toContainText('ตอบถูก 1 / 3 คน')
+  await t.getByRole('button', { name: 'จบเกม' }).click()
+  await t.getByRole('dialog', { name: 'จบเกม' }).getByRole('button', { name: 'จบเกม' }).click()
+  await expect(t.getByTestId('game-results')).toBeVisible()
+  await expect(t.getByTestId('game-results')).toContainText('ถูก 1/1')
+  await expect(t.getByText('✓ บันทึกเป็นคะแนนเก็บแล้ว')).toBeVisible()
 })

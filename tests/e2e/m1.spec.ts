@@ -69,7 +69,7 @@ test('ครูสร้างงาน → นักเรียนส่ง �
 
   // ครูดูตารางและตรวจ
   await teacher.goto('/teacher')
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await teacher.getByRole('link', { name: 'ตารางทวงงาน' }).click()
   await teacher.getByRole('link', { name: 'มานี มีนา · ใบงานเศษส่วน' }).click()
   await expect(teacher.getByText('ข้อ 7 ไม่แน่ใจค่ะ')).toBeVisible()

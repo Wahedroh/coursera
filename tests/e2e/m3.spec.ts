@@ -22,7 +22,7 @@ async function studentPage(browser: Browser, id: string, pin: string): Promise<P
 // ต่อจาก m2: ห้อง "โรงเรียนทดสอบ ชั้น 1" มี สมใจ, สมชาย, มานี (รหัส 3, PIN 1357)
 test('ครูสร้างรายการคะแนน → วางคะแนนจาก Excel → เผยแพร่ → นักเรียนเห็นคะแนนตัวเอง', async ({ browser }) => {
   const teacher = await teacherPage(browser)
-  await teacher.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await teacher.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await teacher.getByRole('link', { name: 'คะแนนสอบ' }).click()
   await teacher.getByLabel('ชื่อรายการ').fill('สอบย่อย บทที่ 3')
   await teacher.getByLabel('คะแนนเต็ม').fill('20')

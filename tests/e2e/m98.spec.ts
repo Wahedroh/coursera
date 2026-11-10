@@ -30,7 +30,7 @@ test('หน้าแรกครู: สรุปวันนี้ (รอต�
 
 test('ครูเพิ่มคำถามท้ายคลิป · นักเรียนเห็นว่าต้องตอบคำถามจึงได้ EXP', async ({ browser }) => {
   const t = await teacherHome(browser)
-  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await t.getByRole('link', { name: 'คลิปย้อนหลัง' }).first().click()
   await t.getByLabel('ลิงก์ YouTube').fill('https://youtu.be/dQw4w9WgXcQ')
   await t.getByLabel('ชื่อคลิป').fill('คลิปมีคำถาม')

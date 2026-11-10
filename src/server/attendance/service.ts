@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from 'drizzle-orm'
+import { and, eq, gte, inArray, lte } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import { type AttendanceDay, type AttendanceRange, type AttendanceStatus } from '../../shared/attendance'
 import { EXP_RULES } from '../../shared/points'
@@ -101,6 +101,20 @@ export async function setStatus(db: Db, dayId: string, studentId: string, status
       .bind(newId(), dayId, studentId, status, source, t),
     ...syncExp(db, dayId, day.date, t, studentId),
   ])
+}
+
+/** ตั้งสถานะหลายคนในวันเดียว (ต้องเปิดวันด้วย openDay แล้ว ทุกคนมีแถวอยู่) — คำสั่งละ 90 คน แล้วปรับ EXP มาเรียนของทั้งวัน */
+export async function setStatuses(db: Db, dayId: string, studentIds: string[], status: AttendanceStatus): Promise<void> {
+  if (!studentIds.length) return
+  const [day] = await db.select().from(attendanceDays).where(eq(attendanceDays.id, dayId))
+  if (!day) throw apiError('day_not_found', 'ไม่พบวันเช็กชื่อ', 404)
+  const t = now()
+  for (let i = 0; i < studentIds.length; i += 90)
+    await db
+      .update(attendanceRecords)
+      .set({ status, source: 'teacher', updatedAt: t })
+      .where(and(eq(attendanceRecords.dayId, dayId), inArray(attendanceRecords.studentId, studentIds.slice(i, i + 90))))
+  await db.$client.batch(syncExp(db, dayId, day.date, t))
 }
 
 export async function attendanceRange(db: Db, classId: string, from: string, to: string): Promise<AttendanceRange> {

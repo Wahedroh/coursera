@@ -29,6 +29,10 @@ import TeacherGrade from './pages/TeacherGrade'
 import TeacherGradebook from './pages/TeacherGradebook'
 import TeacherInsights from './pages/TeacherInsights'
 import TeacherCalendar from './pages/TeacherCalendar'
+import TeacherCardGame from './pages/TeacherCardGame'
+import TeacherCardGameScreen from './pages/TeacherCardGameScreen'
+import TeacherCardScan from './pages/TeacherCardScan'
+import TeacherCards from './pages/TeacherCards'
 import StudentCalendar from './pages/StudentCalendar'
 import TeacherHome from './pages/TeacherHome'
 import TeacherImport from './pages/TeacherImport'
@@ -69,6 +73,10 @@ export default function App() {
         <Route path="/teacher/export" element={<TeacherExport />} />
         <Route path="/teacher/insights" element={<TeacherInsights />} />
         <Route path="/teacher/calendar" element={<TeacherCalendar />} />
+        <Route path="/teacher/card-game" element={<TeacherCardGame />} />
+        <Route path="/teacher/card-games/:id" element={<TeacherCardGameScreen />} />
+        <Route path="/teacher/card-games/:id/scan" element={<TeacherCardScan />} />
+        <Route path="/teacher/classes/:id/cards" element={<TeacherCards />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />

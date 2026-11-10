@@ -10,6 +10,7 @@ export const CLASS_MENU: { label: string; path: (id: string) => string; primary?
   { label: 'เกรด', path: (id) => `/teacher/classes/${id}/grades` },
   { label: 'กราฟ', path: (id) => `/teacher/insights?class=${id}` },
   { label: 'ปฏิทิน', path: (id) => `/teacher/calendar?class=${id}` },
+  { label: 'เกมการ์ด', path: (id) => `/teacher/card-game?class=${id}` },
   { label: 'คลิปย้อนหลัง', path: (id) => `/teacher/classes/${id}/videos` },
   { label: 'ประกาศ', path: (id) => `/teacher/classes/${id}/announcements` },
   { label: 'เอกสารเรียน', path: (id) => `/teacher/classes/${id}/materials` },

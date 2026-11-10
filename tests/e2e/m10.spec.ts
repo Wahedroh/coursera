@@ -6,7 +6,7 @@ async function teacherPage(browser: Browser) {
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await t.getByRole('link', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
   await expect(t.getByText('รหัสห้อง')).toBeVisible()
   return t
 }
