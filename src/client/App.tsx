@@ -28,6 +28,8 @@ import TeacherScores from './pages/TeacherScores'
 import TeacherGrade from './pages/TeacherGrade'
 import TeacherGradebook from './pages/TeacherGradebook'
 import TeacherInsights from './pages/TeacherInsights'
+import TeacherCalendar from './pages/TeacherCalendar'
+import StudentCalendar from './pages/StudentCalendar'
 import TeacherHome from './pages/TeacherHome'
 import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
@@ -46,6 +48,7 @@ export default function App() {
         <Route path="/me/videos" element={<StudentVideos />} />
         <Route path="/me/materials" element={<StudentMaterials />} />
         <Route path="/me/stats" element={<StudentStats />} />
+        <Route path="/me/calendar" element={<StudentCalendar />} />
         <Route path="/me/videos/:id" element={<StudentVideo />} />
         <Route path="/me/fees" element={<StudentFees />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />
@@ -65,6 +68,7 @@ export default function App() {
         <Route path="/teacher/watchlist" element={<TeacherWatchlist />} />
         <Route path="/teacher/export" element={<TeacherExport />} />
         <Route path="/teacher/insights" element={<TeacherInsights />} />
+        <Route path="/teacher/calendar" element={<TeacherCalendar />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />

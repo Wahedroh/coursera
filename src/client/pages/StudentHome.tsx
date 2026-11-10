@@ -142,6 +142,9 @@ export default function StudentHome() {
           <Link to="/me/fees" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             🧾 ค่าเอกสาร
           </Link>
+          <Link to="/me/calendar" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
+            📅 ปฏิทิน
+          </Link>
           <Link to="/me/stats" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
             📈 สถิติของฉัน
           </Link>

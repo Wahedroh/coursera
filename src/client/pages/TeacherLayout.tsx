@@ -6,6 +6,7 @@ const NAV = [
   { to: '/teacher', label: 'หน้าแรก', end: true },
   { to: '/teacher/assignments/new', label: 'สร้างงาน', end: false },
   { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', end: false },
+  { to: '/teacher/calendar', label: 'ปฏิทิน', end: false },
   { to: '/teacher/insights', label: 'กราฟห้องเรียน', end: false },
   { to: '/teacher/export', label: 'ส่งออกข้อมูล', end: false },
   { to: '/teacher/import', label: 'นำเข้ารายชื่อ', end: false },

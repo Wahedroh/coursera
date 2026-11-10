@@ -362,3 +362,22 @@ export const notifications = sqliteTable(
   },
   (t) => [index('notifications_student_idx').on(t.studentId), index('notifications_pushed_idx').on(t.pushedAt)],
 )
+
+/** ปฏิทิน: วันสอบ · กิจกรรม · วันหยุด ที่ครูเพิ่มเอง (กำหนดส่งงานดึงจากตารางงานโดยตรง) */
+export const calendarEvents = sqliteTable(
+  'calendar_events',
+  {
+    id: text('id').primaryKey(),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    kind: text('kind', { enum: ['exam', 'activity', 'holiday'] }).notNull(),
+    title: text('title').notNull(),
+    /** YYYY-MM-DD (เวลาไทย) */
+    date: text('date').notNull(),
+    period: text('period').notNull().default(''),
+    detail: text('detail').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('calendar_events_class_date_idx').on(t.classId, t.date)],
+)
