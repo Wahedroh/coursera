@@ -73,11 +73,11 @@ export default function TeacherSeating() {
     return () => clearTimeout(t)
   }, [countdown])
 
-  async function give(delta: number) {
-    if (!selected) return
+  async function give(delta: number, who = selected, why = reason) {
+    if (!who) return
     try {
-      await api('/api/teacher/points', { body: { studentIds: [selected], delta, reason } })
-      setFlash(`ให้ ${delta > 0 ? '+' : ''}${delta} แต้ม: ${students.get(selected)?.firstName} (${reason})`)
+      await api('/api/teacher/points', { body: { studentIds: [who], delta, reason: why } })
+      setFlash(`ให้ ${delta > 0 ? '+' : ''}${delta} แต้ม: ${students.get(who)?.firstName} (${why})`)
       loadPoints()
     } catch (e) {
       setError(handle(e))
@@ -243,6 +243,22 @@ export default function TeacherSeating() {
                   <span className="text-2xl font-extrabold" aria-live="polite" data-testid="picked-name">
                     {name(picked)} {students.get(picked)?.lastName}
                   </span>
+                )}
+                {countdown === 0 && (
+                  <div className="flex gap-1.5 mt-1" data-testid="pick-points" role="group" aria-label={`ให้แต้ม ${name(picked)}`}>
+                    {[-1, 1, 2, 5].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => void give(d, picked, d > 0 ? 'ตอบคำถาม (สุ่มชื่อ)' : 'สุ่มชื่อ')}
+                        aria-label={`${d > 0 ? '+' : ''}${d} แต้ม`}
+                        className={`rounded-lg px-3 py-1.5 font-extrabold ${d < 0 ? 'bg-white/90 text-red-700' : d === 5 ? 'bg-amber-300 text-amber-950' : 'bg-white text-board'}`}
+                      >
+                        {d > 0 ? '+' : ''}
+                        {d}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

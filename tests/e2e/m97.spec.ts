@@ -260,7 +260,7 @@ test('วิเคราะห์รายคน + ใบสรุปผล: ค
   await t.getByRole('link', { name: '📄 ใบสรุปผล' }).click()
   await expect(t.getByTestId('report-sheet').first()).toBeVisible()
   t.once('dialog', (d) => void d.accept())
-  await t.getByLabel('เปิดให้นักเรียนดาวน์โหลด').check()
+  await t.getByLabel('เปิดให้นักเรียนดาวน์โหลด').click()
   await expect(t.getByText('เปิดให้นักเรียนดาวน์โหลดแล้ว')).toBeVisible()
 
   const s = await studentPage(browser)
