@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { Db } from '../db/client'
-import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers } from '../db/schema'
+import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers, studentNotes } from '../db/schema'
 import { apiError } from '../http'
 import { removeFiles } from '../storage/service'
 
@@ -23,6 +23,7 @@ export async function deleteStudent(db: Db, bucket: R2Bucket, id: string): Promi
     db.delete(notifications).where(eq(notifications.studentId, id)),
     db.delete(pushSubscriptions).where(eq(pushSubscriptions.studentId, id)),
     db.delete(cardAnswers).where(eq(cardAnswers.studentId, id)),
+    db.delete(studentNotes).where(eq(studentNotes.studentId, id)),
     db.delete(students).where(eq(students.id, id)),
   ])
   // รูปงานที่ส่ง/รูปที่ครูเขียนทับ — ลบหลังลบข้อมูลแล้ว (ถ้าพลาด "ลบไฟล์ค้าง" จะเก็บให้ภายหลัง)

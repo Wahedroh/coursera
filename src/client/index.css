@@ -30,3 +30,18 @@ body {
 }
 .animate-hop-slow { animation: hop-slow 2.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .animate-hop-slow { animation: none; } }
+
+/* พิมพ์: ซ่อนเมนู/ปุ่ม แสดงเฉพาะเนื้อหา */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .print-page {
+    break-after: page;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+}

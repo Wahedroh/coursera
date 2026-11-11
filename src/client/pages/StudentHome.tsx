@@ -10,6 +10,7 @@ import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
 import AppSetupCard from '../components/AppSetupCard'
 import NotificationBell from '../components/NotificationBell'
+import ReportReadyCard from '../components/ReportReadyCard'
 import type { StudentBadge } from '../../shared/badges'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
@@ -152,6 +153,7 @@ export default function StudentHome() {
       </header>
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
+        <ReportReadyCard />
         <WeeklyQuests onClaimed={loadExp} />
         <AppSetupCard />
         {feeOwed > 0 && (

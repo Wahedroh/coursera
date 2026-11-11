@@ -34,6 +34,9 @@ import TeacherCardGameScreen from './pages/TeacherCardGameScreen'
 import TeacherCardScan from './pages/TeacherCardScan'
 import TeacherCards from './pages/TeacherCards'
 import StudentCalendar from './pages/StudentCalendar'
+import StudentReport from './pages/StudentReport'
+import TeacherAnalysis from './pages/TeacherAnalysis'
+import TeacherReportCards from './pages/TeacherReportCards'
 import TeacherHome from './pages/TeacherHome'
 import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
@@ -53,6 +56,7 @@ export default function App() {
         <Route path="/me/materials" element={<StudentMaterials />} />
         <Route path="/me/stats" element={<StudentStats />} />
         <Route path="/me/calendar" element={<StudentCalendar />} />
+        <Route path="/me/report" element={<StudentReport />} />
         <Route path="/me/videos/:id" element={<StudentVideo />} />
         <Route path="/me/fees" element={<StudentFees />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />
@@ -77,6 +81,8 @@ export default function App() {
         <Route path="/teacher/card-games/:id" element={<TeacherCardGameScreen />} />
         <Route path="/teacher/card-games/:id/scan" element={<TeacherCardScan />} />
         <Route path="/teacher/classes/:id/cards" element={<TeacherCards />} />
+        <Route path="/teacher/classes/:id/analysis" element={<TeacherAnalysis />} />
+        <Route path="/teacher/classes/:id/report-cards" element={<TeacherReportCards />} />
         <Route path="/teacher/classes/:id/fees" element={<TeacherFees />} />
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />

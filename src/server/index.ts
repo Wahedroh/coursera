@@ -30,6 +30,7 @@ import { studentPushRoutes } from './push/routes'
 import { teacherInsightRoutes } from './insights/routes'
 import { studentCalendarRoutes, teacherCalendarRoutes } from './calendar/routes'
 import { teacherCardRoutes } from './cardgame/routes'
+import { studentReportRoutes, teacherAnalysisRoutes } from './analysis/routes'
 import { runCron } from './push/cron'
 import type { Env } from './env'
 import { apiError, onError } from './http'
@@ -58,6 +59,7 @@ app.route('/api/teacher', teacherTodayRoutes)
 app.route('/api/teacher', teacherInsightRoutes)
 app.route('/api/teacher', teacherCalendarRoutes)
 app.route('/api/teacher', teacherCardRoutes)
+app.route('/api/teacher', teacherAnalysisRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)
@@ -69,6 +71,7 @@ app.route('/api/student/fees', studentFeeRoutes)
 app.route('/api/student/quests', studentQuestRoutes)
 app.route('/api/student/push', studentPushRoutes)
 app.route('/api/student/calendar', studentCalendarRoutes)
+app.route('/api/student/report-card', studentReportRoutes)
 app.route('/api/student', studentPointsRoutes)
 app.route('/api/student', studentAuthRoutes)
 app.route('/api/files', fileRoutes)
