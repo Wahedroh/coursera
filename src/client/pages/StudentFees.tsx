@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { baht, type StudentFee } from '../../shared/fees'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
+import { StudentPayment } from '../components/PaymentInfo'
 
 export default function StudentFees() {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ export default function StudentFees() {
       </header>
       <section className="p-5 flex flex-col gap-3">
         <ErrorBox message={error} />
+        {total > 0 && <StudentPayment owed={baht(total)} />}
         {!items && !error && <Loading />}
         {items?.length === 0 && <p className="text-sm text-stone-500 text-center py-6">ไม่มีค่าเอกสาร</p>}
         {items?.map((f) => (

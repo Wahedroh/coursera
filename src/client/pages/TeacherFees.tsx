@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import { baht, type FeeItemSummary } from '../../shared/fees'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
+import { TeacherPaymentSettings } from '../components/PaymentInfo'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -21,6 +22,7 @@ export default function TeacherFees() {
   const [amount, setAmount] = useState('')
   const [classIds, setClassIds] = useState<string[]>([id])
   const [busy, setBusy] = useState(false)
+  const onPayError = useCallback((e: unknown) => setError(handle(e)), [handle])
 
   useEffect(() => {
     setClassIds([id])
@@ -64,6 +66,7 @@ export default function TeacherFees() {
         )}
       </div>
       <ErrorBox message={error} />
+      <TeacherPaymentSettings onError={onPayError} />
       {!items && !error && <Loading />}
       {items?.length === 0 && <Card className="p-6 text-center text-sm text-stone-500">ยังไม่มีรายการค่าเอกสาร</Card>}
       {items && items.length > 0 && (

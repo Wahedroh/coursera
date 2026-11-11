@@ -1,6 +1,6 @@
 import { ApiClientError } from '../api'
 
-export type UploadKind = 'submission' | 'attachment' | 'annotation' | 'quiz'
+export type UploadKind = 'submission' | 'attachment' | 'annotation' | 'quiz' | 'payment'
 
 export async function uploadImage(blob: Blob, kind: UploadKind, submissionId?: string): Promise<string> {
   const qs = new URLSearchParams({ kind, ...(submissionId ? { submissionId } : {}) })

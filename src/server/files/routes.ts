@@ -32,6 +32,10 @@ fileRoutes.post('/', async (c) => {
   } else if (kind === 'attachment') {
     if (s.kind !== 'teacher') throw unauthorized()
     key = `asg/${newId()}.${EXT[type]}`
+  } else if (kind === 'payment') {
+    // รูป QR รับเงินค่าเอกสาร (นักเรียนทุกคนที่ล็อกอินดูได้เมื่อครูตั้งเป็นช่องทางจ่าย)
+    if (s.kind !== 'teacher') throw unauthorized()
+    key = `pay/${newId()}.${EXT[type]}`
   } else if (kind === 'quiz') {
     // รูปโจทย์เกมการ์ด (ครูเห็นบนจอหน้าห้องเท่านั้น)
     if (s.kind !== 'teacher') throw unauthorized()
