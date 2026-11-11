@@ -432,3 +432,17 @@ export const cardAnswers = sqliteTable(
   },
   (t) => [uniqueIndex('card_answers_unique').on(t.gameId, t.qIndex, t.studentId), index('card_answers_student_idx').on(t.studentId)],
 )
+
+/** โน้ตของครูต่อนักเรียนรายเทอม (ใช้เป็น "ความเห็นครู" ในใบสรุปผล) */
+export const studentNotes = sqliteTable(
+  'student_notes',
+  {
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    termId: text('term_id').notNull(),
+    note: text('note').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('student_notes_unique').on(t.studentId, t.termId)],
+)
