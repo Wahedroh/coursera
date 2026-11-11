@@ -277,3 +277,42 @@ test('วิเคราะห์รายคน + ใบสรุปผล: ค
   expect(buf.subarray(0, 5).toString()).toBe('%PDF-')
   expect(buf.length).toBeGreaterThan(20_000)
 })
+
+test('นักเรียน: ป้ายสตรีค 🔥 บนหน้าแรก · ทำภารกิจครบแล้วหมุนวงล้อได้ครั้งเดียว', async ({ browser }) => {
+  const s = await studentPage(browser)
+  await expect(s.getByTestId('streak')).toContainText(/มาเรียนต่อเนื่อง \d+ คาบ/)
+  // ทำภารกิจให้ครบผ่าน API (มาเรียน 3 · ส่งงาน · ดูคลิป) แล้วกดรับ
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
+  const classId = new URL(t.url()).pathname.split('/').pop()!
+  const q = await (await s.request.get('/api/student/quests')).json()
+  const need = q.quests.filter((x: { claimed: boolean; progress: number; need: number }) => !x.claimed && x.progress < x.need).map((x: { id: string }) => x.id)
+  if (need.includes('submit')) {
+    const { ids } = await (
+      await t.request.post('/api/teacher/assignments', { data: { title: 'งานภารกิจ', instructions: '', attachmentKeys: [], dueAt: Date.now() + 86400_000, maxScore: 5, submitMode: 'text', classIds: [classId] } })
+    ).json()
+    await s.request.put(`/api/student/assignments/${ids[0]}/submission`, { data: { text: 'ตอบ', imageKeys: [], clientRequestId: 'quest-e2e' } })
+  }
+  if (need.includes('video')) {
+    const { ids } = await (await t.request.post('/api/teacher/videos', { data: { title: 'คลิปภารกิจ', description: '', url: 'https://youtu.be/dQw4w9WgXcQ', classIds: [classId] } })).json()
+    await s.request.post(`/api/student/videos/${ids[0]}/watched`, { data: { watchedSeconds: 90, durationSeconds: 100 } })
+  }
+  if (need.includes('attend')) {
+    // เปิดเช็กชื่อวันจันทร์ถึงวันนี้ของสัปดาห์นี้ (ทุกคนมาเรียนเป็นค่าเริ่มต้น)
+    const now = Date.now() + 7 * 3600_000
+    const dow = (new Date(now).getUTCDay() + 6) % 7
+    test.skip(dow < 2, 'ต้นสัปดาห์ยังมีไม่ถึง 3 วันให้เช็กชื่อ')
+    for (let i = dow; i >= 0; i--) await t.request.post(`/api/teacher/classes/${classId}/attendance`, { data: { date: new Date(now - i * 86400_000).toISOString().slice(0, 10) } })
+  }
+  for (const id of ['attend', 'submit', 'video']) await s.request.post(`/api/student/quests/${id}/claim`, { data: {} })
+  await s.reload()
+  await s.getByTestId('wheel-open').click()
+  await s.getByRole('dialog', { name: 'วงล้อนำโชค' }).getByRole('button', { name: 'หมุนเลย!' }).click()
+  await expect(s.getByTestId('wheel-result')).toContainText(/ได้ \+\d+ EXP/, { timeout: 8000 })
+  await s.getByRole('button', { name: 'ปิด' }).click()
+  await expect(s.getByText(/สัปดาห์นี้หมุนวงล้อแล้ว ได้ \+\d+ EXP/)).toBeVisible()
+  await expect(s.getByTestId('wheel-open')).toHaveCount(0)
+})

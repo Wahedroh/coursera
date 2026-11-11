@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ApiClientError } from '../api'
-import type { WeeklyQuests as Quests } from '../../shared/quests'
+import type { WeeklyQuests as Quests, WheelState } from '../../shared/quests'
+import LuckyWheel from './LuckyWheel'
 import { Card } from '../ui'
 
 /** ภารกิจประจำสัปดาห์ — ทำครบแล้วกดรับ EXP */
@@ -8,10 +9,17 @@ export default function WeeklyQuests({ onClaimed }: { onClaimed?: () => void }) 
   const [q, setQ] = useState<Quests | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [wheel, setWheel] = useState<WheelState | null>(null)
+  const [spinning, setSpinning] = useState(false)
+  const loadWheel = () =>
+    api<WheelState>('/api/student/quests/wheel')
+      .then(setWheel)
+      .catch(() => {})
   useEffect(() => {
     api<Quests>('/api/student/quests')
       .then(setQ)
       .catch(() => {})
+    void loadWheel()
   }, [])
   if (!q) return null
 
@@ -21,6 +29,7 @@ export default function WeeklyQuests({ onClaimed }: { onClaimed?: () => void }) 
     try {
       setQ(await api<Quests>(`/api/student/quests/${id}/claim`, { body: {} }))
       onClaimed?.()
+      void loadWheel()
     } catch (e) {
       setError(e instanceof ApiClientError ? e.message : 'รับรางวัลไม่สำเร็จ')
     } finally {
@@ -73,7 +82,23 @@ export default function WeeklyQuests({ onClaimed }: { onClaimed?: () => void }) 
             </div>
           )
         })}
+        {wheel?.canSpin && (
+          <button type="button" onClick={() => setSpinning(true)} className="mt-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white px-3 py-2.5 font-extrabold animate-pulse" data-testid="wheel-open">
+            🎡 ทำครบแล้ว! หมุนวงล้อนำโชค
+          </button>
+        )}
+        {wheel?.spun && <p className="text-xs text-stone-500 text-center">🎡 สัปดาห์นี้หมุนวงล้อแล้ว ได้ +{wheel.spun.exp} EXP</p>}
+        {!wheel?.canSpin && !wheel?.spun && <p className="text-[11px] text-stone-400 text-center">ทำครบ 3 ข้อ ได้หมุนวงล้อนำโชค 🎡</p>}
         {error && <p className="text-xs text-red-600">{error}</p>}
+        {spinning && (
+          <LuckyWheel
+            onClose={() => setSpinning(false)}
+            onDone={(s) => {
+              setWheel(s)
+              onClaimed?.()
+            }}
+          />
+        )}
       </Card>
     </div>
   )

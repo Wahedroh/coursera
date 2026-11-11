@@ -115,7 +115,7 @@ export const pointEvents = sqliteTable(
       .references(() => students.id),
     delta: integer('delta').notNull(),
     reason: text('reason').notNull(),
-    source: text('source', { enum: ['manual', 'assignment', 'attendance', 'live', 'video', 'quest'] }).notNull(),
+    source: text('source', { enum: ['manual', 'assignment', 'attendance', 'live', 'video', 'quest', 'streak', 'wheel'] }).notNull(),
     refId: text('ref_id'),
     createdAt: integer('created_at').notNull(),
   },

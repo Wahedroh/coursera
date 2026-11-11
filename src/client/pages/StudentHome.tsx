@@ -12,6 +12,7 @@ import AppSetupCard from '../components/AppSetupCard'
 import NotificationBell from '../components/NotificationBell'
 import ReportReadyCard from '../components/ReportReadyCard'
 import type { StudentBadge } from '../../shared/badges'
+import type { Streak } from '../../shared/quests'
 import { formatDue, timeLeft } from '../lib/format'
 import { clearDrafts } from '../lib/session'
 import { Button, Card, Chip, Loading } from '../ui'
@@ -35,6 +36,7 @@ export default function StudentHome() {
   const [feeOwed, setFeeOwed] = useState(0)
   const [exp, setExp] = useState<{ exp: number; level: number; nextLevelAt: number } | null>(null)
   const [badges, setBadges] = useState<StudentBadge[]>([])
+  const [streak, setStreak] = useState<Streak | null>(null)
   const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean } | null>(null)
 
   useEffect(() => {
@@ -48,6 +50,13 @@ export default function StudentHome() {
       .then(setAvatar)
       .catch(() => {})
     loadExp()
+    // โหลดสตรีค (ระบบให้รางวัลขั้นที่ถึงแล้วตอนนี้) แล้วโหลด EXP ใหม่
+    api<Streak>('/api/student/quests/streak')
+      .then((s) => {
+        setStreak(s)
+        loadExp()
+      })
+      .catch(() => {})
     api<StudentBadge[]>('/api/student/badges')
       .then((b) => setBadges(b.filter((x) => x.earned)))
       .catch(() => {})
@@ -112,6 +121,20 @@ export default function StudentHome() {
               {Math.max(0, exp.exp - (exp.nextLevelAt - EXP_PER_LEVEL))}/{EXP_PER_LEVEL} EXP
             </span>
           </Link>
+        )}
+        {streak && streak.best > 0 && (
+          <div className="mt-2 mx-auto flex w-fit items-center gap-2 rounded-2xl bg-white/15 px-3 py-1.5" data-testid="streak">
+            <span className={`text-2xl ${streak.current >= 5 ? 'animate-pulse' : ''}`} aria-hidden>
+              🔥
+            </span>
+            <span className="text-left leading-tight">
+              <b className="text-lg">มาเรียนต่อเนื่อง {streak.current} คาบ</b>
+              <span className="block text-[11px] opacity-90">
+                {streak.next ? `อีก ${streak.next.at - streak.current} คาบ ได้ +${streak.next.exp} EXP` : 'ได้รางวัลสตรีคครบทุกขั้นแล้ว 🎉'}
+                {streak.shieldsLeft > 0 ? ' · 🛡️ โล่ 1' : ''}
+              </span>
+            </span>
+          </div>
         )}
         {badges.length > 0 && (
           <Link to="/me/progress" className="mt-2 flex items-center justify-center gap-1" aria-label={`เหรียญตรา ${badges.length} เหรียญ`} data-testid="home-badges">

@@ -3,6 +3,7 @@ import { requireStudent } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
 import { claimQuest, weeklyQuests } from './service'
+import { spinWheel, studentStreak, wheelState } from './streak'
 
 export const studentQuestRoutes = new Hono<AppEnv>()
 studentQuestRoutes.use('*', requireStudent)
@@ -10,3 +11,6 @@ const me = (c: { get(k: 'session'): AppEnv['Variables']['session'] }) => c.get('
 
 studentQuestRoutes.get('/', async (c) => c.json(await weeklyQuests(getDb(c.env), me(c).studentId, me(c).classId, now())))
 studentQuestRoutes.post('/:id/claim', async (c) => c.json(await claimQuest(getDb(c.env), me(c).studentId, me(c).classId, c.req.param('id'), now())))
+studentQuestRoutes.get('/streak', async (c) => c.json(await studentStreak(getDb(c.env), me(c).studentId, me(c).classId, now())))
+studentQuestRoutes.get('/wheel', async (c) => c.json(await wheelState(getDb(c.env), me(c).studentId, now())))
+studentQuestRoutes.post('/wheel/spin', async (c) => c.json(await spinWheel(getDb(c.env), me(c).studentId, now())))

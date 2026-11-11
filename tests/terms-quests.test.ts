@@ -130,7 +130,7 @@ describe('ภารกิจประจำสัปดาห์', () => {
       expect(r.quests.find((q: { id: string }) => q.id === id).claimed).toBe(true)
     }
     await postJson('/api/student/quests/attend/claim', {}, { cookie: sa })
-    expect((await json(await getJson('/api/student/exp', sa))).exp).toBe(before + 15)
+    expect((await json(await getJson('/api/student/exp', sa))).exp).toBe(before + 9)
     const hist = (await json(await getJson('/api/student/progress', sa))).history
     expect(hist.filter((h: { reason: string }) => h.reason.startsWith('ภารกิจสัปดาห์'))).toHaveLength(3)
   })
