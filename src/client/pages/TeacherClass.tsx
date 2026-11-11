@@ -25,6 +25,7 @@ export default function TeacherClass() {
   const [flash, setFlash] = useState<string | null>(null)
   const [grades, setGrades] = useState<ClassGrades | null>(null)
   const [sort, setSort] = useState<Sort>('roster')
+  const [exp, setExp] = useState<Map<string, { exp: number; level: number }>>(new Map())
   const [open, setOpen] = useState<string | null>(null)
   const [detail, setDetail] = useState<{ gb: Gradebook; book: ScoreBook } | null>(null)
 
@@ -36,6 +37,9 @@ export default function TeacherClass() {
 
   useEffect(load, [load])
   const loadGrades = useCallback(() => {
+    api<{ studentId: string; exp: number; level: number }[]>(`/api/teacher/classes/${id}/points`)
+      .then((p) => setExp(new Map(p.map((x) => [x.studentId, { exp: x.exp, level: x.level }]))))
+      .catch(() => {})
     api<ClassGrades>(`/api/teacher/classes/${id}/grades`)
       .then(setGrades)
       .catch(() => {})
@@ -136,6 +140,7 @@ export default function TeacherClass() {
                     </button>
                   </th>
                   <th className="p-2">เกรด</th>
+                  <th className="p-2 text-right whitespace-nowrap">EXP (เทอมนี้)</th>
                   <th className="p-2">PIN</th>
                   <th className="p-2">สถานะ</th>
                   <th className="p-2">จัดการ</th>
@@ -160,6 +165,15 @@ export default function TeacherClass() {
                         )}
                       </td>
                       <td className="p-2">{g?.grade ?? '–'}</td>
+                      <td className="p-2 text-right tabular-nums whitespace-nowrap" data-testid="student-exp">
+                        {exp.get(s.id) ? (
+                          <>
+                            {exp.get(s.id)!.exp} <span className="text-xs text-stone-500">LV {exp.get(s.id)!.level}</span>
+                          </>
+                        ) : (
+                          '–'
+                        )}
+                      </td>
                       <td className="p-2">{s.pinSet ? <Chip tone="green">ตั้งแล้ว</Chip> : <Chip>ยังไม่ตั้ง</Chip>}</td>
                       <td className="p-2">
                         <div className="flex flex-wrap gap-1 items-center">
@@ -200,7 +214,7 @@ export default function TeacherClass() {
                     </tr>
                     {open === s.id && (
                       <tr className="bg-stone-50">
-                        <td colSpan={10} className="p-3">
+                        <td colSpan={11} className="p-3">
                           {!detail ? <Loading /> : <Breakdown studentId={s.id} detail={detail} />}
                         </td>
                       </tr>
