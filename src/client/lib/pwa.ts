@@ -40,14 +40,17 @@ function keyBytes(b64: string): Uint8Array {
   return Uint8Array.from(s, (c) => c.charCodeAt(0))
 }
 
-async function registration() {
-  return navigator.serviceWorker.ready
+/** service worker ที่พร้อมแล้ว — รอไม่เกิน 8 วินาที (ถ้าลงทะเบียนไม่ได้ต้องไม่ค้าง) */
+async function registration(): Promise<ServiceWorkerRegistration> {
+  const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('service worker not ready')), 8000))
+  return Promise.race([navigator.serviceWorker.ready, timeout])
 }
 
-/** การสมัครรับแจ้งเตือนของเครื่องนี้ (ถ้ามี) */
+/** การสมัครรับแจ้งเตือนของเครื่องนี้ (ถ้ามี) — ไม่รอ service worker */
 export async function currentSubscription(): Promise<PushSubscription | null> {
   if (!pushSupported()) return null
-  return (await registration()).pushManager.getSubscription()
+  const reg = await navigator.serviceWorker.getRegistration()
+  return reg ? reg.pushManager.getSubscription() : null
 }
 
 export async function enablePush(): Promise<'on' | 'denied' | 'unsupported'> {
