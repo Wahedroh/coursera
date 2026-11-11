@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import VideoQuestionsEditor from '../components/VideoQuestionsEditor'
-import { LETTERS, MAX_CARD_QUESTIONS, type CardQuestion, type CardQuizSummary } from '../../shared/cardgame'
+import { LETTERS, MAX_CARD_QUESTIONS, TIME_OPTIONS, type CardQuestion, type CardQuizSummary } from '../../shared/cardgame'
 import { Button, Card, ErrorBox } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -187,12 +187,30 @@ export default function TeacherCardGame() {
               ชื่อชุด
               <input className={input} required maxLength={120} placeholder="เช่น ทบทวนกฎของนิวตัน" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
             </label>
+            <label className="text-sm font-semibold flex items-center gap-2">
+              ⏱️ ตั้งเวลาทุกข้อ
+              <select
+                aria-label="ตั้งเวลาทุกข้อ"
+                className="border-2 border-line rounded-lg px-2 py-1 bg-white font-normal"
+                value=""
+                onChange={(e) => e.target.value !== '' && setEditing({ ...editing, questions: editing.questions.map((q) => ({ ...q, seconds: Number(e.target.value) || undefined })) })}
+              >
+                <option value="">เลือก…</option>
+                {TIME_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t ? `${t} วินาที` : 'ไม่จำกัด'}
+                  </option>
+                ))}
+              </select>
+              <span className="text-xs font-normal text-stone-500">ปรับรายข้อได้ด้านล่าง</span>
+            </label>
             <VideoQuestionsEditor
               value={editing.questions}
               onChange={(questions) => setEditing({ ...editing, questions })}
               max={MAX_CARD_QUESTIONS}
               letters={LETTERS}
               allowImage
+              allowTimer
               legend={`คำถาม (สูงสุด ${MAX_CARD_QUESTIONS} ข้อ · ตัวเลือก 2–4 ข้อ)`}
               hint="ติ๊กวงกลมหน้าตัวเลือกที่ถูก · ตัวเลือก A–D ตรงกับด้านของการ์ด · ใส่รูปโจทย์ได้ (เช่น ถ่ายจากหนังสือ/สไลด์)"
             />

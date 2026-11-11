@@ -1,6 +1,6 @@
 import { and, desc, eq, like, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
-import { CARD_EXP, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary } from '../../shared/cardgame'
+import { CARD_EXP, TIME_GRACE_MS, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary } from '../../shared/cardgame'
 import { newId, type Db } from '../db/client'
 import { attendanceDays, cardAnswers, cardGames, cardQuizzes, classes, pointEvents, scoreItems, scores, studentAvatars, students } from '../db/schema'
 import { apiError } from '../http'
@@ -58,8 +58,15 @@ export async function startGame(db: Db, quizId: string, classId: string, t: numb
   const [cls] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const id = newId()
-  await db.insert(cardGames).values({ id, quizId, classId, questions: quiz.questions, createdAt: t })
+  await db.insert(cardGames).values({ id, quizId, classId, questions: quiz.questions, questionStartedAt: t, createdAt: t })
   return id
+}
+
+/** เวลาเหลือของข้อปัจจุบัน (ms) · null = ไม่จำกัด */
+function remainingMs(g: { questions: { seconds?: number }[]; current: number; questionStartedAt: number | null }, t: number): number | null {
+  const sec = g.questions[g.current]?.seconds ?? 0
+  if (!sec) return null
+  return Math.max(0, (g.questionStartedAt ?? t) + sec * 1000 - t)
 }
 
 async function getGame(db: Db, id: string) {
@@ -68,7 +75,7 @@ async function getGame(db: Db, id: string) {
   return g
 }
 
-export async function gameState(db: Db, id: string): Promise<CardGameState> {
+export async function gameState(db: Db, id: string, t = Date.now()): Promise<CardGameState> {
   const g = await getGame(db, id)
   const [quiz] = await db.select({ title: cardQuizzes.title }).from(cardQuizzes).where(eq(cardQuizzes.id, g.quizId))
   const [cls] = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.id, g.classId))
@@ -82,6 +89,7 @@ export async function gameState(db: Db, id: string): Promise<CardGameState> {
     class: cls,
     questions: g.questions,
     current: g.current,
+    remainingMs: remainingMs(g, t),
     revealed: g.revealed,
     ended: g.endedAt !== null,
     roster: (await roster(db, g.classId)).map(({ id, no, zipgradeId, name }) => ({ id, no, zipgradeId, name })),
@@ -94,6 +102,9 @@ export async function recordScans(db: Db, id: string, qIndex: number, scans: { z
   const g = await getGame(db, id)
   if (g.endedAt !== null) throw apiError('game_ended', 'เกมจบแล้ว', 409)
   if (qIndex !== g.current || g.revealed) return { accepted: 0, unknown: [] as string[], locked: true }
+  // หมดเวลาแล้ว (เผื่อเวลาส่งจากมือถือ 2 วินาที) = ไม่รับคำตอบ
+  const left = remainingMs(g, t)
+  if (left !== null && left === 0 && t > (g.questionStartedAt ?? 0) + (g.questions[g.current].seconds ?? 0) * 1000 + TIME_GRACE_MS) return { accepted: 0, unknown: [] as string[], locked: true }
   const nQ = g.questions[g.current].choices.length
   const rows = await roster(db, g.classId)
   // การ์ดพิมพ์ ID เป็นตัวพิมพ์ใหญ่ (โหมด QR ที่อ่านได้ไกล) → เทียบแบบไม่สนตัวพิมพ์
@@ -126,7 +137,7 @@ export async function goTo(db: Db, id: string, index: number): Promise<void> {
   if (index < 0 || index >= g.questions.length) throw apiError('invalid_question', 'ไม่มีข้อนี้', 400)
   // ย้อนกลับไปข้อที่เฉลยแล้ว = ยังล็อกอยู่ · ไปข้อใหม่ = ยังไม่เฉลย
   const [any] = await db.select({ n: sql<number>`count(*)` }).from(cardAnswers).where(and(eq(cardAnswers.gameId, id), eq(cardAnswers.qIndex, index)))
-  await db.update(cardGames).set({ current: index, revealed: index < g.current && any.n > 0 }).where(eq(cardGames.id, id))
+  await db.update(cardGames).set({ current: index, revealed: index < g.current && any.n > 0, questionStartedAt: Date.now() }).where(eq(cardGames.id, id))
 }
 
 export async function gameResult(db: Db, id: string): Promise<CardGameResult> {

@@ -178,3 +178,27 @@ describe('ลบเกม', () => {
     expect((await del(`/api/teacher/card-quizzes/${quizId}`, teacher)).status).toBe(200)
   })
 })
+
+describe('ตั้งเวลารายข้อ', () => {
+  it('นับถอยหลังจากเริ่มข้อ · หมดเวลา (+2 วินาที) ไม่รับคำตอบ · ข้อไม่ตั้งเวลา = ไม่จำกัด · ข้อถัดไปเริ่มนับใหม่', async () => {
+    const { recordScans, gameState } = await import('../src/server/cardgame/service')
+    const teacher = await loginTeacher()
+    const { classId } = await seedClass(db())
+    await seedStudent(db(), classId, { zipgradeId: '501' })
+    const quiz = { title: 'จับเวลา', questions: [{ q: 'ข้อ 1', choices: ['ก', 'ข'], answer: 0, seconds: 20 }, { q: 'ข้อ 2', choices: ['ก', 'ข'], answer: 1 }] }
+    expect((await postJson('/api/teacher/card-quizzes', { ...quiz, questions: [{ ...quiz.questions[0], seconds: 999 }] }, { cookie: teacher })).status).toBe(400)
+    const { id: quizId } = await json(await postJson('/api/teacher/card-quizzes', quiz, { cookie: teacher }))
+    const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    const s0 = await json(await getJson(`/api/teacher/card-games/${id}`, teacher))
+    expect(s0.remainingMs).toBeGreaterThan(18_000)
+    expect(s0.remainingMs).toBeLessThanOrEqual(20_000)
+    const t0 = Date.now()
+    expect((await gameState(db(), id, t0 + 21_000)).remainingMs).toBe(0)
+    expect(await recordScans(db(), id, 0, [{ zipgradeId: '501', answer: 0 }], t0 + 21_000)).toMatchObject({ accepted: 1 }) // ยังอยู่ในเวลาเผื่อ
+    expect(await recordScans(db(), id, 0, [{ zipgradeId: '501', answer: 1 }], t0 + 25_000)).toMatchObject({ accepted: 0, locked: true })
+    expect((await gameState(db(), id)).answers).toEqual({ [Object.keys((await gameState(db(), id)).answers)[0]]: 0 })
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 1 }, { cookie: teacher })
+    expect((await json(await getJson(`/api/teacher/card-games/${id}`, teacher))).remainingMs).toBeNull()
+    expect(await recordScans(db(), id, 1, [{ zipgradeId: '501', answer: 1 }], t0 + 10 * 60_000)).toMatchObject({ accepted: 1 })
+  })
+})

@@ -1,0 +1,1 @@
+ALTER TABLE `card_games` ADD `question_started_at` integer;

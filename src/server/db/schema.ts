@@ -403,8 +403,10 @@ export const cardGames = sqliteTable(
       .notNull()
       .references(() => classes.id),
     /** สำเนาคำถาม ณ ตอนเริ่มเกม (แก้ชุดคำถามทีหลังไม่กระทบผล) */
-    questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number }[]>().notNull(),
+    questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number; image?: string; seconds?: number }[]>().notNull(),
     current: integer('current').notNull().default(0),
+    /** เวลาที่เริ่มข้อปัจจุบัน (ใช้นับถอยหลังเมื่อข้อนั้นตั้งเวลาไว้) */
+    questionStartedAt: integer('question_started_at'),
     revealed: integer('revealed', { mode: 'boolean' }).notNull().default(false),
     endedAt: integer('ended_at'),
     /** รายการคะแนนเก็บที่สร้างตอนจบเกม (ลบเกม = ลบรายการนี้ด้วย) */

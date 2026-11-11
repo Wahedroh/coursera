@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
-import { GameControls, GameResults, useCardGame } from '../components/CardGameParts'
+import { Countdown, GameControls, GameResults, useCardGame, useCountdown } from '../components/CardGameParts'
 import { qrSvg } from '../components/QrCard'
 import { LETTERS, type CardGameResult } from '../../shared/cardgame'
 import { fileUrl } from '../lib/upload'
@@ -22,6 +22,19 @@ export default function TeacherCardGameScreen() {
     if (state?.ended && !result) api<CardGameResult>(`/api/teacher/card-games/${id}/result`).then(setResult).catch(onError)
   }, [state?.ended, result, id, onError])
   useEffect(() => setShowWrong(false), [state?.current])
+  // หมดเวลา → เฉลยอัตโนมัติ (ครั้งเดียวต่อข้อ)
+  const left = useCountdown(state)
+  const autoRevealed = useRef(-1)
+  // ตั้งเวลาเฉลยครั้งเดียวต่อข้อ (รอคำตอบที่กำลังส่งจากมือถืออีก 2.5 วินาที) — การดึงสถานะทุก 1.5 วินาทีต้องไม่ยกเลิกตัวจับเวลา
+  useEffect(() => {
+    if (left !== 0 || !state || state.revealed || state.ended || autoRevealed.current === state.current) return
+    autoRevealed.current = state.current
+    window.setTimeout(() => {
+      api(`/api/teacher/card-games/${id}/reveal`, { body: {} })
+        .then(() => reload())
+        .catch(onError)
+    }, 2500)
+  }, [left, state, id, reload, onError])
 
   if (!state) return error ? <ErrorBox message={error} /> : <Loading />
   const q = state.questions[state.current]
@@ -43,6 +56,7 @@ export default function TeacherCardGameScreen() {
         </div>
         {!state.ended && (
           <div className="flex items-center gap-4">
+            <Countdown left={left} big />
             <span className="text-xl">
               ข้อ <b>{state.current + 1}</b> / {state.questions.length} · สแกนแล้ว{' '}
               <b data-testid="scanned-count">
