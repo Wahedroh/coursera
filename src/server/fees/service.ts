@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
-import { outstanding, type ChargeInput, type FeeItemInput, type FeeItemSummary, type FeeSheet, type StudentFee } from '../../shared/fees'
+import { EMPTY_PAYMENT, outstanding, paymentInfoSchema, type PaymentInfo, type ChargeInput, type FeeItemInput, type FeeItemSummary, type FeeSheet, type StudentFee } from '../../shared/fees'
 import { newId, type Db } from '../db/client'
-import { classes, feeCharges, feeItems, students } from '../db/schema'
+import { classes, feeCharges, feeItems, settings, students } from '../db/schema'
 import { apiError } from '../http'
 
 export const feeItemNotFound = () => apiError('fee_item_not_found', 'ไม่พบรายการค่าเอกสารนี้', 404)
@@ -124,4 +124,16 @@ export async function feesForStudent(db: Db, studentId: string): Promise<Student
     .where(eq(feeCharges.studentId, studentId))
     .orderBy(desc(feeItems.createdAt))
   return rows.map((r) => ({ ...r, outstanding: outstanding(r) }))
+}
+
+const PAYMENT_KEY = 'payment_info'
+export async function getPaymentInfo(db: Db): Promise<PaymentInfo> {
+  const [row] = await db.select().from(settings).where(eq(settings.key, PAYMENT_KEY))
+  if (!row) return EMPTY_PAYMENT
+  const r = paymentInfoSchema.safeParse(JSON.parse(row.value))
+  return r.success ? r.data : EMPTY_PAYMENT
+}
+export async function savePaymentInfo(db: Db, p: PaymentInfo): Promise<void> {
+  const value = JSON.stringify(p)
+  await db.insert(settings).values({ key: PAYMENT_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } })
 }

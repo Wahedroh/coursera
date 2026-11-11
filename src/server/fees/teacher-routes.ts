@@ -1,10 +1,10 @@
 import { Hono } from 'hono'
-import { bulkChargeSchema, chargeInputSchema, createFeeItemsSchema, feeItemInputSchema } from '../../shared/fees'
+import { bulkChargeSchema, chargeInputSchema, createFeeItemsSchema, feeItemInputSchema, paymentInfoSchema } from '../../shared/fees'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
-import { addCharges, createFeeItems, deleteFeeItem, getFeeSheet, listFeeItems, removeCharge, saveCharge, updateFeeItem } from './service'
+import { getPaymentInfo, savePaymentInfo, addCharges, createFeeItems, deleteFeeItem, getFeeSheet, listFeeItems, removeCharge, saveCharge, updateFeeItem } from './service'
 
 export const teacherFeeRoutes = new Hono<AppEnv>()
 teacherFeeRoutes.use('*', requireTeacher)
@@ -33,5 +33,11 @@ teacherFeeRoutes.put('/fee-items/:id/charges/:studentId', async (c) => {
 })
 teacherFeeRoutes.delete('/fee-items/:id/charges/:studentId', async (c) => {
   await removeCharge(getDb(c.env), c.req.param('id'), c.req.param('studentId'))
+  return c.json({ ok: true })
+})
+
+teacherFeeRoutes.get('/payment-info', async (c) => c.json(await getPaymentInfo(getDb(c.env))))
+teacherFeeRoutes.put('/payment-info', async (c) => {
+  await savePaymentInfo(getDb(c.env), await parseBody(c, paymentInfoSchema))
   return c.json({ ok: true })
 })

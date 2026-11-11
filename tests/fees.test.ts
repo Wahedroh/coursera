@@ -87,3 +87,25 @@ it('แก้ราคาไม่กระทบยอดเดิม; ลบ�
   expect(await json(await getJson(`/api/teacher/classes/${classId}/fee-items`, cookie))).toEqual([])
   expect(await json(await getJson('/api/student/fees', await studentCookie(ss[0].id)))).toEqual([])
 })
+
+it('ช่องทางโอนจ่าย: ครูตั้งเลขบัญชี + QR · นักเรียนอ่านได้และเปิดรูป QR ได้ · นักเรียนแก้ไม่ได้ · QR ไม่ถูกลบเป็นไฟล์ค้าง', async () => {
+  const { TINY_JPEG, uploadFile } = await import('./helpers')
+  const teacher = await loginTeacher()
+  const { classId } = await seedClass(db())
+  const sc = await studentCookie((await seedStudent(db(), classId)).id)
+  expect(await json(await getJson('/api/student/fees/payment-info', sc))).toEqual({ bank: '', accountNumber: '', accountName: '', note: '', qrKey: null })
+  expect((await uploadFile('kind=payment', TINY_JPEG, 'image/jpeg', sc)).status).toBe(401)
+  const { key } = await json(await uploadFile('kind=payment', TINY_JPEG, 'image/jpeg', teacher))
+  expect(key).toMatch(/^pay\/.+\.jpg$/)
+  // ยังไม่ได้ตั้งเป็นช่องทางจ่าย → นักเรียนเปิดรูปไม่ได้
+  expect((await getJson(`/api/files/${key}`, sc)).status).toBe(404)
+  const info = { bank: 'กสิกรไทย', accountNumber: '123-4-56789-0', accountName: 'ครูทดสอบ', note: 'ส่งสลิปด้วย', qrKey: key }
+  expect((await putJson('/api/teacher/payment-info', info, sc)).status).toBe(401)
+  expect((await putJson('/api/teacher/payment-info', { ...info, qrKey: 'sub/x/y.jpg' }, teacher)).status).toBe(400)
+  expect((await putJson('/api/teacher/payment-info', info, teacher)).status).toBe(200)
+  expect(await json(await getJson('/api/student/fees/payment-info', sc))).toEqual(info)
+  expect((await getJson(`/api/files/${key}`, sc)).status).toBe(200)
+  const { purgeOrphans } = await import('../src/server/storage/service')
+  await purgeOrphans(db(), env.BUCKET, Date.now() + 3 * 86400_000)
+  expect(await env.BUCKET.get(key)).not.toBeNull()
+})

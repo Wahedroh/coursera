@@ -29,3 +29,16 @@ export type FeeRow = {
 }
 export type FeeSheet = { item: { id: string; classId: string; title: string; amount: number }; class: { id: string; name: string }; students: FeeRow[] }
 export type StudentFee = { id: string; title: string; amount: number; paid: number; outstanding: number }
+
+/** ช่องทางโอนจ่ายค่าเอกสาร (ครูตั้งครั้งเดียว ใช้ทุกห้อง) — นักเรียนเห็นเมื่อมียอดค้าง */
+export const paymentInfoSchema = z.object({
+  bank: z.string().trim().max(60).default(''),
+  accountNumber: z.string().trim().max(40).default(''),
+  accountName: z.string().trim().max(100).default(''),
+  note: z.string().trim().max(300).default(''),
+  /** รูป QR รับเงิน (อัปโหลดด้วย kind=payment) */
+  qrKey: z.string().regex(/^pay\/[A-Za-z0-9]+\.(jpg|png|webp)$/).nullable().default(null),
+})
+export type PaymentInfo = z.infer<typeof paymentInfoSchema>
+export const EMPTY_PAYMENT: PaymentInfo = { bank: '', accountNumber: '', accountName: '', note: '', qrKey: null }
+export const hasPayment = (p: PaymentInfo) => !!(p.accountNumber || p.qrKey)
