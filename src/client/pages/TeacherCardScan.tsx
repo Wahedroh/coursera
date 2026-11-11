@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
-import { GameControls, useCardGame } from '../components/CardGameParts'
+import { Countdown, GameControls, useCardGame, useCountdown } from '../components/CardGameParts'
 import { loadReader, scanImage, type CardScan } from '../lib/cardScanner'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -24,6 +24,9 @@ export default function TeacherCardScan() {
   const qIndex = useRef(-1)
   const revealed = useRef(false)
   const [, bump] = useState(0)
+  const left = useCountdown(state)
+  const timeUp = useRef(false)
+  timeUp.current = left === 0
 
   // ข้อเปลี่ยน → เริ่มนับใหม่
   useEffect(() => {
@@ -102,7 +105,7 @@ export default function TeacherCardScan() {
           ctx.drawImage(v, 0, 0)
           try {
             const found = await scanImage(ctx.getImageData(0, 0, canvas.width, canvas.height))
-            if (!revealed.current) {
+            if (!revealed.current && !timeUp.current) {
               for (const f of found) {
                 if (!nameOf.current.has(f.zipgradeId.toUpperCase())) continue
                 if (seen.current.get(f.zipgradeId) !== f.answer) {
@@ -165,10 +168,13 @@ export default function TeacherCardScan() {
           <b>เกมจบแล้ว</b>
         ) : (
           <>
+            <span className="float-right">
+              <Countdown left={left} />
+            </span>
             <b className="text-lg" data-testid="scan-status">
               ข้อ {state.current + 1}/{state.questions.length} · สแกนแล้ว {done.size}/{state.roster.length}
             </b>
-            <p className="text-xs opacity-85">{state.revealed ? 'เฉลยแล้ว — กด "ข้อถัดไป" เพื่อสแกนข้อต่อไป' : 'ส่องกล้องไปทั่วห้องช้า ๆ · ใครสแกนแล้วขึ้นกรอบเขียว'}</p>
+            <p className="text-xs opacity-85">{state.revealed ? 'เฉลยแล้ว — กด "ข้อถัดไป" เพื่อสแกนข้อต่อไป' : left === 0 ? 'หมดเวลา — ไม่รับคำตอบเพิ่ม' : 'ส่องกล้องไปทั่วห้องช้า ๆ · ใครสแกนแล้วขึ้นกรอบเขียว'}</p>
           </>
         )}
       </header>

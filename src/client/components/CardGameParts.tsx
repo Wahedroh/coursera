@@ -17,6 +17,34 @@ export function useCardGame(id: string, onError: (e: unknown) => void, intervalM
   return { state, reload: load }
 }
 
+/** นับถอยหลังของข้อปัจจุบัน (วินาทีที่เหลือ) · null = ไม่จำกัดเวลา */
+export function useCountdown(state: CardGameState | null): number | null {
+  const [deadline, setDeadline] = useState<number | null>(null)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    setDeadline(state && state.remainingMs !== null && !state.revealed && !state.ended ? Date.now() + state.remainingMs : null)
+  }, [state])
+  useEffect(() => {
+    if (deadline === null) return
+    const t = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(t)
+  }, [deadline])
+  return deadline === null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
+}
+
+export function Countdown({ left, big }: { left: number | null; big?: boolean }) {
+  if (left === null) return null
+  return (
+    <span
+      data-testid="countdown"
+      className={`inline-flex items-center justify-center rounded-full font-extrabold tabular-nums ${big ? 'w-20 h-20 text-4xl' : 'w-11 h-11 text-xl'} ${left <= 5 ? 'bg-red-500 text-white animate-pulse' : 'bg-amber-300 text-amber-950'}`}
+      aria-label={left ? `เหลือ ${left} วินาที` : 'หมดเวลา'}
+    >
+      {left || '⏰'}
+    </span>
+  )
+}
+
 /** ปุ่มควบคุม: เฉลย · ข้อก่อน/ถัดไป · จบเกม */
 export function GameControls({
   state,

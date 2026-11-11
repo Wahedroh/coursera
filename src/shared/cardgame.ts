@@ -30,10 +30,16 @@ export const cardQuestionSchema = z
     image: z.string().regex(/^quiz\/[A-Za-z0-9]+\.(jpg|png|webp)$/).optional(),
     choices: z.array(z.string().trim().max(150)).min(2).max(4),
     answer: z.number().int().min(0).max(3),
+    /** เวลาตอบ (วินาที) · ไม่ใส่/0 = ไม่จำกัด */
+    seconds: z.number().int().min(0).max(600).optional(),
   })
   .refine((x) => x.answer < x.choices.length)
   .refine((x) => x.q.length > 0 || !!x.image, { message: 'ต้องมีโจทย์เป็นข้อความหรือรูป' })
   .refine((x) => !!x.image || x.choices.every((c) => c.length > 0), { message: 'กรอกตัวเลือกให้ครบ (หรือใส่รูปโจทย์ที่มีตัวเลือกในรูป)' })
+export const TIME_OPTIONS = [0, 10, 20, 30, 45, 60, 90, 120] as const
+/** เผื่อเวลาส่งคำตอบจากมือถือหลังหมดเวลา */
+export const TIME_GRACE_MS = 2000
+
 export const cardQuizInputSchema = z.object({
   title: z.string().trim().min(1).max(120),
   questions: z.array(cardQuestionSchema).min(1).max(MAX_CARD_QUESTIONS),
@@ -55,6 +61,8 @@ export type CardGameState = {
   class: { id: string; name: string }
   questions: CardQuestion[]
   current: number
+  /** เวลาเหลือของข้อปัจจุบัน (ms) · null = ไม่จำกัดเวลา · ไม่นับต่อหลังเฉลย */
+  remainingMs: number | null
   revealed: boolean
   ended: boolean
   /** เลขที่ = ลำดับในห้อง (เริ่ม 1) */
