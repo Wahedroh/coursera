@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
 import { purgeOrphans } from '../src/server/storage/service'
+import type { StudentMaterial } from '../src/shared/materials'
 import { del, getJson, json, loginTeacher, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
 const db = () => getDb(env)
@@ -77,4 +78,43 @@ it('ไฟล์เดียวหลายห้อง: ลบห้องห�
   await del(`/api/teacher/materials/${ids[1]}`, cookie)
   expect(await env.BUCKET.get(m.fileKey)).toBeNull()
   expect((await json(await getJson('/api/teacher/storage', cookie))).usage.bytes).toBe(0)
+})
+
+async function uploadQs(cookie: string, extra: Record<string, string>) {
+  const { SELF } = await import('cloudflare:test')
+  const qs = new URLSearchParams({ name: 'x.pdf', title: 'จดบนกระดาน', topic: 'บทที่ 2', ...extra })
+  return SELF.fetch(`http://x/api/teacher/materials?${qs}`, { method: 'POST', headers: { cookie, 'content-type': 'application/octet-stream' }, body: new Blob([PDF]) })
+}
+
+it('แยกเอกสารเปล่ากับเอกสารที่จดในห้อง · วันที่สอนต้องถูกรูปแบบ · แจ้งเตือนเมื่อขอ', async () => {
+  const { cookie, a, b, sa, sb } = await setup()
+  await upload(cookie, [a], 'ใบงาน.pdf', PDF, 'ใบงานเปล่า')
+  expect((await uploadQs(cookie, { classIds: a, kind: 'notes', lessonDate: '2026-11-10', title: 'จด 10 พ.ย.' })).status).toBe(200)
+  expect((await uploadQs(cookie, { classIds: `${a},${b}`, kind: 'notes', lessonDate: '2026-11-12', title: 'จด 12 พ.ย.', notify: '1' })).status).toBe(200)
+  expect((await uploadQs(cookie, { classIds: a, kind: 'notes', lessonDate: '12/11/2026' })).status).toBe(400)
+  expect((await uploadQs(cookie, { classIds: a, kind: 'other' })).status).toBe(400)
+  // เอกสารเปล่าไม่เก็บวันที่สอน
+  await uploadQs(cookie, { classIds: b, kind: 'blank', lessonDate: '2026-11-12', title: 'เปล่า b' })
+
+  const mine = await json(await getJson('/api/student/materials', sa))
+  expect(mine.map((m: { title: string; kind: string; lessonDate: string }) => [m.title, m.kind, m.lessonDate]).sort()).toEqual([
+    ['จด 10 พ.ย.', 'notes', '2026-11-10'],
+    ['จด 12 พ.ย.', 'notes', '2026-11-12'],
+    ['ใบงานเปล่า', 'blank', ''],
+  ])
+  const { splitMaterials } = await import('../src/shared/materials')
+  expect(splitMaterials(mine as StudentMaterial[]).notes.map((m) => m.title)).toEqual(['จด 12 พ.ย.', 'จด 10 พ.ย.'])
+  const other = await json(await getJson('/api/student/materials', sb))
+  expect(other.find((m: { title: string }) => m.title === 'เปล่า b')).toMatchObject({ kind: 'blank', lessonDate: '' })
+
+  // แจ้งเตือนเฉพาะที่ขอ (12 พ.ย.) ทั้งสองห้อง
+  const box = await json(await getJson('/api/student/push/notifications', sb))
+  expect(box.items.map((n: { title: string; url: string }) => [n.title, n.url])).toEqual([['📒 เอกสารที่จดในห้อง: จด 12 พ.ย.', '/me/materials?tab=notes']])
+  expect((await json(await getJson('/api/student/push/notifications', sa))).items).toHaveLength(1)
+
+  // แก้เป็นเอกสารเปล่า → วันที่หายไป
+  const id = mine.find((m: { title: string }) => m.title === 'จด 10 พ.ย.').id
+  expect((await putJson(`/api/teacher/materials/${id}`, { title: 'จด 10 พ.ย.', topic: '', kind: 'blank', lessonDate: '2026-11-10' }, cookie)).status).toBe(200)
+  const after = (await json(await getJson(`/api/teacher/classes/${a}/materials`, cookie))).find((m: { id: string }) => m.id === id)
+  expect(after).toMatchObject({ kind: 'blank', lessonDate: '' })
 })

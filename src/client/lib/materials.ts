@@ -21,8 +21,33 @@ export function groupByTopic<T extends { topic: string }>(items: T[]): [string, 
   return [...m]
 }
 
-export async function uploadMaterial(file: File, meta: { title: string; topic: string; classIds: string[] }): Promise<string[]> {
-  const qs = new URLSearchParams({ title: meta.title, topic: meta.topic, classIds: meta.classIds.join(','), name: file.name })
+/** วันที่สอนแบบไทย เช่น "พฤ. 12 พ.ย. 69" */
+export const lessonDateLabel = (d: string) =>
+  d ? new Date(`${d}T12:00:00+07:00`).toLocaleDateString('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }) : 'ไม่ระบุวันที่'
+
+/** จัดกลุ่มเอกสารที่จดในห้องตามวันที่สอน (รายการเรียงมาแล้ว) */
+export function groupByDate<T extends { lessonDate: string }>(items: T[]): [string, T[]][] {
+  const m = new Map<string, T[]>()
+  for (const it of items) {
+    const k = lessonDateLabel(it.lessonDate)
+    if (!m.has(k)) m.set(k, [])
+    m.get(k)!.push(it)
+  }
+  return [...m]
+}
+
+export type UploadMeta = { title: string; topic: string; kind: 'blank' | 'notes'; lessonDate: string; notify: boolean; classIds: string[] }
+
+export async function uploadMaterial(file: File, meta: UploadMeta): Promise<string[]> {
+  const qs = new URLSearchParams({
+    title: meta.title,
+    topic: meta.topic,
+    kind: meta.kind,
+    lessonDate: meta.kind === 'notes' ? meta.lessonDate : '',
+    notify: meta.kind === 'notes' && meta.notify ? '1' : '0',
+    classIds: meta.classIds.join(','),
+    name: file.name,
+  })
   let res: Response
   try {
     res = await fetch(`/api/teacher/materials?${qs}`, { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/octet-stream' }, body: file })

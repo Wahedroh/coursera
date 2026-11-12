@@ -51,7 +51,7 @@ export async function createMaterials(db: Db, bucket: R2Bucket, classIds: string
   return rows.map((r) => r.id)
 }
 
-const cols = { id: materials.id, title: materials.title, topic: materials.topic, fileKey: materials.fileKey, fileName: materials.fileName, size: materials.size, published: materials.published, createdAt: materials.createdAt }
+const cols = { id: materials.id, title: materials.title, topic: materials.topic, kind: materials.kind, lessonDate: materials.lessonDate, fileKey: materials.fileKey, fileName: materials.fileName, size: materials.size, published: materials.published, createdAt: materials.createdAt }
 
 export async function listMaterials(db: Db, classId: string): Promise<TeacherMaterial[]> {
   return db.select(cols).from(materials).where(eq(materials.classId, classId)).orderBy(desc(materials.createdAt))
