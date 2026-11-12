@@ -26,7 +26,7 @@ teacherAssignmentRoutes.use('*', requireTeacher)
 teacherAssignmentRoutes.post('/assignments', async (c) => {
   const { classIds, ...input } = await parseBody(c, createAssignmentsSchema)
   const ids = await createAssignments(getDb(c.env), classIds, input)
-  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: '📝 งานใหม่', body: input.title, url: '/me' }, now()))
+  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: '📝 งานใหม่', body: input.title, url: '/me?sheet=pending' }, now()))
   return c.json({ ids })
 })
 
