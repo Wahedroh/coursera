@@ -27,29 +27,29 @@ it('monthRange: วันแรก–วันสุดท้ายของเ�
 
 it('ครูเพิ่มวันสอบให้หลายห้อง · นักเรียนเห็นเฉพาะของห้องตัวเอง พร้อมกำหนดส่งงานและสถานะ', async () => {
   const { teacher, a, b, c1, c2 } = await setup()
-  expect((await postJson('/api/teacher/events', { ...EV, classIds: [a, b] }, { cookie: teacher })).status).toBe(200)
-  await postJson('/api/teacher/events', { kind: 'activity', title: 'ทัศนศึกษา', date: '2026-11-21', classIds: [a] }, { cookie: teacher })
-  const due = Date.parse('2026-11-12T16:59:00Z') // 23:59 เวลาไทย 12 พ.ย.
+  expect((await postJson('/api/teacher/events', { ...EV, date: '2030-03-25', classIds: [a, b] }, { cookie: teacher })).status).toBe(200)
+  await postJson('/api/teacher/events', { kind: 'activity', title: 'ทัศนศึกษา', date: '2030-03-21', classIds: [a] }, { cookie: teacher })
+  const due = Date.parse('2030-03-12T16:59:00Z') // 23:59 เวลาไทย 12 มี.ค. 2030 (อนาคต = ส่งตรงเวลา)
   const asg = await seedAssignment(a, { title: 'ใบงานเวกเตอร์', dueAt: due })
   await putJson(`/api/student/assignments/${asg}/submission`, { text: 'ตอบ', imageKeys: [], clientRequestId: 'c1' }, c1)
 
-  const mine = await json(await getJson('/api/student/calendar?month=2026-11', c1))
+  const mine = await json(await getJson('/api/student/calendar?month=2030-03', c1))
   expect(mine.map((x: { type: string; title: string; date: string }) => [x.type, x.title, x.date])).toEqual([
-    ['due', 'ใบงานเวกเตอร์', '2026-11-12'],
-    ['event', 'ทัศนศึกษา', '2026-11-21'],
-    ['event', 'สอบกลางภาค', '2026-11-25'],
+    ['due', 'ใบงานเวกเตอร์', '2030-03-12'],
+    ['event', 'ทัศนศึกษา', '2030-03-21'],
+    ['event', 'สอบกลางภาค', '2030-03-25'],
   ])
   expect(mine[0].status).toBe('submitted')
   expect(mine[2]).toMatchObject({ kind: 'exam', period: 'คาบ 2–3', detail: 'บทที่ 1–4' })
-  const other = await json(await getJson('/api/student/calendar?month=2026-11', c2))
+  const other = await json(await getJson('/api/student/calendar?month=2030-03', c2))
   expect(other.map((x: { title: string }) => x.title)).toEqual(['สอบกลางภาค'])
-  expect(await json(await getJson('/api/student/calendar?month=2026-12', c1))).toEqual([])
-  expect((await getJson('/api/student/calendar?month=2026-13', c1)).status).toBe(400)
+  expect(await json(await getJson('/api/student/calendar?month=2030-04', c1))).toEqual([])
+  expect((await getJson('/api/student/calendar?month=2030-13', c1)).status).toBe(400)
 
   // ครูเห็นทุกห้อง หรือกรองห้อง
-  expect(await json(await getJson('/api/teacher/calendar?month=2026-11', teacher))).toHaveLength(4)
-  expect(await json(await getJson(`/api/teacher/calendar?month=2026-11&classId=${b}`, teacher))).toHaveLength(1)
-  expect((await getJson('/api/teacher/calendar?month=2026-11', c1)).status).toBe(401)
+  expect(await json(await getJson('/api/teacher/calendar?month=2030-03', teacher))).toHaveLength(4)
+  expect(await json(await getJson(`/api/teacher/calendar?month=2030-03&classId=${b}`, teacher))).toHaveLength(1)
+  expect((await getJson('/api/teacher/calendar?month=2030-03', c1)).status).toBe(401)
 })
 
 it('แก้/ลบรายการได้ · ตรวจรูปแบบข้อมูล', async () => {
