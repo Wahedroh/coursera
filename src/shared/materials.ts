@@ -22,12 +22,28 @@ export const materialExt = (fileName: string): MaterialExt | null => {
   return ext in MATERIAL_TYPES ? (ext as MaterialExt) : null
 }
 
-export const materialMetaSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  topic: z.string().trim().max(100),
-})
+export const MATERIAL_KINDS = ['blank', 'notes'] as const
+export type MaterialKind = (typeof MATERIAL_KINDS)[number]
+export const MATERIAL_KIND_LABEL: Record<MaterialKind, string> = { blank: 'เอกสารเปล่า', notes: 'เอกสารที่จดในห้อง' }
+
+export const materialMetaSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    topic: z.string().trim().max(100),
+    kind: z.enum(MATERIAL_KINDS).default('blank'),
+    /** วันที่สอน (YYYY-MM-DD) ใช้กับเอกสารที่จดในห้อง; เอกสารเปล่าเว้นว่าง */
+    lessonDate: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).default(''),
+  })
+  .transform((m) => ({ ...m, lessonDate: m.kind === 'notes' ? m.lessonDate : '' }))
 export type MaterialMeta = z.infer<typeof materialMetaSchema>
 export const materialPublishSchema = z.object({ published: z.boolean() })
 
-export type TeacherMaterial = { id: string; title: string; topic: string; fileKey: string; fileName: string; size: number; published: boolean; createdAt: number }
+export type TeacherMaterial = { id: string; title: string; topic: string; kind: MaterialKind; lessonDate: string; fileKey: string; fileName: string; size: number; published: boolean; createdAt: number }
 export type StudentMaterial = Omit<TeacherMaterial, 'published'>
+
+/** แยกเอกสารเปล่า (เรียงตามที่เพิ่มล่าสุด) กับเอกสารที่จดในห้อง (เรียงตามวันที่สอน ใหม่สุดก่อน) */
+export function splitMaterials<T extends { kind: MaterialKind; lessonDate: string; createdAt: number }>(items: T[]): { blank: T[]; notes: T[] } {
+  const notes = items.filter((m) => m.kind === 'notes')
+  notes.sort((a, b) => (b.lessonDate || '').localeCompare(a.lessonDate || '') || b.createdAt - a.createdAt)
+  return { blank: items.filter((m) => m.kind !== 'notes'), notes }
+}

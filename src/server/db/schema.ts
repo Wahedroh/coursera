@@ -242,6 +242,9 @@ export const materials = sqliteTable('materials', {
     .references(() => classes.id),
   title: text('title').notNull(),
   topic: text('topic').notNull().default(''),
+  /** blank = เอกสารเปล่า · notes = เอกสารที่จดในห้อง (มีวันที่สอน) */
+  kind: text('kind', { enum: ['blank', 'notes'] }).notNull().default('blank'),
+  lessonDate: text('lesson_date').notNull().default(''),
   fileKey: text('file_key').notNull(),
   fileName: text('file_name').notNull(),
   size: integer('size').notNull(),
