@@ -37,14 +37,14 @@ it('เปิดไข่ครบ 16 ใบ ได้ตัวละครค�
   expect(new Set(got).size).toBe(16)
 })
 
-it('EXP ของงานตั้งอัตโนมัติ 30 · ครูกำหนดเองได้ (ส่งสายได้ครึ่ง)', async () => {
+it('EXP ของงานตั้งอัตโนมัติ 25 · ครูกำหนดเองได้ (ส่งสายได้ครึ่ง)', async () => {
   const cookie = await loginTeacher()
   const { classId } = await seedClass(db())
   const a = await seedStudent(db(), classId)
   const ca = await studentCookie(a.id)
   const base = { instructions: '', attachmentKeys: [], maxScore: 10, submitMode: 'text', classIds: [classId] }
   const auto = (await json(await postJson('/api/teacher/assignments', { ...base, title: 'อัตโนมัติ', dueAt: null }, { cookie }))).ids[0]
-  expect((await json(await getJson(`/api/teacher/assignments/${auto}`, cookie))).expReward).toBe(30)
+  expect((await json(await getJson(`/api/teacher/assignments/${auto}`, cookie))).expReward).toBe(25)
   const big = (await json(await postJson('/api/teacher/assignments', { ...base, title: 'โครงงาน', dueAt: Date.now() - 1000, expReward: 50 }, { cookie }))).ids[0]
   await putJson(`/api/student/assignments/${big}/submission`, { text: 'ส่ง', imageKeys: [], clientRequestId: 'x' }, ca)
   const gb = await json(await getJson(`/api/teacher/classes/${classId}/gradebook`, cookie))

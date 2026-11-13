@@ -304,7 +304,6 @@ test('นักเรียน: ป้ายสตรีค 🔥 บนหน้
     // เปิดเช็กชื่อวันจันทร์ถึงวันนี้ของสัปดาห์นี้ (ทุกคนมาเรียนเป็นค่าเริ่มต้น)
     const now = Date.now() + 7 * 3600_000
     const dow = (new Date(now).getUTCDay() + 6) % 7
-    test.skip(dow < 2, 'ต้นสัปดาห์ยังมีไม่ถึง 3 วันให้เช็กชื่อ')
     for (let i = dow; i >= 0; i--) await t.request.post(`/api/teacher/classes/${classId}/attendance`, { data: { date: new Date(now - i * 86400_000).toISOString().slice(0, 10) } })
   }
   for (const id of ['attend', 'submit', 'video']) await s.request.post(`/api/student/quests/${id}/claim`, { data: {} })

@@ -12,10 +12,11 @@ export async function weeklyQuests(db: Db, studentId: string, classId: string, t
   const start = weekStartBangkok(t)
   const end = start + WEEK
   const week = todayBangkok(start)
-  const [att] = await db.all<{ n: number }>(sql`
-    SELECT count(*) AS n FROM attendance_records r JOIN attendance_days d ON d.id = r.day_id
-    WHERE r.student_id = ${studentId} AND d.class_id = ${classId} AND d.date >= ${week} AND d.date <= ${todayBangkok(end - 1)}
-      AND r.status IN ('present', 'late')`)
+  // มาเรียนครบทุกคาบที่ครูเปิดเช็กชื่อในสัปดาห์นี้ (ป่วย/ลาไม่นับเป็นคาบที่ต้องมา)
+  const [att] = await db.all<{ n: number; need: number }>(sql`
+    SELECT coalesce(sum(r.status IN ('present', 'late')), 0) AS n, coalesce(sum(r.status NOT IN ('sick', 'leave')), 0) AS need
+    FROM attendance_records r JOIN attendance_days d ON d.id = r.day_id
+    WHERE r.student_id = ${studentId} AND d.class_id = ${classId} AND d.date >= ${week} AND d.date <= ${todayBangkok(end - 1)}`)
   const [sub] = await db.all<{ n: number }>(sql`
     SELECT count(*) AS n FROM submissions s JOIN assignments a ON a.id = s.assignment_id
     WHERE s.student_id = ${studentId} AND s.submitted_at >= ${start} AND s.submitted_at < ${end}
@@ -32,7 +33,10 @@ export async function weeklyQuests(db: Db, studentId: string, classId: string, t
   return {
     week,
     endsAt: end,
-    quests: QUESTS.map((q) => ({ ...q, progress: Math.min(q.need, progress[q.id]), claimed: claimed.has(refOf(week, q.id, studentId)) })),
+    quests: QUESTS.map((q) => {
+      const need = q.id === 'attend' ? Math.max(1, att?.need ?? 0) : q.need
+      return { ...q, need, progress: Math.min(need, progress[q.id]), claimed: claimed.has(refOf(week, q.id, studentId)) }
+    }),
   }
 }
 
