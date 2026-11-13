@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { fileUrl } from '../lib/upload'
 import { api, ApiClientError } from '../api'
 import ProtectedYouTube from '../components/ProtectedYouTube'
 import type { StudentVideo as Video, VideoWatchResult } from '../../shared/videos'
@@ -97,9 +98,15 @@ export default function StudentVideo() {
                     <legend className="font-semibold text-sm mb-1">
                       {i + 1}. {q.q}
                     </legend>
+                    {q.image && (
+                      <a href={fileUrl(q.image)} target="_blank" rel="noreferrer" className="block mb-1">
+                        <img src={fileUrl(q.image)} alt={`รูปคำถามข้อ ${i + 1}`} className="w-full max-h-80 object-contain rounded-xl border border-line bg-white" />
+                      </a>
+                    )}
                     {q.choices.map((c, k) => (
                       <label key={k} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm bg-white ${answers[i] === k ? 'border-board ring-2 ring-board/20' : 'border-line'}`}>
                         <input type="radio" name={`q-${i}`} checked={answers[i] === k} onChange={() => setAnswers((a) => a.map((x, j) => (j === i ? k : x)))} />
+                        <b className="w-4 text-stone-500">{['ก', 'ข', 'ค', 'ง'][k]}</b>
                         {c}
                       </label>
                     ))}

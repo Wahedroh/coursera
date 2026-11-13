@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
-import { del, getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
+import { del, getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie, TINY_JPEG, uploadFile } from './helpers'
 
 const db = () => getDb(env)
 beforeEach(resetDb)
@@ -58,4 +58,36 @@ it('สิทธิ์: นักเรียนเรียก API ครู 40
   expect((await getJson(`/api/teacher/classes/${a}/videos`, sa)).status).toBe(401)
   expect((await postJson('/api/teacher/videos', { ...VIDEO, classIds: [a] }, { cookie: sa })).status).toBe(401)
   expect((await getJson('/api/student/videos')).status).toBe(401)
+})
+
+it('คำถามท้ายคลิปเป็นรูปได้: เว้นตัวเลือกว่างได้เมื่อมีรูป · นักเรียนห้องนั้นเปิดรูปได้ ห้องอื่นไม่ได้ · ตอบแล้วได้ EXP', async () => {
+  const { cookie, a, sa, sb } = await setup()
+  const { key } = await json(await uploadFile('kind=quiz', TINY_JPEG, 'image/jpeg', cookie))
+  // ไม่มีรูปและไม่มีข้อความ → 400 · ไม่มีรูปแต่ตัวเลือกว่าง → 400
+  expect((await postJson('/api/teacher/videos', { ...VIDEO, classIds: [a], questions: [{ q: '', choices: ['ก', 'ข'], answer: 0 }] }, { cookie })).status).toBe(400)
+  expect((await postJson('/api/teacher/videos', { ...VIDEO, classIds: [a], questions: [{ q: 'ข้อ 1', choices: ['', ''], answer: 0 }] }, { cookie })).status).toBe(400)
+  const questions = [
+    { q: '', image: key, choices: ['', '', '', ''], answer: 2 },
+    { q: 'หน่วยของแรงคือ', choices: ['N', 'J'], answer: 0 },
+  ]
+  const { ids } = await json(await postJson('/api/teacher/videos', { ...VIDEO, classIds: [a], questions }, { cookie }))
+  const [v] = await json(await getJson('/api/student/videos', sa))
+  expect(v.quiz[0]).toEqual({ q: '', image: key, choices: ['', '', '', ''] })
+  expect(v.quiz[1]).toEqual({ q: 'หน่วยของแรงคือ', choices: ['N', 'J'] })
+  expect(JSON.stringify(v)).not.toContain('answer')
+  expect((await getJson(`/api/files/${key}`, sa)).status).toBe(200)
+  expect((await getJson(`/api/files/${key}`, sb)).status).toBe(404)
+  // ซ่อนคลิป → นักเรียนเปิดรูปไม่ได้
+  await putJson(`/api/teacher/videos/${ids[0]}/published`, { published: false }, cookie)
+  expect((await getJson(`/api/files/${key}`, sa)).status).toBe(404)
+  await putJson(`/api/teacher/videos/${ids[0]}/published`, { published: true }, cookie)
+
+  const wrong = await json(await postJson(`/api/student/videos/${ids[0]}/watched`, { watchedSeconds: 90, durationSeconds: 100, answers: [1, 0] }, { cookie: sa }))
+  expect(wrong).toMatchObject({ awarded: false })
+  const ok = await json(await postJson(`/api/student/videos/${ids[0]}/watched`, { watchedSeconds: 90, durationSeconds: 100, answers: [2, 0] }, { cookie: sa }))
+  expect(ok).toMatchObject({ awarded: true })
+  // รูปที่ใช้ในคำถามคลิปไม่ถูกลบเป็นไฟล์ค้าง
+  const { purgeOrphans } = await import('../src/server/storage/service')
+  await purgeOrphans(db(), env.BUCKET, Date.now() + 3 * 86400_000)
+  expect(await env.BUCKET.get(key)).not.toBeNull()
 })

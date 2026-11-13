@@ -30,6 +30,7 @@ export async function canRead(db: Db, session: SessionInfo, key: string): Promis
       EXISTS (SELECT 1 FROM assignments a, json_each(a.attachment_keys) j WHERE a.class_id = ${session.classId} AND j.value = ${key})
       OR EXISTS (SELECT 1 FROM submissions s, json_each(s.annotated_keys) j WHERE s.student_id = ${session.studentId} AND j.value = ${key})
       OR EXISTS (SELECT 1 FROM materials m WHERE m.class_id = ${session.classId} AND m.published = 1 AND m.file_key = ${key})
-      OR EXISTS (SELECT 1 FROM settings st WHERE st.key = 'payment_info' AND (st.value ->> 'qrKey') = ${key})`)
+      OR EXISTS (SELECT 1 FROM settings st WHERE st.key = 'payment_info' AND (st.value ->> 'qrKey') = ${key})
+      OR EXISTS (SELECT 1 FROM videos v, json_each(v.questions) j WHERE v.class_id = ${session.classId} AND v.published = 1 AND (j.value ->> 'image') = ${key})`)
   return !!row
 }

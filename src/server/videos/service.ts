@@ -50,10 +50,10 @@ export async function deleteVideo(db: Db, id: string): Promise<void> {
 const visible = (classId: string) => and(eq(videos.classId, classId), eq(videos.published, true))
 const studentCols = { id: videos.id, title: videos.title, description: videos.description, youtubeId: videos.youtubeId, createdAt: videos.createdAt, questions: videos.questions }
 /** ซ่อนเฉลย */
-const forStudent = ({ questions, ...v }: { questions: { q: string; choices: string[] }[] } & Omit<StudentVideo, 'quiz' | 'rewarded'>, rewarded: boolean): StudentVideo => ({
+const forStudent = ({ questions, ...v }: { questions: { q: string; image?: string; choices: string[] }[] } & Omit<StudentVideo, 'quiz' | 'rewarded'>, rewarded: boolean): StudentVideo => ({
   ...v,
   rewarded,
-  quiz: questions.map(({ q, choices }) => ({ q, choices })),
+  quiz: questions.map(({ q, image, choices }) => ({ q, choices, ...(image ? { image } : {}) })),
 })
 
 const refOf = (videoId: string, studentId: string) => `${videoId}:${studentId}`
