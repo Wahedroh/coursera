@@ -32,13 +32,21 @@ export const gradingSchema = z.object({
   visible: z.boolean(),
   /** กติกาครู: สะสมสัตว์วิเศษครบ 16 ตัว (ครบชุดซีซันของเทอม) ได้เกรดสูงสุด — ค่าเริ่มต้นเปิด */
   fullSetTopGrade: z.boolean().default(true),
+  /** และคะแนนสอบทุกครั้งต้องได้อย่างน้อยกี่ % (0 = ไม่ใช้เงื่อนไขสอบ) */
+  fullSetMinExamPct: z.number().int().min(0).max(100).default(80),
 })
 export type GradingSettings = z.infer<typeof gradingSchema>
-export const DEFAULT_GRADING: GradingSettings = { bands: DEFAULT_BANDS, visible: false, fullSetTopGrade: true }
+export const DEFAULT_GRADING: GradingSettings = { bands: DEFAULT_BANDS, visible: false, fullSetTopGrade: true, fullSetMinExamPct: 80 }
 
-/** เกรดสุดท้าย: ครบชุดและเปิดกติกา = เกรดสูงสุด (ช่วงแรกของเกณฑ์) แม้ยังไม่มีคะแนน */
-export const finalGrade = (computed: string | null, fullSet: boolean, g: Pick<GradingSettings, 'bands' | 'fullSetTopGrade'>): string | null =>
-  fullSet && g.fullSetTopGrade ? g.bands[0].grade : computed
+type FullSetRule = Pick<GradingSettings, 'bands' | 'fullSetTopGrade' | 'fullSetMinExamPct'>
+/**
+ * ได้เกรดสูงสุดตามกติกาครูไหม: เปิดกติกา + ครบชุด + คะแนนสอบทุกครั้ง ≥ เกณฑ์
+ * examMinPct = % ต่ำสุดของการสอบในเทอม (ขาดสอบ/ยังไม่กรอก = 0) · null = ยังไม่มีการสอบ (ถ้ามีเกณฑ์สอบ ถือว่ายังไม่ผ่าน)
+ */
+export const fullSetEligible = (fullSet: boolean, examMinPct: number | null, g: FullSetRule): boolean =>
+  g.fullSetTopGrade && fullSet && (g.fullSetMinExamPct === 0 || (examMinPct !== null && examMinPct >= g.fullSetMinExamPct - 1e-9))
+/** เกรดสุดท้าย: ผ่านกติกาครบชุด = เกรดสูงสุด (ช่วงแรกของเกณฑ์) */
+export const finalGrade = (computed: string | null, eligible: boolean, g: Pick<GradingSettings, 'bands'>): string | null => (eligible ? g.bands[0].grade : computed)
 
 export type GradeResult = { percentile: number; rank: number; grade: string }
 
@@ -95,7 +103,11 @@ export type ClassGrades = {
     grade: string | null
     /** สะสมสัตว์วิเศษครบชุดซีซันของเทอมนี้ */
     fullSet: boolean
+    /** % ต่ำสุดของการสอบในเทอม (null = ยังไม่มีการสอบ) */
+    examMinPct: number | null
+    /** ได้เกรดสูงสุดจากกติกาครบชุด */
+    fullSetBonus: boolean
   }[]
 }
 
-export type StudentGrade = { visible: false } | { visible: true; total: number; maxTotal: number; grade: string | null; fullSet: boolean }
+export type StudentGrade = { visible: false } | { visible: true; total: number; maxTotal: number; grade: string | null; fullSet: boolean; fullSetBonus: boolean; examMinPct: number | null; minExamPct: number }

@@ -37,7 +37,11 @@ export default function StudentScores() {
             <div>
               <p className="text-sm font-semibold">เกรดคาดการณ์ตอนนี้</p>
               <p className="text-xs text-stone-500">
-                {grade.fullSet ? '🏆 สะสมสัตว์วิเศษครบชุด ได้เกรดสูงสุดตามกติกาครู' : `คะแนนสะสม ${grade.total}/${grade.maxTotal} · อิงกลุ่มในห้อง เปลี่ยนได้เมื่อมีคะแนนใหม่`}
+                {grade.fullSetBonus
+                  ? '🏆 สะสมสัตว์วิเศษครบชุด + คะแนนสอบถึงเกณฑ์ ได้เกรดสูงสุดตามกติกาครู'
+                  : grade.fullSet
+                    ? `🏆 สะสมครบชุดแล้ว แต่คะแนนสอบต้องได้ ${grade.minExamPct}% ขึ้นไปทุกครั้ง${grade.examMinPct !== null ? ` (ครั้งที่ต่ำสุดตอนนี้ ${Math.round(grade.examMinPct)}%)` : ''}`
+                    : `คะแนนสะสม ${grade.total}/${grade.maxTotal} · อิงกลุ่มในห้อง เปลี่ยนได้เมื่อมีคะแนนใหม่`}
               </p>
             </div>
             <span className="text-4xl font-extrabold text-board" data-testid="my-grade">

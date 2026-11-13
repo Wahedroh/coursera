@@ -20,6 +20,7 @@ export default function TeacherGrades() {
   const [bands, setBands] = useState<GradeBand[]>([])
   const [visible, setVisible] = useState(false)
   const [fullSetTop, setFullSetTop] = useState(true)
+  const [minExam, setMinExam] = useState('80')
   const [className, setClassName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -30,6 +31,7 @@ export default function TeacherGrades() {
     setBands(g.settings.bands)
     setVisible(g.settings.visible)
     setFullSetTop(g.settings.fullSetTopGrade)
+    setMinExam(String(g.settings.fullSetMinExamPct))
     setDirty(false)
   }, [])
   useEffect(() => {
@@ -37,7 +39,8 @@ export default function TeacherGrades() {
     api<{ class: { name: string } }>(`/api/teacher/classes/${id}/students`).then((d) => setClassName(d.class.name)).catch(() => {})
   }, [id, handle, apply])
 
-  async function save(next: { bands: GradeBand[]; visible: boolean; fullSetTopGrade: boolean }, msg: string) {
+  async function save(next: { bands: GradeBand[]; visible: boolean; fullSetTopGrade: boolean; fullSetMinExamPct?: number }, msg: string) {
+    next = { fullSetMinExamPct: data?.settings.fullSetMinExamPct ?? 80, ...next }
     setError(null)
     try {
       apply(await api<ClassGrades>(`/api/teacher/classes/${id}/grading`, { method: 'PUT', body: next }))
@@ -149,9 +152,35 @@ export default function TeacherGrades() {
           />
           <span>
             <b>🏆 สะสมสัตว์วิเศษครบ 16 ตัว ได้เกรด {saved[0]?.grade}</b>
-            <span className="block text-xs text-stone-500">ครบชุดซีซันของเทอมนี้ (ต้องถึง LV 16) · ได้เกรดสูงสุดทันทีไม่ว่าคะแนนเท่าไร · นักเรียนเห็นกติกานี้ในหน้าตัวละคร</span>
+            <span className="block text-xs text-stone-500">ครบชุดซีซันของเทอมนี้ (ต้องถึง LV 16) และคะแนนสอบถึงเกณฑ์ด้านล่าง · นักเรียนเห็นกติกานี้ในหน้าตัวละคร</span>
           </span>
         </label>
+        {fullSetTop && (
+          <div className="flex flex-wrap items-center gap-2 text-sm -mt-1 pl-1">
+            <label className="flex items-center gap-2">
+              และคะแนนสอบ<b>ทุกครั้ง</b>ต้องได้อย่างน้อย
+              <input
+                aria-label="เกณฑ์คะแนนสอบขั้นต่ำ (%)"
+                type="number"
+                min={0}
+                max={100}
+                className="w-20 border-2 border-line rounded-lg px-2 py-1"
+                value={minExam}
+                onChange={(e) => setMinExam(e.target.value)}
+              />
+              %
+            </label>
+            <button
+              type="button"
+              disabled={!/^\d{1,3}$/.test(minExam) || Number(minExam) > 100 || Number(minExam) === data.settings.fullSetMinExamPct}
+              onClick={() => void save({ bands: saved, visible, fullSetTopGrade: true, fullSetMinExamPct: Number(minExam) }, Number(minExam) > 0 ? `เกณฑ์สอบ: ทุกครั้ง ≥ ${minExam}%` : 'ไม่ใช้เงื่อนไขคะแนนสอบ')}
+              className="rounded-lg border-2 border-board bg-white px-3 py-1 text-xs font-bold text-board disabled:opacity-40"
+            >
+              ใช้เกณฑ์สอบนี้
+            </button>
+            <span className="text-xs text-stone-500">ขาดสอบ/ยังไม่กรอก = 0 · ใส่ 0 = ไม่ใช้เงื่อนไขสอบ</span>
+          </div>
+        )}
       </Card>
 
       {data.maxTotal === 0 ? (
@@ -194,9 +223,14 @@ export default function TeacherGrades() {
                     <td className="p-2 text-right">{s.percentile}</td>
                     <td className="p-2 text-center" data-testid={`grade-${s.zipgradeId}`}>
                       <span className={`inline-block min-w-10 rounded-lg px-2 py-0.5 font-extrabold ${toneOf(saved, s.grade)}`}>{s.grade}</span>
-                      {s.fullSet && fullSetTop && (
-                        <span className="block text-[11px] text-amber-700 font-semibold" title="สะสมสัตว์วิเศษครบชุด">
+                      {s.fullSetBonus && (
+                        <span className="block text-[11px] text-amber-700 font-semibold" title="สะสมสัตว์วิเศษครบชุด + คะแนนสอบถึงเกณฑ์">
                           🏆 ครบชุด
+                        </span>
+                      )}
+                      {s.fullSet && !s.fullSetBonus && fullSetTop && (
+                        <span className="block text-[11px] text-stone-500" title="ครบชุดแต่คะแนนสอบยังไม่ถึงเกณฑ์">
+                          🏆 ครบชุด · สอบต่ำสุด {s.examMinPct === null ? '–' : `${Math.round(s.examMinPct)}%`}
                         </span>
                       )}
                     </td>

@@ -23,7 +23,7 @@ it('ยังไม่มีคะแนนเลย → ยังไม่ต�
   const { cookie, classId } = await setup()
   const g = await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))
   expect(g.maxTotal).toBe(0)
-  expect(g.settings).toEqual({ bands: DEFAULT_BANDS, visible: false, fullSetTopGrade: true })
+  expect(g.settings).toEqual({ bands: DEFAULT_BANDS, visible: false, fullSetTopGrade: true, fullSetMinExamPct: 80 })
   expect(g.students.every((s: { grade: string | null }) => s.grade === null)).toBe(true)
   expect(g.students).toHaveLength(4)
 })
@@ -60,7 +60,7 @@ it('นักเรียนเห็นเกรดตัวเองเฉพ�
   const c0 = await studentCookie(ss[0].id)
   expect(await json(await getJson('/api/student/grade', c0))).toEqual({ visible: false })
   await putJson(`/api/teacher/classes/${classId}/grading`, { bands: DEFAULT_BANDS, visible: true }, cookie)
-  expect(await json(await getJson('/api/student/grade', c0))).toEqual({ visible: true, total: 9, maxTotal: 10, grade: '4', fullSet: false })
+  expect(await json(await getJson('/api/student/grade', c0))).toEqual({ visible: true, total: 9, maxTotal: 10, grade: '4', fullSet: false, fullSetBonus: false, examMinPct: 90, minExamPct: 80 })
   const mine = await json(await getJson('/api/student/grade', await studentCookie(ss[1].id)))
   expect(mine).toMatchObject({ total: 3 })
   expect(JSON.stringify(mine)).not.toContain('"9"')
@@ -103,47 +103,64 @@ async function giveCharacters(studentId: string, n: number) {
     await env.DB.prepare(`INSERT INTO eggs (id, student_id, term_id, level, character_id, opened_at, created_at) VALUES (?, ?, 'term-1', ?, ?, 1, 1)`).bind(`egg-${studentId}-${i}`, studentId, i + 1, c.id).run()
 }
 
-it('กติกาครู: สะสมสัตว์วิเศษครบ 16 ตัว ได้เกรดสูงสุด · 15 ตัวยังไม่ได้ · ปิดกติกาได้ · ใช้ทุกที่ที่คิดเกรด', async () => {
+it('กติกาครู: ครบ 16 ตัว + สอบทุกครั้ง ≥ 80% = เกรดสูงสุด · สอบไม่ถึง/15 ตัว ไม่ได้ · ปรับเกณฑ์/ปิดได้ · ใช้ทุกที่ที่คิดเกรด', async () => {
   const { cookie, classId, ss, setScore } = await setup()
   await setScore(ss[0].id, 10)
-  await setScore(ss[1].id, 6)
-  await setScore(ss[2].id, 1)
-  await setScore(ss[3].id, 0)
-  await giveCharacters(ss[3].id, 16)
+  await setScore(ss[1].id, 9) // ครบชุด + 90% → ได้
+  await setScore(ss[2].id, 9) // 15 ตัว → ไม่ได้
+  await setScore(ss[3].id, 6) // ครบชุด แต่ 60% → ไม่ได้
+  for (const s of [ss[1], ss[3]]) await giveCharacters(s.id, 16)
   await giveCharacters(ss[2].id, 15)
-  const g = await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))
-  const row = (id: string) => g.students.find((s: { id: string }) => s.id === id)
-  expect(row(ss[3].id)).toMatchObject({ grade: '4', fullSet: true, total: 0 })
-  expect(row(ss[2].id)).toMatchObject({ fullSet: false })
-  expect(row(ss[2].id).grade).not.toBe('4')
+  const rows = async () => {
+    const g = await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))
+    return (id: string) => g.students.find((s: { id: string }) => s.id === id)
+  }
+  let row = await rows()
+  expect(row(ss[1].id)).toMatchObject({ grade: '4', fullSet: true, fullSetBonus: true, examMinPct: 90 })
+  expect(row(ss[2].id)).toMatchObject({ fullSet: false, fullSetBonus: false })
+  expect(row(ss[3].id)).toMatchObject({ fullSet: true, fullSetBonus: false, examMinPct: 60 })
+  expect(row(ss[3].id).grade).not.toBe('4')
 
-  // นักเรียนเห็นเกรด + รู้ว่าได้จากครบชุด · หน้าตัวละครบอกกติกา
+  // สอบครั้งที่ 2: ss[1] ขาดสอบ = 0% → หลุด
+  const { ids } = await json(await postJson('/api/teacher/score-items', { title: 'สอบ 2', category: 'quiz', maxScore: 20, takenOn: '2026-10-27', classIds: [classId] }, { cookie }))
+  await putJson(`/api/teacher/score-items/${ids[0]}/scores/${ss[0].id}`, { score: 20, absent: false, note: '' }, cookie)
+  await putJson(`/api/teacher/score-items/${ids[0]}/scores/${ss[1].id}`, { score: null, absent: true, note: '' }, cookie)
+  row = await rows()
+  expect(row(ss[1].id)).toMatchObject({ fullSetBonus: false, examMinPct: 0 })
+  await putJson(`/api/teacher/score-items/${ids[0]}/scores/${ss[1].id}`, { score: 16, absent: false, note: '' }, cookie) // 80% พอดี
+  row = await rows()
+  expect(row(ss[1].id)).toMatchObject({ grade: '4', fullSetBonus: true, examMinPct: 80 })
+
+  // นักเรียนเห็นเกรด/เหตุผล · หน้าตัวละครบอกกติกาพร้อมเกณฑ์สอบ
   await putJson(`/api/teacher/classes/${classId}/grading`, { bands: DEFAULT_BANDS, visible: true }, cookie)
+  expect(await json(await getJson('/api/student/grade', await studentCookie(ss[1].id)))).toMatchObject({ grade: '4', fullSetBonus: true })
   const c3 = await studentCookie(ss[3].id)
-  expect(await json(await getJson('/api/student/grade', c3))).toMatchObject({ grade: '4', fullSet: true })
-  expect((await json(await getJson('/api/student/progress', c3))).fullSetReward).toBe('4')
+  expect(await json(await getJson('/api/student/grade', c3))).toMatchObject({ fullSet: true, fullSetBonus: false, examMinPct: 0, minExamPct: 80 })
+  expect((await json(await getJson('/api/student/progress', c3))).fullSetReward).toEqual({ grade: '4', minExamPct: 80 })
 
   // รวมทุกห้อง (หน้าติดตามนักเรียน) ตรงกัน
   const { allClassGrades } = await import('../src/server/grades/service')
-  expect((await allClassGrades(db())).get(classId)?.get(ss[3].id)).toBe('4')
+  const all = (await allClassGrades(db())).get(classId)
+  expect(all?.get(ss[1].id)).toBe('4')
+  expect(all?.get(ss[3].id)).not.toBe('4')
 
-  // เกณฑ์ 5 ระดับที่ครูเปลี่ยนชื่อเกรดบนสุด → ได้ช่วงบนสุด
-  await putJson(`/api/teacher/classes/${classId}/grading`, { bands: [{ grade: 'A', min: 80 }, { grade: 'B', min: 0 }], visible: true }, cookie)
+  // ลดเกณฑ์สอบเป็น 0 (ไม่ใช้เงื่อนไขสอบ) → ss[3] ได้ · เกณฑ์ชื่อเกรดบนสุดอื่น
+  await putJson(`/api/teacher/classes/${classId}/grading`, { bands: [{ grade: 'A', min: 80 }, { grade: 'B', min: 0 }], visible: true, fullSetMinExamPct: 0 }, cookie)
   expect((await json(await getJson('/api/student/grade', c3))).grade).toBe('A')
 
   // ปิดกติกา → กลับไปคิดตามคะแนน
   await putJson(`/api/teacher/classes/${classId}/grading`, { bands: DEFAULT_BANDS, visible: true, fullSetTopGrade: false }, cookie)
-  const off = await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))
-  expect(off.settings.fullSetTopGrade).toBe(false)
-  expect(off.students.find((s: { id: string }) => s.id === ss[3].id).grade).not.toBe('4')
+  row = await rows()
+  expect(row(ss[1].id).fullSetBonus).toBe(false)
   expect((await json(await getJson('/api/student/progress', c3))).fullSetReward).toBeNull()
+  expect((await putJson(`/api/teacher/classes/${classId}/grading`, { bands: DEFAULT_BANDS, visible: true, fullSetMinExamPct: 101 }, cookie)).status).toBe(400)
 })
 
-it('ครบชุดแต่ยังไม่มีคะแนนใด ๆ ในห้อง → ได้เกรดสูงสุดเลย', async () => {
+it('ครบชุดแต่ยังไม่มีการสอบ → ยังไม่ได้ (ต้องมีคะแนนสอบผ่านเกณฑ์) · เกณฑ์ 0 = ได้เลย', async () => {
   const { cookie, classId, ss } = await setup()
   await giveCharacters(ss[0].id, 16)
-  const g = await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))
-  expect(g.maxTotal).toBe(0)
-  expect(g.students.find((s: { id: string }) => s.id === ss[0].id).grade).toBe('4')
-  expect(g.students.find((s: { id: string }) => s.id === ss[1].id).grade).toBeNull()
+  const grade = async () => (await json(await getJson(`/api/teacher/classes/${classId}/grades`, cookie))).students.find((s: { id: string }) => s.id === ss[0].id)
+  expect(await grade()).toMatchObject({ grade: null, fullSet: true, examMinPct: null, fullSetBonus: false })
+  await putJson(`/api/teacher/classes/${classId}/grading`, { bands: DEFAULT_BANDS, visible: false, fullSetMinExamPct: 0 }, cookie)
+  expect(await grade()).toMatchObject({ grade: '4', fullSetBonus: true })
 })

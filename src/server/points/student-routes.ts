@@ -17,7 +17,7 @@ studentPointsRoutes.get('/progress', requireStudent, async (c) => {
   const db = getDb(c.env)
   const g = await getGrading(db, me(c).classId)
   // กติกาครู: ครบชุดได้เกรดสูงสุด — บอกนักเรียนเพื่อเป็นแรงจูงใจ
-  return c.json({ ...(await progress(db, me(c).studentId)), fullSetReward: g.fullSetTopGrade ? g.bands[0].grade : null })
+  return c.json({ ...(await progress(db, me(c).studentId)), fullSetReward: g.fullSetTopGrade ? { grade: g.bands[0].grade, minExamPct: g.fullSetMinExamPct } : null })
 })
 studentPointsRoutes.post('/eggs/:id/open', requireStudent, async (c) => c.json(await openEgg(getDb(c.env), me(c).studentId, c.req.param('id'))))
 studentPointsRoutes.get('/leaderboard', requireStudent, async (c) => c.json(await leaderboard(getDb(c.env), me(c).classId, me(c).studentId)))
