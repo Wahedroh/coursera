@@ -9,7 +9,7 @@ import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type Detail = {
-  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null; onPaper: boolean }
+  submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null; onPaper: boolean; excusedFrom: number | null }
   assignment: { id: string; classId: string; title: string; maxScore: number; dueAt: number | null }
   student: { title: string | null; firstName: string; lastName: string; zipgradeId: string }
   neighbors: { prevId: string | null; nextId: string | null }
@@ -86,6 +86,18 @@ export default function TeacherGrade() {
     }
   }
 
+  async function setOnTime(onTime: boolean) {
+    if (!d) return
+    setError(null)
+    try {
+      const r = await api<{ submittedAt: number; excusedFrom: number | null }>(`/api/teacher/submissions/${d.submission.id}/on-time`, { method: 'PUT', body: { onTime } })
+      const status = d.submission.status === 'late' || d.submission.status === 'submitted' ? (onTime ? 'submitted' : 'late') : d.submission.status
+      setD({ ...d, submission: { ...d.submission, ...r, status } })
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
+
   async function sendBack() {
     setBusy(true)
     try {
@@ -119,7 +131,29 @@ export default function TeacherGrade() {
             </span>{' '}
             <Chip tone={statusTone}>{statusLabel}</Chip>
           </h1>
-          <p className="text-xs text-stone-500">ส่งเมื่อ {fmt.format(d.submission.submittedAt)}</p>
+          <p className="text-xs text-stone-500">
+            ส่งเมื่อ {fmt.format(d.submission.excusedFrom ?? d.submission.submittedAt)}
+            {d.assignment.dueAt !== null && <> · กำหนดส่ง {fmt.format(d.assignment.dueAt)}</>}
+          </p>
+          {d.submission.excusedFrom !== null ? (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="late-fix">
+              <Chip tone="green">✓ ครูนับว่าตรงเวลา</Chip>
+              <button type="button" className="text-xs underline text-stone-500" onClick={() => void setOnTime(false)}>
+                ยกเลิก (กลับเป็นส่งสาย)
+              </button>
+            </p>
+          ) : (
+            d.assignment.dueAt !== null &&
+            d.submission.submittedAt > d.assignment.dueAt && (
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="late-fix">
+                <span className="text-amber-700 font-semibold">⏰ ส่งช้า</span>
+                <button type="button" className="rounded-lg border-2 border-board bg-white px-2 py-0.5 text-xs font-bold text-board" onClick={() => void setOnTime(true)}>
+                  ✓ นับว่าตรงเวลา
+                </button>
+                <span className="text-xs text-stone-500">เช่น มีเหตุจำเป็น/ครูขยายเวลาให้ · ได้ EXP เต็ม</span>
+              </p>
+            )
+          )}
         </div>
         <div className="flex gap-2">
           {d.neighbors.prevId && (

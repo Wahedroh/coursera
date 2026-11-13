@@ -19,6 +19,7 @@ export default function TeacherGrades() {
   const [data, setData] = useState<ClassGrades | null>(null)
   const [bands, setBands] = useState<GradeBand[]>([])
   const [visible, setVisible] = useState(false)
+  const [fullSetTop, setFullSetTop] = useState(true)
   const [className, setClassName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
@@ -28,6 +29,7 @@ export default function TeacherGrades() {
     setData(g)
     setBands(g.settings.bands)
     setVisible(g.settings.visible)
+    setFullSetTop(g.settings.fullSetTopGrade)
     setDirty(false)
   }, [])
   useEffect(() => {
@@ -35,14 +37,17 @@ export default function TeacherGrades() {
     api<{ class: { name: string } }>(`/api/teacher/classes/${id}/students`).then((d) => setClassName(d.class.name)).catch(() => {})
   }, [id, handle, apply])
 
-  async function save(next: { bands: GradeBand[]; visible: boolean }, msg: string) {
+  async function save(next: { bands: GradeBand[]; visible: boolean; fullSetTopGrade: boolean }, msg: string) {
     setError(null)
     try {
       apply(await api<ClassGrades>(`/api/teacher/classes/${id}/grading`, { method: 'PUT', body: next }))
       setFlash(msg)
     } catch (e) {
       setError(handle(e))
-      if (data) setVisible(data.settings.visible)
+      if (data) {
+        setVisible(data.settings.visible)
+        setFullSetTop(data.settings.fullSetTopGrade)
+      }
     }
   }
 
@@ -114,7 +119,7 @@ export default function TeacherGrades() {
           ))}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <Button type="button" disabled={!dirty || !valid} onClick={() => save({ bands, visible }, 'บันทึกเกณฑ์แล้ว')} className="py-2">
+          <Button type="button" disabled={!dirty || !valid} onClick={() => save({ bands, visible, fullSetTopGrade: fullSetTop }, 'บันทึกเกณฑ์แล้ว')} className="py-2">
             บันทึกเกณฑ์
           </Button>
           {!valid && <span className="text-xs text-red-600">ต้องเรียงจากมากไปน้อย ช่วงสุดท้ายเริ่มที่ 0 และใส่ชื่อเกรดทุกช่อง</span>}
@@ -125,12 +130,28 @@ export default function TeacherGrades() {
               onChange={(e) => {
                 const v = e.target.checked
                 setVisible(v)
-                void save({ bands: saved, visible: v }, v ? 'นักเรียนเห็นเกรดคาดการณ์ของตัวเองแล้ว' : 'ซ่อนเกรดจากนักเรียนแล้ว')
+                void save({ bands: saved, visible: v, fullSetTopGrade: fullSetTop }, v ? 'นักเรียนเห็นเกรดคาดการณ์ของตัวเองแล้ว' : 'ซ่อนเกรดจากนักเรียนแล้ว')
               }}
             />
             ให้นักเรียนเห็นเกรดของตัวเอง
           </label>
         </div>
+        <label className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={fullSetTop}
+            onChange={(e) => {
+              const v = e.target.checked
+              setFullSetTop(v)
+              void save({ bands: saved, visible, fullSetTopGrade: v }, v ? `เปิดกติกา: สะสมครบ 16 ตัว ได้เกรด ${saved[0].grade}` : 'ปิดกติกาสะสมครบชุดแล้ว')
+            }}
+          />
+          <span>
+            <b>🏆 สะสมสัตว์วิเศษครบ 16 ตัว ได้เกรด {saved[0]?.grade}</b>
+            <span className="block text-xs text-stone-500">ครบชุดซีซันของเทอมนี้ (ต้องถึง LV 16) · ได้เกรดสูงสุดทันทีไม่ว่าคะแนนเท่าไร · นักเรียนเห็นกติกานี้ในหน้าตัวละคร</span>
+          </span>
+        </label>
       </Card>
 
       {data.maxTotal === 0 ? (
@@ -173,6 +194,11 @@ export default function TeacherGrades() {
                     <td className="p-2 text-right">{s.percentile}</td>
                     <td className="p-2 text-center" data-testid={`grade-${s.zipgradeId}`}>
                       <span className={`inline-block min-w-10 rounded-lg px-2 py-0.5 font-extrabold ${toneOf(saved, s.grade)}`}>{s.grade}</span>
+                      {s.fullSet && fullSetTop && (
+                        <span className="block text-[11px] text-amber-700 font-semibold" title="สะสมสัตว์วิเศษครบชุด">
+                          🏆 ครบชุด
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

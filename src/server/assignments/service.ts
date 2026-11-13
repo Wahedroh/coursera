@@ -128,7 +128,7 @@ function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submi
     submitMode: a.submitMode,
     status: s ? s.status : 'missing',
     submission: s
-      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null, onPaper: s.onPaper }
+      ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null, onPaper: s.onPaper, excusedLate: s.excusedFrom !== null }
       : null,
   }
 }
@@ -154,7 +154,7 @@ export async function upsertSubmission(
 
   const status: 'late' | 'submitted' = a.dueAt !== null && p.now > a.dueAt ? 'late' : 'submitted'
   // ส่งใหม่ (รวมหลังครูส่งกลับ) = งานชิ้นใหม่: ล้างผลตรวจเดิม ไม่ให้ครูเห็นรูปที่ตรวจไว้รอบก่อน
-  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null, onPaper: false }
+  const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null, onPaper: false, excusedFrom: null }
   if (existing) {
     await db.update(submissions).set(values).where(eq(submissions.id, existing.id))
   } else {
@@ -257,6 +257,36 @@ export async function gradeSubmission(
   ])
 }
 
+/**
+ * ครูแก้ "ส่งสาย" เป็น "นับว่าตรงเวลา" (เช่น มีเหตุจำเป็น) หรือยกเลิกกลับ
+ * นับว่าตรงเวลา = เลื่อนเวลาส่งที่ใช้คิดเป็นกำหนดส่ง (ทุกที่ที่คิดตรงเวลา/สายใช้ค่าเดียวกัน) และเก็บเวลาจริงไว้
+ * EXP ของงานที่ตรวจแล้วปรับเป็นเต็ม/ครึ่งตาม
+ */
+export async function setOnTime(db: Db, id: string, onTime: boolean, t: number): Promise<{ submittedAt: number; excusedFrom: number | null }> {
+  const { submission: s, assignment: a } = await getSubmission(db, id)
+  let submittedAt: number
+  let excusedFrom: number | null
+  if (onTime) {
+    if (s.excusedFrom !== null) return { submittedAt: s.submittedAt, excusedFrom: s.excusedFrom }
+    if (a.dueAt === null || s.submittedAt <= a.dueAt) throw apiError('not_late', 'งานนี้ส่งตรงเวลาอยู่แล้ว', 409)
+    submittedAt = a.dueAt
+    excusedFrom = s.submittedAt
+  } else {
+    if (s.excusedFrom === null) return { submittedAt: s.submittedAt, excusedFrom: null }
+    submittedAt = s.excusedFrom
+    excusedFrom = null
+  }
+  const status = s.status === 'late' || s.status === 'submitted' ? (onTime ? 'submitted' : 'late') : s.status
+  await db.batch([
+    db.update(submissions).set({ submittedAt, excusedFrom, status, updatedAt: t }).where(eq(submissions.id, id)),
+    db
+      .update(pointEvents)
+      .set({ delta: onTime ? a.expReward : lateExp(a.expReward) })
+      .where(and(eq(pointEvents.source, 'assignment'), eq(pointEvents.refId, id))),
+  ])
+  return { submittedAt, excusedFrom }
+}
+
 export async function returnSubmission(db: Db, id: string, comment: string, t: number): Promise<void> {
   await getSubmission(db, id)
   await db.update(submissions).set({ status: 'returned', comment, updatedAt: t }).where(eq(submissions.id, id))
@@ -280,6 +310,7 @@ export async function recordPaper(db: Db, assignmentId: string, studentId: strin
     imageKeys: [],
     annotatedKeys: [],
     onPaper: true,
+    excusedFrom: null,
     status,
     submittedAt,
     score: input.score,

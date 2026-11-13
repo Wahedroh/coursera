@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { assignmentInputSchema, createAssignmentsSchema, gradeInputSchema, paperInputSchema, returnInputSchema } from '../../shared/assignments'
+import { assignmentInputSchema, createAssignmentsSchema, gradeInputSchema, onTimeSchema, paperInputSchema, returnInputSchema } from '../../shared/assignments'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
@@ -17,6 +17,7 @@ import {
   recordPaper,
   undoPaper,
   returnSubmission,
+  setOnTime,
   updateAssignment,
 } from './service'
 
@@ -65,6 +66,12 @@ teacherAssignmentRoutes.post('/submissions/:id/return', async (c) => {
 teacherAssignmentRoutes.put('/assignments/:id/paper/:studentId', async (c) =>
   c.json(await recordPaper(getDb(c.env), c.req.param('id'), c.req.param('studentId'), await parseBody(c, paperInputSchema), now())),
 )
+
+/** ส่งสาย ↔ นับว่าตรงเวลา (ครูแก้ได้) */
+teacherAssignmentRoutes.put('/submissions/:id/on-time', async (c) => {
+  const { onTime } = await parseBody(c, onTimeSchema)
+  return c.json(await setOnTime(getDb(c.env), c.req.param('id'), onTime, now()))
+})
 
 teacherAssignmentRoutes.delete('/submissions/:id/paper', async (c) => {
   await undoPaper(getDb(c.env), c.req.param('id'))

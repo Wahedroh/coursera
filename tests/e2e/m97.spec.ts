@@ -348,3 +348,38 @@ test('ค่าเอกสาร: ครูตั้งเลขบัญชี
   await expect(pay).toContainText('ครูทดสอบ ใจดี')
   await expect(pay.getByRole('img', { name: 'QR สำหรับโอนจ่ายค่าเอกสาร' })).toBeVisible()
 })
+
+test('ส่งสาย: ครูกด "นับว่าตรงเวลา" ได้ และยกเลิกกลับได้ · นักเรียนเห็น', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
+  const classId = new URL(t.url()).pathname.split('/').pop()!
+  const { ids } = await (
+    await t.request.post('/api/teacher/assignments', { data: { title: 'งานทดสอบส่งสาย', instructions: '', attachmentKeys: [], dueAt: Date.now() + 1500, maxScore: 10, submitMode: 'text', classIds: [classId] } })
+  ).json()
+  await t.waitForTimeout(2500)
+  const s = await studentPage(browser)
+  expect((await s.request.put(`/api/student/assignments/${ids[0]}/submission`, { data: { text: 'ส่งช้า', imageKeys: [], clientRequestId: 'late-e2e' } })).ok()).toBe(true)
+  const gb = await (await t.request.get(`/api/teacher/classes/${classId}/gradebook`)).json()
+  const subId = gb.students.map((x: { cells: Record<string, { submissionId: string | null }> }) => x.cells[ids[0]]?.submissionId).find(Boolean)
+
+  await t.goto(`/teacher/submissions/${subId}`)
+  const fix = t.getByTestId('late-fix')
+  await expect(fix).toContainText('ส่งช้า')
+  await fix.getByRole('button', { name: '✓ นับว่าตรงเวลา' }).click()
+  await expect(fix).toContainText('ครูนับว่าตรงเวลา')
+  await t.reload()
+  await expect(t.getByTestId('late-fix')).toContainText('ครูนับว่าตรงเวลา')
+  await expect(t.getByText('ส่งตรงเวลา', { exact: true })).toBeVisible()
+
+  await s.goto(`/me/assignments/${ids[0]}`)
+  await expect(s.getByText(/ครูนับว่าส่งตรงเวลา/)).toBeVisible()
+
+  await t.getByTestId('late-fix').getByRole('button', { name: /ยกเลิก/ }).click()
+  await expect(t.getByTestId('late-fix')).toContainText('ส่งช้า')
+  // เก็บกวาด: ลบงานทดสอบ (ไม่ให้กระทบเทสต์ถัดไป)
+  t.on('dialog', (d) => d.accept())
+  await t.request.delete(`/api/teacher/assignments/${ids[0]}`)
+})

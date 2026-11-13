@@ -49,3 +49,12 @@ it('นักเรียนแจกแต้มไม่ได้', async () =
   const { a } = await setup()
   expect((await postJson('/api/teacher/points', { studentIds: [a.id], delta: 5, reason: 'x' }, { cookie: await studentCookie(a.id) })).status).toBe(401)
 })
+
+it('แต้มรายห้องมีชื่อเล่นที่นักเรียนตั้ง (ไว้โชว์ตอนสุ่มชื่อ) · ยังไม่ตั้ง = ว่าง', async () => {
+  const { cookie, classId, a, b } = await setup()
+  const { DEFAULT_AVATAR } = await import('../src/shared/avatar')
+  expect((await putJson('/api/student/avatar', { nickname: '  นักบินน้อย ', config: DEFAULT_AVATAR }, await studentCookie(a.id))).status).toBe(200)
+  const rows = await json(await getJson(`/api/teacher/classes/${classId}/points`, cookie))
+  expect(rows.find((r: { studentId: string }) => r.studentId === a.id).nickname).toBe('นักบินน้อย')
+  expect(rows.find((r: { studentId: string }) => r.studentId === b.id).nickname).toBe('')
+})

@@ -9,7 +9,7 @@ import { useTeacherErrorHandler } from './useTeacherGuard'
 
 type Student = { id: string; firstName: string; lastName: string; active: boolean }
 type Layout = { cols: number; seats: (string | null)[] }
-type Points = { studentId: string; exp: number; level: number; avatar: AvatarConfig }[]
+type Points = { studentId: string; exp: number; level: number; avatar: AvatarConfig; nickname: string }[]
 
 /** สุ่มได้แล้วโชว์ตัวละครก่อนกี่วินาที ค่อยเฉลยชื่อ */
 const REVEAL_SECONDS = 3
@@ -41,6 +41,7 @@ export default function TeacherSeating() {
   const [picked, setPicked] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(0)
   const [avatars, setAvatars] = useState<Map<string, AvatarConfig>>(new Map())
+  const [nicknames, setNicknames] = useState<Map<string, string>>(new Map())
   const [groupCount, setGroupCount] = useState(6)
   const [groups, setGroups] = useState<string[][] | null>(null)
   const [leaderboard, setLeaderboard] = useState(false)
@@ -51,6 +52,7 @@ export default function TeacherSeating() {
       .then((p) => {
         setPoints(new Map(p.map((x) => [x.studentId, x.exp])))
         setAvatars(new Map(p.map((x) => [x.studentId, x.avatar])))
+        setNicknames(new Map(p.filter((x) => x.nickname).map((x) => [x.studentId, x.nickname])))
       })
       .catch(() => {})
   }, [id])
@@ -231,7 +233,7 @@ export default function TeacherSeating() {
           <div className="rounded-2xl p-4 bg-board text-white text-center flex flex-col items-center gap-2">
             <span className="text-xs opacity-80">🎲 สุ่มชื่อ (เหลือ {remaining} คนที่ยังไม่ถูกสุ่ม)</span>
             {picked && (
-              <div className="flex flex-col items-center gap-1 pt-3 pb-1" data-testid="pick-result">
+              <div className="flex flex-col items-center gap-1 pt-3 pb-1" data-testid="pick-result" data-student-id={picked} data-first-name={name(picked)}>
                 <div className={`rounded-2xl bg-white/95 p-2 ${countdown > 0 ? 'animate-hop' : ''}`}>
                   <AvatarArt config={avatars.get(picked) ?? DEFAULT_AVATAR} size={7} label="ตัวละครของคนที่ถูกสุ่ม" />
                 </div>
@@ -240,9 +242,22 @@ export default function TeacherSeating() {
                     {countdown}
                   </span>
                 ) : (
-                  <span className="text-2xl font-extrabold" aria-live="polite" data-testid="picked-name">
-                    {name(picked)} {students.get(picked)?.lastName}
-                  </span>
+                  <div className="flex flex-col items-center leading-tight" aria-live="polite">
+                    {nicknames.get(picked) ? (
+                      <>
+                        <span className="text-3xl font-extrabold text-amber-300" data-testid="picked-name">
+                          {nicknames.get(picked)}
+                        </span>
+                        <span className="text-sm opacity-85 mt-1" data-testid="picked-realname">
+                          ({name(picked)} {students.get(picked)?.lastName})
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-2xl font-extrabold" data-testid="picked-name">
+                        {name(picked)} {students.get(picked)?.lastName}
+                      </span>
+                    )}
+                  </div>
                 )}
                 {countdown === 0 && (
                   <div className="flex gap-1.5 mt-1" data-testid="pick-points" role="group" aria-label={`ให้แต้ม ${name(picked)}`}>

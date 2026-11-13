@@ -37,7 +37,7 @@ export default function StudentScores() {
             <div>
               <p className="text-sm font-semibold">เกรดคาดการณ์ตอนนี้</p>
               <p className="text-xs text-stone-500">
-                คะแนนสะสม {grade.total}/{grade.maxTotal} · อิงกลุ่มในห้อง เปลี่ยนได้เมื่อมีคะแนนใหม่
+                {grade.fullSet ? '🏆 สะสมสัตว์วิเศษครบชุด ได้เกรดสูงสุดตามกติกาครู' : `คะแนนสะสม ${grade.total}/${grade.maxTotal} · อิงกลุ่มในห้อง เปลี่ยนได้เมื่อมีคะแนนใหม่`}
               </p>
             </div>
             <span className="text-4xl font-extrabold text-board" data-testid="my-grade">

@@ -129,8 +129,11 @@ export default function StudentSubmit() {
           <p className="text-sm font-semibold text-board">
             {a.status === 'late' ? 'ส่งแล้ว (สาย) รอครูตรวจ' : 'ส่งแล้ว รอครูตรวจ'}
             {a.submission?.onPaper && ' · 📄 ครูบันทึกว่าส่งเป็นกระดาษ'}
+            {a.submission?.excusedLate && ' · ✓ ครูนับว่าส่งตรงเวลา'}
           </p>
-          <p className="text-xs text-stone-500">แก้ไขและส่งใหม่ได้จนกว่าครูจะตรวจ</p>
+          <p className="text-xs text-stone-500">
+            แก้ไขและส่งใหม่ได้จนกว่าครูจะตรวจ{a.submission?.excusedLate && ' (ถ้าส่งใหม่หลังกำหนด จะนับเป็นส่งสายอีกครั้ง)'}
+          </p>
         </Card>
       )}
 
