@@ -17,7 +17,7 @@ type Progress = {
   eggs: { id: string; level: number; characterId: string | null; openedAt: number | null; season: number; termName: string | null }[]
   history: { delta: number; reason: string; createdAt: number }[]
   /** กติกาครู: สะสมครบชุดซีซันเทอมนี้ได้เกรดนี้ (null = ไม่ได้เปิดกติกา) */
-  fullSetReward: string | null
+  fullSetReward: { grade: string; minExamPct: number } | null
 }
 type Rank = { rank: number; firstName: string; exp: number; level: number; isMe: boolean; avatar: AvatarConfig }
 
@@ -126,7 +126,9 @@ export default function StudentProgress() {
                 </h2>
                 {season === p.term.season && p.fullSetReward && (
                   <p className={`rounded-xl px-3 py-2 text-sm font-semibold ${have === set.length ? 'bg-board-soft text-board' : 'bg-amber-50 text-amber-800 border border-amber-200'}`} data-testid="fullset-reward">
-                    {have === set.length ? `🎉 สะสมครบ ${set.length} ตัวแล้ว ได้เกรด ${p.fullSetReward} ตามกติกาครู!` : `🏆 กติกาครู: สะสมครบ ${set.length} ตัว ได้เกรด ${p.fullSetReward} · อีก ${set.length - have} ตัว`}
+                    {have === set.length
+                      ? `🎉 สะสมครบ ${set.length} ตัวแล้ว!${p.fullSetReward.minExamPct > 0 ? ` ถ้าคะแนนสอบทุกครั้งได้ ${p.fullSetReward.minExamPct}% ขึ้นไป ได้เกรด ${p.fullSetReward.grade}` : ` ได้เกรด ${p.fullSetReward.grade} ตามกติกาครู`}`
+                      : `🏆 กติกาครู: สะสมครบ ${set.length} ตัว${p.fullSetReward.minExamPct > 0 ? ` + สอบทุกครั้งได้ ${p.fullSetReward.minExamPct}% ขึ้นไป` : ''} ได้เกรด ${p.fullSetReward.grade} · อีก ${set.length - have} ตัว`}
                   </p>
                 )}
                 <div className="grid grid-cols-4 gap-2">
