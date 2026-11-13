@@ -39,13 +39,18 @@ test('ครูเพิ่มคำถามท้ายคลิป · นั�
   await t.getByLabel('ข้อ 1 ตัวเลือก ก', { exact: true }).fill('1')
   await t.getByLabel('ข้อ 1 ตัวเลือก ข', { exact: true }).fill('2')
   await t.getByLabel('ข้อ 1 คำตอบที่ถูกคือ ข').check()
+  // ข้อ 2 เป็นรูป (ตัวเลือกอยู่ในรูป เว้นช่องตัวเลือกว่างได้)
+  await t.getByRole('button', { name: '+ เพิ่มคำถาม' }).click()
+  await t.getByLabel('รูปโจทย์ข้อ 2', { exact: true }).setInputFiles({ name: 'q.png', mimeType: 'image/png', buffer: await t.screenshot({ clip: { x: 0, y: 0, width: 300, height: 200 } }) })
+  await expect(t.getByRole('img', { name: 'รูปโจทย์ข้อ 2' })).toBeVisible()
+  await t.getByLabel('ข้อ 2 คำตอบที่ถูกคือ ก').check()
   await t.getByRole('button', { name: 'เพิ่มคลิป', exact: true }).click()
-  await expect(t.getByText('คำถามท้ายคลิป 1 ข้อ')).toBeVisible()
+  await expect(t.getByText('คำถามท้ายคลิป 2 ข้อ')).toBeVisible()
 
   const s = await studentPage(browser)
   await s.goto('/me/videos')
   await s.getByText('คลิปมีคำถาม').click()
-  await expect(s.getByTestId('watch-reward')).toContainText('ดูถึง 70% + ตอบ 1 ข้อ รับ +5 EXP')
+  await expect(s.getByTestId('watch-reward')).toContainText('ดูถึง 70% + ตอบ 2 ข้อ รับ +5 EXP')
 })
 
 test('นักเรียน: ภารกิจสัปดาห์นี้บนหน้าแรก · คอลเลกชันแยกซีซัน', async ({ browser }) => {

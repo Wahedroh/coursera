@@ -151,7 +151,7 @@ export default function TeacherVideos() {
             คำอธิบาย (ไม่บังคับ)
             <textarea className={input} rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
-          <VideoQuestionsEditor value={questions} onChange={setQuestions} />
+          <VideoQuestionsEditor value={questions} onChange={setQuestions} allowImage />
           <p className="text-xs text-stone-500">
             นักเรียนดูได้ในเว็บนี้เท่านั้น (กดออกไป YouTube หรือกดแชร์ไม่ได้) · แนะนำตั้งคลิปใน YouTube เป็น “ไม่เป็นสาธารณะ (Unlisted)” และเปิด “อนุญาตการฝัง”
           </p>
@@ -195,7 +195,7 @@ function EditVideo({ video, onSave }: { video: TeacherVideo; onSave: (body: { ti
       <input aria-label="แก้ชื่อคลิป" className={input} required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
       <input aria-label="แก้ลิงก์ YouTube" className={`${input} ${ok ? '' : 'border-red-500 bg-red-50'}`} required value={url} onChange={(e) => setUrl(e.target.value)} />
       <textarea aria-label="แก้คำอธิบาย" className={input} rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} />
-      <VideoQuestionsEditor value={questions} onChange={setQuestions} />
+      <VideoQuestionsEditor value={questions} onChange={setQuestions} allowImage />
       <Button type="submit" disabled={!ok}>
         บันทึกการแก้ไข
       </Button>
