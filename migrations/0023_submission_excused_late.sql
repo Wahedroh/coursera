@@ -1,0 +1,1 @@
+ALTER TABLE `submissions` ADD `excused_from` integer;

@@ -100,6 +100,8 @@ export const submissions = sqliteTable(
     imagesPurgedAt: integer('images_purged_at'),
     /** นักเรียนส่งเป็นกระดาษกับครู ครูบันทึกเอง (ไม่มีข้อความ/รูปในระบบ) */
     onPaper: integer('on_paper', { mode: 'boolean' }).notNull().default(false),
+    /** ครูนับว่าส่งตรงเวลา: เวลาส่งจริง (submitted_at ถูกเลื่อนเป็นกำหนดส่ง) · null = ไม่ได้แก้ */
+    excusedFrom: integer('excused_from'),
     clientRequestId: text('client_request_id'),
     updatedAt: integer('updated_at').notNull(),
   },

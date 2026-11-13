@@ -37,7 +37,7 @@ export type StudentAssignment = {
   maxScore: number
   submitMode: SubmitMode
   status: StudentStatus
-  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean; onPaper: boolean } | null
+  submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean; onPaper: boolean; excusedLate: boolean } | null
 }
 
 export const submissionInputSchema = z.object({
@@ -74,3 +74,5 @@ export const returnInputSchema = z.object({ comment: z.string().max(2000) })
 /** ครูบันทึกว่านักเรียนส่งงานเป็นกระดาษ · score = null คือยังไม่ให้คะแนน (ตรวจทีหลังได้) */
 export const paperInputSchema = z.object({ score: z.number().nullable(), late: z.boolean(), comment: z.string().max(2000) })
 
+
+export const onTimeSchema = z.object({ onTime: z.boolean() })
