@@ -48,7 +48,9 @@ test('เช็กชื่อ + QR เช็กอิน + แจกแต้�
   await teacher.getByRole('button', { name: 'ตอบคำถาม' }).click()
   await teacher.getByRole('button', { name: '+5' }).click()
   await expect(teacher.getByText('ให้ +5 แต้ม: มานี')).toBeVisible()
-  // ครบเลเวล 1 พอดี: ส่งงาน M1 +30 · มาเรียน +5 · แจก +5 = 40 EXP
+  await teacher.getByRole('button', { name: '+5' }).click()
+  await expect(teacher.getByText('ให้ +5 แต้ม: มานี')).toBeVisible()
+  // ครบเลเวล 1 พอดี: ส่งงาน M1 +25 · มาเรียน +5 · แจก +5 +5 = 40 EXP
 
   await student.goto('/me/progress')
   await expect(student.getByText('LV 1', { exact: true })).toBeVisible()

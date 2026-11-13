@@ -202,3 +202,24 @@ describe('สรุปวันนี้ของครู', () => {
     expect((await getJson('/api/teacher/today', sa)).status).toBe(401)
   })
 })
+
+describe('ภารกิจมาเรียน = ครบทุกคาบของสัปดาห์', () => {
+  it('เรียนสัปดาห์ละคาบเดียวก็ทำได้ · ขาดคาบใดคาบหนึ่งไม่ได้ · ป่วย/ลาไม่นับเป็นคาบที่ต้องมา', async () => {
+    const { teacher, classId, sa } = await setup()
+    const attend = async () => (await json(await getJson('/api/student/quests', sa))).quests.find((q: { id: string }) => q.id === 'attend')
+    expect(await attend()).toMatchObject({ title: 'มาเรียนครบทุกคาบของสัปดาห์', need: 1, progress: 0 })
+    const mon = weekStartBangkok(Date.now())
+    const { day } = await openDay(db(), classId, todayBangkok(mon))
+    expect(await attend()).toMatchObject({ need: 1, progress: 1 })
+    expect((await postJson('/api/student/quests/attend/claim', {}, { cookie: sa })).status).toBe(200)
+
+    // อีกห้อง/อีกคน: 2 คาบ ขาด 1 → ไม่ครบ · เปลี่ยนเป็นลาป่วย → ครบ
+    const me = await json(await getJson('/api/me', sa))
+    const { day: d2 } = await openDay(db(), classId, todayBangkok(mon + 86400_000))
+    await putJson(`/api/teacher/attendance/${d2!.id}/records/${me.student.id}`, { status: 'absent' }, teacher)
+    expect(await attend()).toMatchObject({ need: 2, progress: 1 })
+    await putJson(`/api/teacher/attendance/${d2!.id}/records/${me.student.id}`, { status: 'sick' }, teacher)
+    expect(await attend()).toMatchObject({ need: 1, progress: 1 })
+    expect(day).toBeTruthy()
+  })
+})

@@ -52,7 +52,7 @@ test('นักเรียน: ภารกิจสัปดาห์นี้
   const s = await studentPage(browser)
   const q = s.getByTestId('weekly-quests')
   await expect(q.getByRole('heading', { name: '🎯 ภารกิจสัปดาห์นี้' })).toBeVisible()
-  for (const name of ['มาเรียน 3 คาบ', 'ส่งงานตรงเวลา 1 ชิ้น', 'ทบทวนคลิป 1 คลิป']) await expect(q.getByText(name)).toBeVisible()
+  for (const name of ['มาเรียนครบทุกคาบของสัปดาห์', 'ส่งงานตรงเวลา 1 ชิ้น', 'ทบทวนคลิป 1 คลิป']) await expect(q.getByText(name)).toBeVisible()
   await s.getByRole('link', { name: '⭐ ตัวละครและแต้มของฉัน' }).click()
   await expect(s.getByText('เทอม 2/2569')).toBeVisible()
   await expect(s.getByTestId('collection-s1').getByRole('heading', { name: /ซีซัน 1 · สัตว์วิเศษ/ })).toContainText('เทอมนี้')
