@@ -23,16 +23,16 @@ export async function givePoints(db: Db, studentIds: string[], delta: number, re
 /** แต้มของนักเรียนที่อยู่ในช่วงเทอม (EXP เริ่มนับใหม่ทุกเทอม) */
 const inTerm = (w: TermWindow) => and(gte(pointEvents.createdAt, w.start), lt(pointEvents.createdAt, w.end))
 
-export async function classPoints(db: Db, classId: string): Promise<{ studentId: string; exp: number; level: number; avatar: AvatarConfig }[]> {
+export async function classPoints(db: Db, classId: string): Promise<{ studentId: string; exp: number; level: number; avatar: AvatarConfig; nickname: string }[]> {
   const w = await termWindow(db)
   const rows = await db
-    .select({ studentId: students.id, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
+    .select({ studentId: students.id, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config, nickname: studentAvatars.nickname })
     .from(students)
     .leftJoin(pointEvents, and(eq(pointEvents.studentId, students.id), inTerm(w)))
     .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
     .where(and(eq(students.classId, classId), eq(students.active, true)))
     .groupBy(students.id)
-  return rows.map((r) => ({ ...r, level: levelOf(r.exp), avatar: parseAvatar(r.avatar) }))
+  return rows.map((r) => ({ ...r, level: levelOf(r.exp), avatar: parseAvatar(r.avatar), nickname: (r.nickname ?? '').trim() }))
 }
 
 export async function getSeating(db: Db, classId: string): Promise<Layout> {
@@ -168,7 +168,7 @@ export async function leaderboard(db: Db, classId: string, studentId: string) {
   if (!(await leaderboardEnabled(db, classId))) throw apiError('leaderboard_disabled', 'ครูยังไม่เปิดกระดานจัดอันดับ', 403)
   const w = await termWindow(db)
   const rows = await db
-    .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config })
+    .select({ id: students.id, firstName: students.firstName, exp: sql<number>`coalesce(sum(${pointEvents.delta}), 0)`, avatar: studentAvatars.config, nickname: studentAvatars.nickname })
     .from(students)
     .leftJoin(pointEvents, and(eq(pointEvents.studentId, students.id), inTerm(w)))
     .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))

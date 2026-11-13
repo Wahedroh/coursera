@@ -22,14 +22,14 @@ test('สุ่มชื่อไม่ซ้ำจนครบทุกคน �
       await expect(page.getByTestId('picked-name')).toHaveCount(0)
     }
     await expect(page.getByTestId('picked-name')).toBeVisible({ timeout: 5000 })
-    seen.add((await page.getByTestId('picked-name').textContent())!)
+    seen.add((await page.getByTestId('pick-result').getAttribute('data-student-id'))!)
   }
   expect(seen.size).toBe(total)
   await page.getByRole('button', { name: 'สุ่มชื่อ', exact: true }).click()
   await expect(counter).toContainText(`เหลือ ${total - 1} คน`)
   // ให้แต้มคนที่ถูกสุ่มได้ทันที
   await expect(page.getByTestId('pick-points')).toBeVisible({ timeout: 5000 })
-  const who = (await page.getByTestId('picked-name').textContent())!.trim().split(' ')[0]
+  const who = (await page.getByTestId('pick-result').getAttribute('data-first-name'))!
   await page.getByTestId('pick-points').getByRole('button', { name: '+2 แต้ม' }).click()
   await expect(page.getByText(`ให้ +2 แต้ม: ${who} (ตอบคำถาม (สุ่มชื่อ))`)).toBeVisible()
   // หน้ารายชื่อแสดง EXP รายคน
