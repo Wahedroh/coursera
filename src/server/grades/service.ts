@@ -1,10 +1,22 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { assignGrades, DEFAULT_GRADING, gradingSchema, type ClassGrades, type GradingSettings, type StudentGrade } from '../../shared/grades'
+import { assignGrades, DEFAULT_GRADING, finalGrade, gradingSchema, type ClassGrades, type GradingSettings, type StudentGrade } from '../../shared/grades'
 import type { Db } from '../db/client'
 import { classes, settings, students } from '../db/schema'
 import { apiError } from '../http'
 import { termWindow } from '../terms/service'
 import type { TermWindow } from '../../shared/terms'
+import { charactersOfSeason } from '../../shared/characters'
+
+/** นักเรียนที่มีตัวละครครบชุดของซีซันนี้ (ทั้งห้อง หรือทุกห้องถ้าไม่ระบุ) */
+export async function fullSetOwners(db: Db, season: number, classId?: string): Promise<Set<string>> {
+  const ids = charactersOfSeason(season).map((c) => c.id)
+  if (!ids.length) return new Set()
+  const rows = await db.all<{ studentId: string; n: number }>(sql`
+    SELECT e.student_id AS studentId, count(DISTINCT e.character_id) AS n FROM eggs e JOIN students st ON st.id = e.student_id
+    WHERE e.character_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) ${classId ? sql`AND st.class_id = ${classId}` : sql``}
+    GROUP BY e.student_id`)
+  return new Set(rows.filter((r) => r.n >= ids.length).map((r) => r.studentId))
+}
 
 const key = (classId: string) => `grading:${classId}`
 
@@ -28,7 +40,8 @@ export async function saveGrading(db: Db, classId: string, g: GradingSettings): 
  * จัดอันดับเฉพาะนักเรียนที่ยังอยู่ในห้อง (active)
  */
 export async function classGrades(db: Db, classId: string, win?: TermWindow): Promise<ClassGrades> {
-  const { start, end } = win ?? (await termWindow(db))
+  const w = win ?? (await termWindow(db))
+  const { start, end } = w
   const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
   if (!c) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const roster = await db
@@ -59,11 +72,18 @@ export async function classGrades(db: Db, classId: string, win?: TermWindow): Pr
   })
   // ยังไม่มีคะแนนเลย = ยังตัดเกรดไม่ได้
   const graded = maxTotal > 0 ? assignGrades(rows, settings.bands) : new Map()
+  const full = await fullSetOwners(db, w.term.season, classId)
   return {
     settings,
     maxTotal,
     itemCounts: { assignments: maxAsg.n, exams: maxExam.n },
-    students: rows.map((r) => ({ ...r, percentile: graded.get(r.id)?.percentile ?? null, rank: graded.get(r.id)?.rank ?? null, grade: graded.get(r.id)?.grade ?? null })),
+    students: rows.map((r) => ({
+      ...r,
+      percentile: graded.get(r.id)?.percentile ?? null,
+      rank: graded.get(r.id)?.rank ?? null,
+      grade: finalGrade(graded.get(r.id)?.grade ?? null, full.has(r.id), settings),
+      fullSet: full.has(r.id),
+    })),
   }
 }
 
@@ -72,12 +92,13 @@ export async function gradeForStudent(db: Db, studentId: string, classId: string
   if (!g.visible) return { visible: false }
   const all = await classGrades(db, classId)
   const me = all.students.find((s) => s.id === studentId)
-  return { visible: true, total: me?.total ?? 0, maxTotal: all.maxTotal, grade: me?.grade ?? null }
+  return { visible: true, total: me?.total ?? 0, maxTotal: all.maxTotal, grade: me?.grade ?? null, fullSet: me?.fullSet ?? false }
 }
 
 /** เกรดคาดการณ์ทุกห้องในคำสั่งไม่กี่ครั้ง (D1 แพ็กเกจฟรีจำกัด 50 คำสั่งต่อคำขอ) — วิธีคิดเดียวกับ classGrades */
 export async function allClassGrades(db: Db): Promise<Map<string, Map<string, string | null>>> {
-  const { start } = await termWindow(db)
+  const w = await termWindow(db)
+  const { start } = w
   const roster = await db.all<{ id: string; classId: string }>(sql`SELECT id, class_id AS classId FROM students WHERE active = 1`)
   const asg = await db.all<{ studentId: string; total: number }>(sql`
     SELECT s.student_id AS studentId, sum(s.score) AS total FROM submissions s JOIN assignments a ON a.id = s.assignment_id
@@ -99,9 +120,10 @@ export async function allClassGrades(db: Db): Promise<Map<string, Map<string, st
         const p = gradingSchema.safeParse(JSON.parse(r.value))
         if (p.success) g = p.data
       } catch {}
-      return [r.key.slice('grading:'.length), g.bands]
+      return [r.key.slice('grading:'.length), g]
     }),
   )
+  const full = await fullSetOwners(db, w.term.season)
   const a = new Map(asg.map((r) => [r.studentId, r.total]))
   const e = new Map(exam.map((r) => [r.studentId, r.total]))
   const maxBy = new Map(maxes.map((m) => [m.classId, m.max]))
@@ -112,8 +134,9 @@ export async function allClassGrades(db: Db): Promise<Map<string, Map<string, st
   }
   const out = new Map<string, Map<string, string | null>>()
   for (const [classId, rows] of byClass) {
-    const graded = (maxBy.get(classId) ?? 0) > 0 ? assignGrades(rows, bandsOf.get(classId) ?? DEFAULT_GRADING.bands) : new Map()
-    out.set(classId, new Map(rows.map((r) => [r.id, graded.get(r.id)?.grade ?? null])))
+    const g = bandsOf.get(classId) ?? DEFAULT_GRADING
+    const graded = (maxBy.get(classId) ?? 0) > 0 ? assignGrades(rows, g.bands) : new Map()
+    out.set(classId, new Map(rows.map((r) => [r.id, finalGrade(graded.get(r.id)?.grade ?? null, full.has(r.id), g)])))
   }
   return out
 }

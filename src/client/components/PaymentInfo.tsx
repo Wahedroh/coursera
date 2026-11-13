@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { EMPTY_PAYMENT, hasPayment, type PaymentInfo } from '../../shared/fees'
 import { resizeImage } from '../lib/image'
@@ -58,11 +58,16 @@ export function TeacherPaymentSettings({ onError }: { onError: (e: unknown) => v
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  // ครูเริ่มพิมพ์ก่อนข้อมูลเดิมโหลดเสร็จ → ไม่เขียนทับสิ่งที่พิมพ์
+  const touched = useRef(false)
   useEffect(() => {
-    api<PaymentInfo>('/api/teacher/payment-info').then(setP).catch(onError)
+    api<PaymentInfo>('/api/teacher/payment-info')
+      .then((x) => !touched.current && setP(x))
+      .catch(onError)
   }, [onError])
   const set = (x: Partial<PaymentInfo>) => {
-    setP({ ...p, ...x })
+    touched.current = true
+    setP((prev) => ({ ...prev, ...x }))
     setSaved(false)
   }
   async function pick(file: File | undefined) {

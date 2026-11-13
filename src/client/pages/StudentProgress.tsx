@@ -16,6 +16,8 @@ type Progress = {
   term: { name: string; season: number }
   eggs: { id: string; level: number; characterId: string | null; openedAt: number | null; season: number; termName: string | null }[]
   history: { delta: number; reason: string; createdAt: number }[]
+  /** กติกาครู: สะสมครบชุดซีซันเทอมนี้ได้เกรดนี้ (null = ไม่ได้เปิดกติกา) */
+  fullSetReward: string | null
 }
 type Rank = { rank: number; firstName: string; exp: number; level: number; isMe: boolean; avatar: AvatarConfig }
 
@@ -122,6 +124,11 @@ export default function StudentProgress() {
                   {upcoming && <span className="text-xs font-normal text-stone-500">เริ่มสะสมได้เทอมหน้า</span>}
                   {have === set.length && <span className="text-xs">🏆 ครบชุด!</span>}
                 </h2>
+                {season === p.term.season && p.fullSetReward && (
+                  <p className={`rounded-xl px-3 py-2 text-sm font-semibold ${have === set.length ? 'bg-board-soft text-board' : 'bg-amber-50 text-amber-800 border border-amber-200'}`} data-testid="fullset-reward">
+                    {have === set.length ? `🎉 สะสมครบ ${set.length} ตัวแล้ว ได้เกรด ${p.fullSetReward} ตามกติกาครู!` : `🏆 กติกาครู: สะสมครบ ${set.length} ตัว ได้เกรด ${p.fullSetReward} · อีก ${set.length - have} ตัว`}
+                  </p>
+                )}
                 <div className="grid grid-cols-4 gap-2">
                   {set.map((c) => (
                     <Card key={c.id} className={`p-2 flex flex-col items-center text-center ${owned.has(c.id) ? '' : 'bg-stone-50'}`}>

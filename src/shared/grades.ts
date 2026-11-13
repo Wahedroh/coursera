@@ -30,9 +30,15 @@ export const gradingSchema = z.object({
     .refine((bs) => bs[bs.length - 1].min === 0, 'ช่วงสุดท้ายต้องเริ่มที่ 0')
     .refine((bs) => new Set(bs.map((b) => b.grade)).size === bs.length, 'เกรดซ้ำ'),
   visible: z.boolean(),
+  /** กติกาครู: สะสมสัตว์วิเศษครบ 16 ตัว (ครบชุดซีซันของเทอม) ได้เกรดสูงสุด — ค่าเริ่มต้นเปิด */
+  fullSetTopGrade: z.boolean().default(true),
 })
 export type GradingSettings = z.infer<typeof gradingSchema>
-export const DEFAULT_GRADING: GradingSettings = { bands: DEFAULT_BANDS, visible: false }
+export const DEFAULT_GRADING: GradingSettings = { bands: DEFAULT_BANDS, visible: false, fullSetTopGrade: true }
+
+/** เกรดสุดท้าย: ครบชุดและเปิดกติกา = เกรดสูงสุด (ช่วงแรกของเกณฑ์) แม้ยังไม่มีคะแนน */
+export const finalGrade = (computed: string | null, fullSet: boolean, g: Pick<GradingSettings, 'bands' | 'fullSetTopGrade'>): string | null =>
+  fullSet && g.fullSetTopGrade ? g.bands[0].grade : computed
 
 export type GradeResult = { percentile: number; rank: number; grade: string }
 
@@ -87,7 +93,9 @@ export type ClassGrades = {
     percentile: number | null
     rank: number | null
     grade: string | null
+    /** สะสมสัตว์วิเศษครบชุดซีซันของเทอมนี้ */
+    fullSet: boolean
   }[]
 }
 
-export type StudentGrade = { visible: false } | { visible: true; total: number; maxTotal: number; grade: string | null }
+export type StudentGrade = { visible: false } | { visible: true; total: number; maxTotal: number; grade: string | null; fullSet: boolean }
