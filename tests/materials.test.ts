@@ -118,3 +118,17 @@ it('แยกเอกสารเปล่ากับเอกสารที�
   const after = (await json(await getJson(`/api/teacher/classes/${a}/materials`, cookie))).find((m: { id: string }) => m.id === id)
   expect(after).toMatchObject({ kind: 'blank', lessonDate: '' })
 })
+
+it('พื้นที่เก็บไฟล์: แยกตามประเภท (เอกสารเปล่า/จดในห้อง/รูปงาน) และรวมเท่ากับที่ใช้ทั้งหมด', async () => {
+  const { cookie, a } = await setup()
+  await upload(cookie, [a], 'ใบงาน.pdf', PDF)
+  const { SELF } = await import('cloudflare:test')
+  const qs = new URLSearchParams({ classIds: a, name: 'จด.pdf', title: 'จด', topic: '', kind: 'notes', lessonDate: '2026-11-14' })
+  await SELF.fetch(`http://x/api/teacher/materials?${qs}`, { method: 'POST', headers: { cookie, 'content-type': 'application/octet-stream' }, body: new Blob([DOCX.slice(0, 0), PDF, PDF]) })
+  const r = await json(await getJson('/api/teacher/storage', cookie))
+  const by = Object.fromEntries(r.breakdown.map((p: { id: string; bytes: number; files: number }) => [p.id, p]))
+  expect(by['mat-blank']).toMatchObject({ files: 1, bytes: PDF.byteLength })
+  expect(by['mat-notes']).toMatchObject({ files: 1, bytes: PDF.byteLength * 2 })
+  expect(r.breakdown.reduce((n: number, p: { bytes: number }) => n + p.bytes, 0)).toBe(r.usage.bytes)
+  expect(r.breakdown.reduce((n: number, p: { files: number }) => n + p.files, 0)).toBe(r.usage.files)
+})

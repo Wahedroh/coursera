@@ -53,7 +53,7 @@ export default function TeacherHome() {
       {storage && storage.bytes / storage.freeBytes >= 0.75 && (
         <Link to="/teacher/storage" className="block">
           <Card className="p-3 bg-amber-50 border-amber-200 text-sm">
-            ⚠️ <b>พื้นที่เก็บรูปใช้ไป {Math.round((storage.bytes / storage.freeBytes) * 100)}%</b> · แตะเพื่อลบรูปงานที่ตรวจแล้ว
+            ⚠️ <b>พื้นที่เก็บไฟล์ใช้ไป {Math.round((storage.bytes / storage.freeBytes) * 100)}%</b> (รูปงาน + เอกสารเรียน + ไฟล์อื่น) · แตะเพื่อดูและลบรูปงานที่ตรวจแล้ว
           </Card>
         </Link>
       )}
