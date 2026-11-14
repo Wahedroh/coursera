@@ -478,3 +478,31 @@ export const timetableSlots = sqliteTable(
   },
   (t) => [index('timetable_class_idx').on(t.classId)],
 )
+
+/** เครื่องของครูที่เปิดรับแจ้งเตือน (ครูมีคนเดียว จึงไม่ผูกกับผู้ใช้) */
+export const teacherPushSubscriptions = sqliteTable('teacher_push_subscriptions', {
+  id: text('id').primaryKey(),
+  endpoint: text('endpoint').notNull().unique(),
+  createdAt: integer('created_at').notNull(),
+})
+
+/** แจ้งเตือนของครู (ก่อนเข้าคาบ · ลืมเช็กชื่อ · งานรอตรวจ · ส่งแก้ · ครบกำหนด · เผยแพร่ · ยืนยันการสอน) */
+export const teacherNotifications = sqliteTable(
+  'teacher_notifications',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull(),
+    title: text('title').notNull(),
+    body: text('body').notNull().default(''),
+    url: text('url').notNull().default('/teacher'),
+    /** ส่งครั้งเดียวต่อเรื่อง */
+    dedupeKey: text('dedupe_key').unique(),
+    /** รวมหลายเหตุการณ์เป็นรายการเดียว (เช่น ส่งแก้แล้ว N คน) */
+    count: integer('count').notNull().default(1),
+    createdAt: integer('created_at').notNull(),
+    pushedAt: integer('pushed_at'),
+    shownAt: integer('shown_at'),
+    readAt: integer('read_at'),
+  },
+  (t) => [index('teacher_notifications_created_idx').on(t.createdAt)],
+)

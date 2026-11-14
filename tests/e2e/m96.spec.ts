@@ -32,6 +32,13 @@ test('ตารางสอน: เพิ่มคาบที่กำลัง
   const card = t.getByTestId('now-card')
   await expect(card).toContainText('กำลังสอน')
   await expect(card).toContainText('โรงเรียนทดสอบ ชั้น 1')
+  // ยืนยันการสอน (เซลฟี + พิกัด) → ลิงก์ของครู · กดยืนยันแล้ว
+  const selfie = card.getByTestId('selfie-row')
+  await expect(selfie.getByRole('link', { name: /ยืนยันการสอน/ })).toHaveAttribute('href', 'https://change-classroom1.base44.app/')
+  await selfie.getByRole('button', { name: 'ยืนยันแล้ว ✓' }).click()
+  await expect(selfie).toContainText('ยืนยันการสอนคาบนี้แล้ว')
+  await t.reload()
+  await expect(t.getByTestId('selfie-row')).toContainText('ยืนยันการสอนคาบนี้แล้ว')
   await card.getByRole('link', { name: /อัปที่จด/ }).click()
   await expect(t.getByRole('radio', { name: /เอกสารที่จดในห้อง/ })).toBeChecked()
 
@@ -197,4 +204,19 @@ test('ลาก PDF จาก GoodNotes หลายครั้ง + รูป 
   expect(res.headers()['content-type']).toBe('application/pdf')
   const doc = await PDFDocument.load(await res.body())
   expect(doc.getPageCount()).toBe(4)
+})
+
+test('แจ้งเตือนครู: กระดิ่งในแถบเมนู · ตั้งค่าเปิด/ปิดทีละเรื่องแล้วบันทึก', async ({ browser }) => {
+  const t = await teacherPage(browser)
+  await t.getByRole('link', { name: /^แจ้งเตือน/ }).click()
+  await expect(t.getByRole('heading', { name: '🔔 แจ้งเตือน' })).toBeVisible()
+  const sw = t.getByRole('switch', { name: '📋 ลืมเช็กชื่อ' })
+  await expect(sw).toHaveAttribute('aria-checked', 'true')
+  await sw.click()
+  await expect(t.getByText('บันทึกแล้ว ✓')).toBeVisible()
+  await t.reload()
+  await expect(t.getByRole('switch', { name: '📋 ลืมเช็กชื่อ' })).toHaveAttribute('aria-checked', 'false')
+  await t.getByRole('switch', { name: '📋 ลืมเช็กชื่อ' }).click()
+  await expect(t.getByText('บันทึกแล้ว ✓')).toBeVisible()
+  await expect(t.getByLabel('ลิงก์ยืนยันการสอน')).toHaveValue('https://change-classroom1.base44.app/')
 })

@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm'
 import { type AssignmentInput, type AssignmentSummary, type Gradebook, type StudentAssignment, type StudentStatus, type SubmissionInput } from '../../shared/assignments'
 import { lateExp } from '../../shared/points'
+import { notifyResubmitted } from '../teacherNotify/service'
 import { newId, now, type Db } from '../db/client'
 import { assignments, classes, notifications, pointEvents, students, submissions } from '../db/schema'
 import { removeFiles } from '../storage/service'
@@ -159,6 +160,8 @@ export async function upsertSubmission(
   const values = { text, imageKeys, status, submittedAt: p.now, clientRequestId, updatedAt: p.now, annotatedKeys: [], score: null, gradedAt: null, onPaper: false, excusedFrom: null }
   if (existing) {
     await db.update(submissions).set(values).where(eq(submissions.id, existing.id))
+    // ส่งแก้หลังครูส่งกลับ → แจ้งครู
+    if (existing.status === 'returned') await notifyResubmitted(db, { id: p.assignmentId, title: a.title, classId: p.classId }, p.now)
   } else {
     await db
       .insert(submissions)
