@@ -42,6 +42,7 @@ import TeacherOverview from './pages/TeacherOverview'
 import TeacherTimetable from './pages/TeacherTimetable'
 import TeacherScheduled from './pages/TeacherScheduled'
 import TeacherLibrary from './pages/TeacherLibrary'
+import TeacherNotifications from './pages/TeacherNotifications'
 import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
 import TeacherGrades from './pages/TeacherGrades'
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/teacher/timetable" element={<TeacherTimetable />} />
         <Route path="/teacher/scheduled" element={<TeacherScheduled />} />
         <Route path="/teacher/library" element={<TeacherLibrary />} />
+        <Route path="/teacher/notifications" element={<TeacherNotifications />} />
         <Route path="/teacher/classes/:id" element={<TeacherClass />} />
         <Route path="/teacher/classes/:id/gradebook" element={<TeacherGradebook />} />
         <Route path="/teacher/classes/:id/attendance" element={<TeacherAttendance />} />

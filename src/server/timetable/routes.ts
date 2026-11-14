@@ -9,6 +9,8 @@ import { apiError, parseBody } from '../http'
 import { enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
 import { invalidateRelease } from './release'
+import { getNotifySettings, selfieDone } from '../teacherNotify/service'
+import { todayBangkok } from '../../shared/attendance'
 import { addSlot, deleteSlot, isPaused, listSlots, setPaused, timetableNow } from './service'
 
 export const teacherTimetableRoutes = new Hono<AppEnv>()
@@ -28,7 +30,15 @@ teacherTimetableRoutes.put('/timetable/paused', async (c) => {
   await setPaused(getDb(c.env), paused)
   return c.json({ ok: true })
 })
-teacherTimetableRoutes.get('/timetable/now', async (c) => c.json(await timetableNow(getDb(c.env), now())))
+teacherTimetableRoutes.get('/timetable/now', async (c) => {
+  const db = getDb(c.env)
+  const t = now()
+  const r = await timetableNow(db, t)
+  // ยืนยันการสอน (เซลฟี + พิกัด) ของคาบที่กำลังสอน
+  const ns = await getNotifySettings(db)
+  const selfie = r.current && ns.selfie.on && ns.selfie.url ? { url: ns.selfie.url, done: await selfieDone(db, r.current.id, todayBangkok(t)), date: todayBangkok(t) } : null
+  return c.json({ ...r, selfie })
+})
 
 // ---- รายการที่รอเผยแพร่ (ตั้งเวลา/ร่าง) ทุกประเภท ----
 const TABLES = { assignment: 'assignments', video: 'videos', material: 'materials', announcement: 'announcements' } as const

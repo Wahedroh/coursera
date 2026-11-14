@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router'
 import { api } from '../api'
 
@@ -34,6 +34,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
             ผู้ช่วยครู
           </span>
         </Link>
+        <TeacherBell />
         {NAV.map((n) => (
           <NavLink
             key={n.to}
@@ -50,5 +51,29 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
       </aside>
       <main className="flex-1 p-4 md:p-7 flex flex-col gap-4 min-w-0">{children}</main>
     </div>
+  )
+}
+
+/** กระดิ่งแจ้งเตือนของครู (จำนวนที่ยังไม่อ่าน) */
+function TeacherBell() {
+  const [unread, setUnread] = useState(0)
+  useEffect(() => {
+    const load = () =>
+      api<{ unread: number }>('/api/teacher/notifications')
+        .then((r) => setUnread(r.unread))
+        .catch(() => {})
+    load()
+    const id = window.setInterval(load, 120_000)
+    return () => window.clearInterval(id)
+  }, [])
+  return (
+    <NavLink
+      to="/teacher/notifications"
+      aria-label={unread ? `แจ้งเตือน ${unread} รายการใหม่` : 'แจ้งเตือน'}
+      className={({ isActive }) => `relative rounded-xl px-2.5 md:px-3 py-2 text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white/15 text-white' : 'text-green-100'}`}
+    >
+      🔔 แจ้งเตือน
+      {unread > 0 && <span className="ml-1.5 inline-block rounded-full bg-red-500 text-white px-1.5 text-xs font-extrabold">{unread}</span>}
+    </NavLink>
   )
 }

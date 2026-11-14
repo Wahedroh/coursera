@@ -53,24 +53,25 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   return reg ? reg.pushManager.getSubscription() : null
 }
 
-export async function enablePush(): Promise<'on' | 'denied' | 'unsupported'> {
+/** base = /api/student/push (นักเรียน) หรือ /api/teacher/push (ครู) */
+export async function enablePush(base = '/api/student/push'): Promise<'on' | 'denied' | 'unsupported'> {
   if (!pushSupported()) return 'unsupported'
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') return 'denied'
   const reg = await registration()
   let sub = await reg.pushManager.getSubscription()
   if (!sub) {
-    const { publicKey } = await api<{ publicKey: string }>('/api/student/push/key')
+    const { publicKey } = await api<{ publicKey: string }>(`${base}/key`)
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) as BufferSource })
   }
-  await api('/api/student/push/subscribe', { body: { endpoint: sub.endpoint } })
+  await api(`${base}/subscribe`, { body: { endpoint: sub.endpoint } })
   return 'on'
 }
 
-export async function disablePush(): Promise<void> {
+export async function disablePush(base = '/api/student/push'): Promise<void> {
   const sub = await currentSubscription()
   if (!sub) return
-  await api('/api/student/push/unsubscribe', { body: { endpoint: sub.endpoint } }).catch(() => {})
+  await api(`${base}/unsubscribe`, { body: { endpoint: sub.endpoint } }).catch(() => {})
   await sub.unsubscribe()
 }
 

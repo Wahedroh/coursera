@@ -176,6 +176,13 @@
       "when": 1794636818542,
       "tag": "0024_timetable_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1794650889876,
+      "tag": "0025_teacher_notifications",
+      "breakpoints": true
     }
   ]
 }

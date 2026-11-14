@@ -11,7 +11,7 @@ export const httpPushSender: PushSender = async (endpoint, authorization) =>
   (await fetch(endpoint, { method: 'POST', headers: { Authorization: authorization, TTL: '86400', Urgency: 'normal', 'Content-Length': '0' } })).status
 
 /** ส่งได้ไม่เกินนี้ต่อรอบ (Workers แพ็กเกจฟรีจำกัด 50 subrequest ต่อคำขอ) — ที่เหลือส่งรอบถัดไป */
-export const PUSH_PER_RUN = 40
+export const PUSH_PER_RUN = 35
 const RECENT = 3 * 86400_000
 
 export async function subscribe(db: Db, studentId: string, endpoint: string, t: number): Promise<void> {

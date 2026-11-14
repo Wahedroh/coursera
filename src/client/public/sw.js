@@ -7,7 +7,10 @@ self.addEventListener('push', (event) => {
     (async () => {
       let items = []
       try {
-        const res = await fetch('/api/student/push/take', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' })
+        const opts = { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' }
+        let res = await fetch('/api/student/push/take', opts)
+        // เครื่องนี้ล็อกอินเป็นครู → ดึงแจ้งเตือนของครู
+        if (res.status === 401) res = await fetch('/api/teacher/push/take', opts)
         if (res.ok) items = await res.json()
       } catch {}
       // ต้องแสดงอย่างน้อย 1 รายการเสมอ (เบราว์เซอร์บังคับ)
@@ -29,6 +32,8 @@ self.addEventListener('notificationclick', (event) => {
   const url = new URL((event.notification.data && event.notification.data.url) || '/me', self.location.origin).href
   event.waitUntil(
     (async () => {
+      // ลิงก์ภายนอก (เช่น หน้ายืนยันการสอนของครู) เปิดหน้าต่างใหม่
+      if (new URL(url).origin !== self.location.origin) return self.clients.openWindow(url)
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       for (const w of wins) {
         if (new URL(w.url).origin === self.location.origin) {

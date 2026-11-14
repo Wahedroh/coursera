@@ -6,7 +6,16 @@ import { WEEKDAY_LABEL, WEEKDAY_SHORT, type Slot } from '../../shared/timetable'
 import { Card } from '../ui'
 
 type Occ = Slot & { startAt: number; endAt: number }
-type Now = { paused: boolean; hasSlots: boolean; current: Occ | null; upcoming: Occ[]; missingAttendance: { classId: string; date: string; weekday: number }[]; currentDayId: string | null }
+type Now = {
+  paused: boolean
+  hasSlots: boolean
+  current: Occ | null
+  upcoming: Occ[]
+  missingAttendance: { classId: string; date: string; weekday: number }[]
+  currentDayId: string | null
+  /** ยืนยันการสอน (เซลฟี + พิกัด) ของคาบนี้ */
+  selfie: { url: string; done: boolean; date: string } | null
+}
 type ClassInfo = { id: string; name: string; studentCount: number }
 
 const time = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
@@ -49,6 +58,12 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
     navigate(`/teacher/classes/${classId}/attendance`)
   }
 
+  async function markSelfie(done: boolean) {
+    if (!now?.current || !now.selfie) return
+    await api('/api/teacher/selfie-done', { method: 'PUT', body: { slotId: now.current.id, date: now.selfie.date, done } }).catch(() => {})
+    setNow({ ...now, selfie: { ...now.selfie, done } })
+  }
+
   const c = now.current
   const info = c ? cls(c.classId) : null
   const next = now.upcoming[0]
@@ -68,6 +83,20 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
           <p className="text-sm opacity-85">
             {WEEKDAY_LABEL[c.weekday]} {c.start}–{c.end} · {info.studentCount} คน · เหลืออีก {Math.max(0, Math.round((c.endAt - Date.now()) / 60000))} นาที
           </p>
+          {now.selfie && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-white/15 px-3 py-2" data-testid="selfie-row">
+              {now.selfie.done ? (
+                <span className="font-bold">✅ ยืนยันการสอนคาบนี้แล้ว</span>
+              ) : (
+                <a href={now.selfie.url} target="_blank" rel="noreferrer" className="rounded-lg bg-amber-400 text-amber-950 px-3 py-1.5 text-sm font-extrabold">
+                  📸 ยืนยันการสอน (เซลฟี + พิกัด)
+                </a>
+              )}
+              <button type="button" onClick={() => void markSelfie(!now.selfie!.done)} className="text-xs underline opacity-90">
+                {now.selfie.done ? 'ยกเลิก' : 'ยืนยันแล้ว ✓'}
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-3">
             <button type="button" disabled={busy} onClick={() => void checkIn(c.classId)} className="rounded-xl bg-white text-ink py-2 font-bold text-sm">
               <span className="block text-xl">📋</span>

@@ -1,3 +1,4 @@
+import { drainTeacher, generateTeacherNotifications } from '../teacherNotify/service'
 import { releaseDue } from '../timetable/release'
 import { sql } from 'drizzle-orm'
 import { getDb } from '../db/client'
@@ -22,10 +23,12 @@ export async function enqueueDueReminders(env: Pick<Env, 'DB'>, t: number): Prom
   return res.meta.changes ?? 0
 }
 
-/** งานตามเวลา (ทุก 30 นาที): เตือนงานใกล้ครบกำหนด แล้วส่ง push ที่ค้าง */
+/** งานตามเวลา (ทุก 5 นาที): เตือนงานใกล้ครบกำหนด แล้วส่ง push ที่ค้าง */
 export async function runCron(env: Pick<Env, 'DB'>, t: number, send?: PushSender) {
   const released = await releaseDue(getDb(env), t, true)
   const reminders = await enqueueDueReminders(env, t)
   const events = await enqueueEventReminders(getDb(env), t)
-  return { released, reminders, events, ...(await drain(getDb(env), t, send)) }
+  const teacher = await generateTeacherNotifications(getDb(env), t)
+  const teacherPushed = await drainTeacher(getDb(env), t, send)
+  return { released, reminders, events, teacher, teacherPushed, ...(await drain(getDb(env), t, send)) }
 }
