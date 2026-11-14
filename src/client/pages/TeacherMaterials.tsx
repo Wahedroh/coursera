@@ -9,7 +9,7 @@ import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
 import CopyButton from '../components/CopyDialog'
 import PasteZone, { type PastedPage } from '../components/PasteZone'
-import { imagesToPdf } from '../lib/pdf'
+import { combineToPdf } from '../lib/pdf'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -81,7 +81,7 @@ export default function TeacherMaterials() {
     try {
       // หน้าที่วางมา → รวมเป็น PDF ไฟล์เดียว
       const upload = pages.length
-        ? new File([await imagesToPdf(pages.map((p) => p.blob))], `จดในห้อง-${lessonDate}.pdf`, { type: 'application/pdf' })
+        ? new File([await combineToPdf(pages)], `จดในห้อง-${lessonDate}.pdf`, { type: 'application/pdf' })
         : file!
       if (upload.size > MAX_MATERIAL_BYTES) throw new Error('ไฟล์รวมใหญ่เกิน 25MB — ลองแบ่งเป็นหลายครั้ง')
       const ids = await uploadMaterial(upload, { title, topic, kind, lessonDate, notify, classIds, ...publishBody(pub) })
@@ -222,7 +222,7 @@ export default function TeacherMaterials() {
               </label>
               <PasteZone pages={pages} onPages={onPages} onFile={(f) => pick(f)} autoFocus={startKind === 'notes'} />
               {file && !pages.length && <p className="text-xs text-stone-600">ไฟล์ที่เลือก: {file.name}</p>}
-              {file && pages.length > 0 && <p className="text-xs text-amber-700">มีทั้งไฟล์และหน้าที่วาง — ระบบจะใช้หน้าที่วาง ({pages.length} หน้า)</p>}
+              {file && pages.length > 0 && <p className="text-xs text-amber-700">มีทั้งไฟล์และหน้าที่วาง — ระบบจะใช้ชิ้นที่ลาก/วาง ({pages.length} ชิ้น)</p>}
             </div>
           )}
           <label className="text-sm font-semibold">

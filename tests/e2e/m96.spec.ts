@@ -155,3 +155,46 @@ test('เอกสารที่จดในห้อง: วางรูปจ
   expect(res.headers()['content-type']).toBe('application/pdf')
   expect((await res.body()).subarray(0, 5).toString()).toBe('%PDF-')
 })
+
+test('ลาก PDF จาก GoodNotes หลายครั้ง + รูป → รวมเป็น PDF ไฟล์เดียวตามลำดับ (หน้าครบ)', async ({ browser }) => {
+  const { PDFDocument } = await import('pdf-lib')
+  const makePdf = async (n: number) => {
+    const d = await PDFDocument.create()
+    for (let i = 0; i < n; i++) d.addPage([400, 500])
+    return Buffer.from(await d.save()).toString('base64')
+  }
+  const t = await teacherPage(browser)
+  await t.goto('/teacher/menu/materials')
+  await t.getByRole('link', { name: 'เอกสารเรียน โรงเรียนทดสอบ ชั้น 1' }).click()
+  await t.waitForURL(/materials/)
+  await t.goto(t.url() + '?kind=notes')
+  const zone = t.getByTestId('paste-zone')
+  const drop = (b64: string, name: string, type: string) =>
+    zone.evaluate(
+      (el, [b, n, ty]) => {
+        const bytes = Uint8Array.from(atob(b), (c) => c.charCodeAt(0))
+        const dt = new DataTransfer()
+        dt.items.add(new File([bytes], n, { type: ty }))
+        el.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }))
+      },
+      [b64, name, type] as const,
+    )
+  await drop(await makePdf(2), 'หน้า 1-2.pdf', 'application/pdf')
+  await drop(await makePdf(1), 'หน้า 3.pdf', 'application/pdf')
+  const png = await t.screenshot({ clip: { x: 0, y: 0, width: 200, height: 260 } })
+  await drop(png.toString('base64'), 'รูป.png', 'image/png')
+  const strip = t.getByTestId('pasted-pages')
+  await expect(strip.getByRole('img')).toHaveCount(3)
+  await expect(strip).toContainText('2 หน้า')
+  await expect(strip).toContainText('1 หน้า')
+  await t.getByLabel('ชื่อเอกสาร').fill('จดในห้อง (ลากหลายไฟล์)')
+  await t.getByRole('button', { name: 'อัปโหลด', exact: true }).click()
+  await expect(t.getByText(/อัปโหลด "จดในห้อง \(ลากหลายไฟล์\)" แล้ว 1 ห้อง/)).toBeVisible()
+
+  const list = await (await t.request.get(`/api/teacher/classes/${new URL(t.url()).pathname.split('/')[3]}/materials`)).json()
+  const m = list.find((x: { title: string }) => x.title === 'จดในห้อง (ลากหลายไฟล์)')
+  const res = await t.request.get(`/api/files/${m.fileKey}`)
+  expect(res.headers()['content-type']).toBe('application/pdf')
+  const doc = await PDFDocument.load(await res.body())
+  expect(doc.getPageCount()).toBe(4)
+})

@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
-export type PastedPage = { id: number; blob: Blob; url: string }
+import { pdfPageCount } from '../lib/pdf'
+
+/** ชิ้นที่วาง/ลากเข้ามา (รูป หรือ PDF) — ตอนอัปโหลดรวมเป็น PDF ไฟล์เดียวตามลำดับ */
+export type PastedPage = { id: number; blob: Blob; url: string; kind: 'image' | 'pdf'; name: string; pageCount: number | null }
 let seq = 0
 const isImage = (f: Blob) => f.type.startsWith('image/')
+const isPdf = (f: Blob) => f.type === 'application/pdf' || (f instanceof File && /\.pdf$/i.test(f.name))
 
 /**
  * ช่องวางเอกสารที่จด: วางรูปจากคลิปบอร์ด (แตะค้าง → วาง หรือปุ่ม “วางจากคลิปบอร์ด”) หรือลากไฟล์มาปล่อย
@@ -23,6 +27,8 @@ export default function PasteZone({
   const zone = useRef<HTMLDivElement>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [over, setOver] = useState(false)
+  // จำนวนหน้าของ PDF แต่ละชิ้น (นับแบบ async แยกจากรายการ กันอัปเดตทับกัน)
+  const [counts, setCounts] = useState<Record<number, number | null>>({})
   const pagesRef = useRef(pages)
   pagesRef.current = pages
 
@@ -33,20 +39,32 @@ export default function PasteZone({
 
   /** คืนจำนวนที่รับได้ · types = ชนิดข้อมูลที่พบในคลิปบอร์ด (ไว้บอกครูเมื่อไม่พบรูป) */
   function add(files: Blob[], types: string[] = []): number {
-    const imgs = files.filter(isImage)
-    const pdf = files.find((f) => f.type === 'application/pdf')
-    if (pdf) onFile(pdf instanceof File ? pdf : new File([pdf], 'จดในห้อง.pdf', { type: 'application/pdf' }))
-    if (imgs.length) {
-      onPages([...pagesRef.current, ...imgs.map((blob) => ({ id: ++seq, blob, url: URL.createObjectURL(blob) }))])
-      setMsg(`เพิ่ม ${imgs.length} หน้า`)
-    } else if (pdf) setMsg('ได้ไฟล์ PDF แล้ว')
+    const usable = files.filter((f) => isImage(f) || isPdf(f))
+    // ไฟล์ชนิดอื่น (Word/PowerPoint) ใช้เป็นไฟล์เดี่ยวแบบเดิม
+    const other = files.find((f) => !isImage(f) && !isPdf(f) && f instanceof File) as File | undefined
+    if (other) onFile(other)
+    if (usable.length) {
+      const added: PastedPage[] = usable.map((blob) => ({
+        id: ++seq,
+        blob,
+        url: URL.createObjectURL(blob),
+        kind: isPdf(blob) ? 'pdf' : 'image',
+        name: blob instanceof File ? blob.name : isPdf(blob) ? 'PDF' : 'รูป',
+        pageCount: isPdf(blob) ? null : 1,
+      }))
+      onPages([...pagesRef.current, ...added])
+      setMsg(`เพิ่ม ${added.length} ชิ้น · รวมเป็น PDF ไฟล์เดียวตอนอัปโหลด`)
+      // นับหน้าของ PDF ที่ลากมา
+      for (const a of added.filter((x) => x.kind === 'pdf'))
+        void pdfPageCount(a.blob).then((n) => setCounts((c) => ({ ...c, [a.id]: n })))
+    } else if (other) setMsg(`ได้ไฟล์ ${other.name}`)
     else {
       const seen = [...new Set(types)].filter(Boolean)
       setMsg(
         `ไม่พบรูปในคลิปบอร์ด${seen.length ? ` (พบข้อมูลชนิด: ${seen.join(', ')})` : ''} — ลองวิธีที่ 1 หรือ 2 ใน “วิธีคัดลอกจาก GoodNotes” ด้านล่าง`,
       )
     }
-    return imgs.length + (pdf ? 1 : 0)
+    return usable.length + (other ? 1 : 0)
   }
 
   /** รูปที่ฝังมาเป็น HTML (<img src="data:…">) */
@@ -171,8 +189,8 @@ export default function PasteZone({
         className={`min-h-28 rounded-2xl border-2 border-dashed px-4 py-5 text-center text-sm outline-none caret-transparent ${over ? 'border-board bg-board-soft' : 'border-amber-300 bg-amber-50'} focus:border-board`}
       >
         <span contentEditable={false} data-keep className="pointer-events-none select-none">
-          <b className="block text-base">📋 แตะค้างในกรอบนี้ แล้วเลือก “วาง”</b>
-          <span className="text-stone-500">หรือลากไฟล์ PDF/รูปมาปล่อย · วางได้หลายหน้า ระบบรวมเป็น PDF ไฟล์เดียวให้</span>
+          <b className="block text-base">✋ ลากหน้าที่จด / ไฟล์ PDF จาก GoodNotes มาปล่อยที่นี่</b>
+          <span className="text-stone-500">ลากได้หลายครั้ง ระบบต่อกันตามลำดับแล้วรวมเป็น PDF ไฟล์เดียว · รูปภาพแตะค้างแล้ว “วาง” ได้ด้วย</span>
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -182,33 +200,41 @@ export default function PasteZone({
         {msg && <span className="text-xs text-stone-600">{msg}</span>}
       </div>
       <details className="text-xs text-stone-500" open>
-        <summary className="cursor-pointer font-semibold">วิธีคัดลอกจาก GoodNotes (ให้ได้เป็นรูป)</summary>
+        <summary className="cursor-pointer font-semibold">วิธีลากจาก GoodNotes</summary>
         <ol className="list-decimal pl-5 mt-1 space-y-1">
           <li>
-            <b>ถ่ายภาพหน้าจอ iPad (แนะนำ):</b> เปิดหน้าที่จดให้เต็มจอ → กด <b>ปุ่มด้านบน + ปุ่มเพิ่มเสียง</b> พร้อมกัน (หรือใช้ Pencil ปัดจากมุมล่างเข้าหาจอ) → แตะภาพย่อที่มุมจอ → ครอปได้ → แตะ <b>เสร็จสิ้น</b> → เลือก{' '}
-            <b>“คัดลอกและลบ”</b> → มาแตะค้างในกรอบด้านบน → <b>วาง</b>
+            เปิด <b>GoodNotes คู่กับแอปนี้แบบแบ่งจอ (Split View)</b>: ปัดขึ้นจากขอบล่างเล็กน้อยให้เห็น Dock → ลากไอคอน GoodNotes ไปวางข้างจอ
           </li>
           <li>
-            <b>บ่วงบาศใน GoodNotes:</b> ใช้เครื่องมือบ่วงบาศล้อมส่วนที่จด → แตะในกรอบ → <b>ถ่ายภาพหน้าจอ</b> → เลือก <b>คัดลอก</b> → มาวางที่นี่
+            ใน GoodNotes เปิด <b>หน้าย่อ (ไอคอนตาราง)</b> → <b>แตะค้างที่หน้า</b> แล้วลากมาปล่อยในกรอบด้านบน
           </li>
           <li>
-            <b>ทั้งเล่มเป็น PDF:</b> ใน GoodNotes กด <b>แชร์/ส่งออก → PDF → บันทึกไปยังไฟล์</b> แล้วใช้ช่อง <b>“หรือเลือกไฟล์”</b> ด้านล่าง หรือเปิดคู่กันแบบแบ่งจอ (Split View) แล้วลากไฟล์มาปล่อยในกรอบ
+            <b>ลากหลายหน้าทีเดียว:</b> แตะค้างหน้าแรกแล้วขยับเล็กน้อย จากนั้นใช้อีกนิ้ว<b>แตะหน้าอื่นเพิ่ม</b> (ซ้อนเป็นกอง) แล้วลากทั้งกองมาปล่อย · หรือลากทีละหน้าหลายครั้งก็ได้
+          </li>
+          <li>
+            เรียงลำดับด้วย ◀ ▶ ใต้รูปย่อ แล้วกด <b>อัปโหลด</b> → ได้ PDF ไฟล์เดียว
           </li>
         </ol>
-        <p className="mt-1">
-          หมายเหตุ: <b>“คัดลอกหน้า”</b> จากหน้าย่อของ GoodNotes ได้เป็นหน้า GoodNotes (ไม่ใช่รูป) จึงวางในเว็บไม่ได้ ถ้าวางไม่ได้ ระบบจะบอกชนิดข้อมูลที่พบ ส่งข้อความนั้นให้ผู้ดูแลได้
-        </p>
+        <p className="mt-1">ภาพหน้าจอ iPad (คัดลอกและลบ) วางในกรอบได้เช่นกัน · ไฟล์ Word/PowerPoint ใช้ช่อง “หรือเลือกไฟล์”</p>
       </details>
       {pages.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1" data-testid="pasted-pages">
           {pages.map((p, i) => (
             <figure key={p.id} className="shrink-0 w-28 rounded-xl border border-line bg-white p-1 flex flex-col gap-1">
-              <img src={p.url} alt={`หน้าที่ ${i + 1}`} className="h-32 w-full object-contain bg-stone-50 rounded-lg" />
+              {p.kind === 'image' ? (
+                <img src={p.url} alt={`หน้าที่ ${i + 1}`} className="h-32 w-full object-contain bg-stone-50 rounded-lg" />
+              ) : (
+                <div role="img" aria-label={`PDF ชิ้นที่ ${i + 1}`} className="h-32 w-full rounded-lg bg-red-50 flex flex-col items-center justify-center text-center px-1">
+                  <span className="text-2xl">📄</span>
+                  <span className="text-[10px] text-stone-600 break-all line-clamp-2">{p.name}</span>
+                  <b className="text-xs text-red-700">{(counts[p.id] ?? p.pageCount) == null ? 'PDF' : `${counts[p.id] ?? p.pageCount} หน้า`}</b>
+                </div>
+              )}
               <figcaption className="flex items-center justify-between text-xs">
                 <button type="button" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`เลื่อนหน้า ${i + 1} ขึ้น`} className="px-1 disabled:opacity-30">
                   ◀
                 </button>
-                <b>หน้า {i + 1}</b>
+                <b>ชิ้น {i + 1}</b>
                 <button type="button" disabled={i === pages.length - 1} onClick={() => move(i, 1)} aria-label={`เลื่อนหน้า ${i + 1} ลง`} className="px-1 disabled:opacity-30">
                   ▶
                 </button>
