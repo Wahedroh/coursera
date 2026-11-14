@@ -1,3 +1,4 @@
+import { teacherOverviewRoutes } from './overview/routes'
 import { Hono } from 'hono'
 import { sessionMiddleware } from './auth/middleware'
 import { studentAuthRoutes } from './auth/student-routes'
@@ -60,6 +61,7 @@ app.route('/api/teacher', teacherInsightRoutes)
 app.route('/api/teacher', teacherCalendarRoutes)
 app.route('/api/teacher', teacherCardRoutes)
 app.route('/api/teacher', teacherAnalysisRoutes)
+app.route('/api/teacher', teacherOverviewRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)

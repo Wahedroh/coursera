@@ -27,19 +27,24 @@ test('ครูเพิ่มนักเรียนรายคน แล้�
   await expect(s.getByText('ใหม่ใจ ย้ายมา', { exact: false })).toBeVisible()
 })
 
-test('หน้าแรกครูมีเมนูห้องเรียนครบ เลือกห้องแล้วไปหน้าของห้องนั้น และจำห้องที่เลือกไว้', async ({ page }) => {
+test('หน้าแรกครูมีเมนูห้องเรียนครบ · แต่ละเมนูเห็นทุกห้องแยกโรงเรียน/ชั้น แล้วเข้าห้องได้', async ({ page }) => {
   await page.goto('/teacher/login')
   await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
   await expect(page.getByRole('heading', { name: 'เมนูห้องเรียน' })).toBeVisible()
   for (const name of ['ตารางทวงงาน', '+ สร้างงาน', 'เช็กชื่อ', 'ผังห้อง & แต้ม', 'คะแนนสอบ', 'เกรด', 'คลิปย้อนหลัง', 'ประกาศ', 'เอกสารเรียน', 'ค่าเอกสาร'])
     await expect(page.getByRole('link', { name, exact: true })).toBeVisible()
-  await page.getByLabel('เลือกห้องสำหรับเมนู').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
-  await page.getByRole('link', { name: 'ประกาศ', exact: true }).click()
+  // ตารางทวงงาน: เห็นงานของทุกห้อง แยกโรงเรียน
+  await page.getByRole('link', { name: 'ตารางทวงงาน', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'ตารางทวงงาน', exact: true })).toBeVisible()
+  await expect(page.getByTestId('overview-school-โรงเรียนทดสอบ')).toBeVisible()
+  await expect(page.getByTestId('overview-items-โรงเรียนทดสอบ ชั้น 1')).toContainText('ใบงานเศษส่วน')
+  // สลับเมนูด้านบนได้ทุกปุ่ม
+  await page.getByRole('navigation', { name: 'เมนูครู' }).getByRole('link', { name: 'คะแนนสอบ', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'คะแนนสอบ', exact: true })).toBeVisible()
+  await page.getByRole('navigation', { name: 'เมนูครู' }).getByRole('link', { name: 'ประกาศ', exact: true }).click()
+  await page.getByRole('link', { name: 'ประกาศ โรงเรียนทดสอบ ชั้น 1' }).click()
   await expect(page.getByRole('link', { name: '← โรงเรียนทดสอบ ชั้น 1' })).toBeVisible()
-  await page.getByRole('link', { name: 'หน้าแรก' }).click()
-  await expect(page.getByLabel('เลือกห้องสำหรับเมนู')).toHaveValue(await page.getByLabel('เลือกห้องสำหรับเมนู').inputValue())
-  await expect(page.getByLabel('เลือกห้องสำหรับเมนู').locator('option:checked')).toHaveText('โรงเรียนทดสอบ ชั้น 1')
 })
 
 test('หน้าห้อง: เห็นคะแนนนักเรียน เรียงมาก→น้อย/น้อย→มาก ดูรายชิ้น และลบนักเรียนได้', async ({ page }) => {
