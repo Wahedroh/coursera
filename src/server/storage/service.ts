@@ -25,7 +25,7 @@ export async function assertRoom(db: Db, size: number, isTeacher: boolean): Prom
   if (u.bytes + size > STORAGE_LIMIT_BYTES) {
     throw apiError(
       'storage_full',
-      isTeacher ? 'พื้นที่เก็บรูปใกล้เต็ม กรุณาลบรูปงานที่ตรวจแล้วในหน้า "พื้นที่ไฟล์"' : 'พื้นที่เก็บรูปของห้องเรียนเต็มชั่วคราว กรุณาแจ้งครู (ส่งเป็นข้อความไปก่อนได้)',
+      isTeacher ? 'พื้นที่เก็บไฟล์ใกล้เต็ม กรุณาลบรูปงานที่ตรวจแล้วหรือเอกสารที่ไม่ใช้ในหน้า "พื้นที่ไฟล์"' : 'พื้นที่เก็บไฟล์ของห้องเรียนเต็มชั่วคราว กรุณาแจ้งครู (ส่งเป็นข้อความไปก่อนได้)',
       507,
     )
   }
@@ -157,4 +157,30 @@ export async function purgeOrphans(db: Db, bucket: R2Bucket, t: number): Promise
   } while (cursor)
   await removeFiles(db, bucket, orphans.map((o) => o.key))
   return { files: orphans.length, bytes: orphans.reduce((n, o) => n + o.size, 0) }
+}
+
+/** ประเภทไฟล์ในพื้นที่เก็บ (ตามโฟลเดอร์ของไฟล์) */
+export const STORAGE_GROUPS = [
+  { id: 'sub', label: 'รูปงานที่นักเรียนส่ง' },
+  { id: 'ann', label: 'รูปที่ครูเขียนตรวจ' },
+  { id: 'mat-blank', label: 'เอกสารเปล่า (ใบงาน/ใบความรู้)' },
+  { id: 'mat-notes', label: 'เอกสารที่จดในห้อง' },
+  { id: 'asg', label: 'ไฟล์แนบในงาน' },
+  { id: 'quiz', label: 'รูปโจทย์ (เกมการ์ด/คำถามท้ายคลิป)' },
+  { id: 'pay', label: 'QR รับเงินค่าเอกสาร' },
+  { id: 'other', label: 'อื่น ๆ' },
+] as const
+export type StorageBreakdown = { id: string; label: string; files: number; bytes: number }[]
+
+/** พื้นที่ที่ใช้แยกตามประเภท (รวมกันเท่ากับพื้นที่ที่ใช้ทั้งหมด) */
+export async function storageBreakdown(db: Db): Promise<StorageBreakdown> {
+  const rows = await db.all<{ g: string; files: number; bytes: number }>(sql`
+    SELECT CASE
+        WHEN f.key LIKE 'mat/%' THEN CASE WHEN EXISTS (SELECT 1 FROM materials m WHERE m.file_key = f.key AND m.kind = 'notes') THEN 'mat-notes' ELSE 'mat-blank' END
+        WHEN substr(f.key, 1, instr(f.key, '/') - 1) IN ('sub', 'ann', 'asg', 'quiz', 'pay') THEN substr(f.key, 1, instr(f.key, '/') - 1)
+        ELSE 'other' END AS g,
+      count(*) AS files, coalesce(sum(f.size), 0) AS bytes
+    FROM stored_files f GROUP BY g`)
+  const by = new Map(rows.map((r) => [r.g, r]))
+  return STORAGE_GROUPS.map((g) => ({ id: g.id, label: g.label, files: by.get(g.id)?.files ?? 0, bytes: by.get(g.id)?.bytes ?? 0 }))
 }

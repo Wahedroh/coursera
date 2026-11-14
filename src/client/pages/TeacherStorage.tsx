@@ -7,19 +7,30 @@ import { useTeacherErrorHandler } from './useTeacherGuard'
 type Usage = { bytes: number; files: number; limitBytes: number; freeBytes: number; syncedAt: number | null }
 type Candidate = { assignmentId: string; title: string; className: string; submissions: number; files: number; bytes: number; lastGradedAt: number }
 
-export const fmtBytes = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} GB` : b >= 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${Math.round(b / 1024)} KB`)
+type Part = { id: string; label: string; files: number; bytes: number }
+const PART_COLOR: Record<string, string> = {
+  sub: 'bg-board',
+  ann: 'bg-teal-400',
+  'mat-blank': 'bg-blue-500',
+  'mat-notes': 'bg-amber-400',
+  asg: 'bg-violet-500',
+  quiz: 'bg-pink-400',
+  pay: 'bg-stone-500',
+  other: 'bg-stone-300',
+}
+export const fmtBytes = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} GB` : b >= 1024 ** 2 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${b > 0 ? Math.max(1, Math.round(b / 1024)) : 0} KB`)
 const dayFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit' })
 
 export default function TeacherStorage() {
   const handle = useTeacherErrorHandler()
-  const [data, setData] = useState<{ usage: Usage; candidates: Candidate[] } | null>(null)
+  const [data, setData] = useState<{ usage: Usage; breakdown: Part[]; candidates: Candidate[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [days, setDays] = useState(30)
 
   const load = useCallback(() => {
-    api<{ usage: Usage; candidates: Candidate[] }>('/api/teacher/storage').then(setData).catch((e) => setError(handle(e)))
+    api<{ usage: Usage; breakdown: Part[]; candidates: Candidate[] }>('/api/teacher/storage').then(setData).catch((e) => setError(handle(e)))
   }, [handle])
   useEffect(load, [load])
 
@@ -41,7 +52,8 @@ export default function TeacherStorage() {
   const purged = (r: { submissions?: number; files: number; bytes: number }) => `ลบรูปแล้ว ${r.files} ไฟล์ จากงาน ${r.submissions ?? 0} ชิ้น · คืนพื้นที่ ${fmtBytes(r.bytes)}`
 
   if (!data) return <TeacherLayout>{error ? <ErrorBox message={error} /> : <Loading />}</TeacherLayout>
-  const { usage: u, candidates } = data
+  const { usage: u, candidates, breakdown } = data
+  const parts = breakdown.filter((p) => p.bytes > 0)
   const pct = Math.min(100, (u.bytes / u.freeBytes) * 100)
   const tone = pct >= 90 ? 'bg-red-500' : pct >= 75 ? 'bg-amber-400' : 'bg-board'
   const total = candidates.reduce((n, c) => n + c.bytes, 0)
@@ -58,14 +70,29 @@ export default function TeacherStorage() {
           </b>
           <span className="text-stone-500">{u.files} ไฟล์</span>
         </div>
-        <div className="h-3 rounded-full bg-stone-100 overflow-hidden">
-          <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
+        <div className="h-3 rounded-full bg-stone-100 overflow-hidden flex" title={`ใช้ไป ${pct.toFixed(1)}%`}>
+          {parts.length ? (
+            parts.map((p) => <div key={p.id} className={`h-full ${PART_COLOR[p.id] ?? 'bg-stone-400'}`} style={{ width: `${(p.bytes / u.freeBytes) * 100}%` }} />)
+          ) : (
+            <div className={`h-full ${tone}`} style={{ width: `${pct}%` }} />
+          )}
         </div>
         <p className="text-xs text-stone-500">
           {pct >= 90
-            ? '⚠️ ใกล้เต็มแล้ว — ถ้าเกิน 9.5 GB นักเรียนจะแนบรูปไม่ได้ (ยังส่งข้อความได้) กรุณาลบรูปงานที่ตรวจแล้ว'
-            : 'แพ็กเกจฟรีของ Cloudflare ได้ 10 GB · ระบบหยุดรับรูปใหม่ที่ 9.5 GB เพื่อไม่ให้เต็มกลางคาบ'}
+            ? '⚠️ ใกล้เต็มแล้ว — ถ้าเกิน 9.5 GB จะอัปโหลดไฟล์/รูปใหม่ไม่ได้ (นักเรียนยังส่งข้อความได้) กรุณาลบรูปงานที่ตรวจแล้วหรือเอกสารที่ไม่ใช้'
+            : `ใช้ไป ${pct.toFixed(1)}% ของแพ็กเกจฟรี Cloudflare (10 GB) · รวมไฟล์ทุกชนิดด้านล่าง · ระบบหยุดรับไฟล์ใหม่ที่ 9.5 GB เพื่อไม่ให้เต็มกลางคาบ`}
         </p>
+        <ul className="grid gap-1 sm:grid-cols-2 text-sm" data-testid="storage-breakdown">
+          {breakdown.map((p) => (
+            <li key={p.id} className={`flex items-center gap-2 ${p.bytes ? '' : 'opacity-50'}`}>
+              <span className={`h-3 w-3 shrink-0 rounded-sm ${PART_COLOR[p.id] ?? 'bg-stone-400'}`} aria-hidden />
+              <span className="flex-1">{p.label}</span>
+              <span className="tabular-nums text-stone-600">
+                {fmtBytes(p.bytes)} · {p.files} ไฟล์
+              </span>
+            </li>
+          ))}
+        </ul>
         <button type="button" className="self-start text-xs text-board underline" disabled={busy} onClick={() => api<Usage>('/api/teacher/storage/sync', { body: {} }).then(() => load()).catch((e) => setError(handle(e)))}>
           นับพื้นที่ใหม่
         </button>
