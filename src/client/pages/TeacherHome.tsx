@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { Card, ErrorBox, Loading } from '../ui'
-import ClassMenu from '../components/ClassMenu'
+import { OverviewMenu } from '../components/ClassMenu'
 import TeacherToday from '../components/TeacherToday'
 import TermCard from '../components/TermCard'
 import TeacherLayout from './TeacherLayout'
@@ -19,21 +19,6 @@ export default function TeacherHome() {
   const [schools, setSchools] = useState<School[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [storage, setStorage] = useState<{ bytes: number; freeBytes: number } | null>(null)
-  // ห้องที่เลือกในเมนูลัด (จำไว้ในเครื่องนี้)
-  const [menuClass, setMenuClass] = useState<string>(() => {
-    try {
-      return localStorage.getItem('teacher:menuClass') ?? ''
-    } catch {
-      return ''
-    }
-  })
-  const pickClass = (id: string) => {
-    setMenuClass(id)
-    try {
-      localStorage.setItem('teacher:menuClass', id)
-    } catch {}
-  }
-
   useEffect(() => {
     api<{ bytes: number; freeBytes: number }>('/api/teacher/storage/usage').then(setStorage).catch(() => {})
   }, [])
@@ -47,8 +32,6 @@ export default function TeacherHome() {
   const total = schools?.reduce((n, s) => n + s.classes.reduce((m, c) => m + c.studentCount, 0), 0) ?? 0
   const pinSet = schools?.reduce((n, s) => n + s.classes.reduce((m, c) => m + c.pinSetCount, 0), 0) ?? 0
   const classCount = schools?.reduce((n, s) => n + s.classes.length, 0) ?? 0
-  const allClasses = schools?.flatMap((s) => s.classes) ?? []
-  const selected = allClasses.find((c) => c.id === menuClass) ?? allClasses[0]
 
   return (
     <TeacherLayout>
@@ -74,23 +57,13 @@ export default function TeacherHome() {
         </Link>
       )}
       {classCount > 0 && <TeacherToday />}
-      {selected && (
+      {classCount > 0 && (
         <Card className="p-4 flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+          <div>
             <h2 className="font-bold">เมนูห้องเรียน</h2>
-            <select aria-label="เลือกห้องสำหรับเมนู" className="border-2 border-line rounded-xl px-3 py-1.5 bg-white font-semibold" value={selected.id} onChange={(e) => pickClass(e.target.value)}>
-              {schools!.map((s) => (
-                <optgroup key={s.schoolId} label={s.schoolName}>
-                  {s.classes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <p className="text-xs text-stone-500">แตะเมนูเพื่อดูทุกห้อง แยกโรงเรียน/ชั้น แล้วเลือกห้องที่จะจัดการ</p>
           </div>
-          <ClassMenu classId={selected.id} />
+          <OverviewMenu />
         </Card>
       )}
       {!schools && !error && <Loading />}

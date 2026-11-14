@@ -38,6 +38,7 @@ import StudentReport from './pages/StudentReport'
 import TeacherAnalysis from './pages/TeacherAnalysis'
 import TeacherReportCards from './pages/TeacherReportCards'
 import TeacherHome from './pages/TeacherHome'
+import TeacherOverview from './pages/TeacherOverview'
 import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
 import TeacherGrades from './pages/TeacherGrades'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />
         <Route path="/teacher/import" element={<TeacherImport />} />
+        <Route path="/teacher/menu/:kind" element={<TeacherOverview />} />
         <Route path="/teacher/classes/:id" element={<TeacherClass />} />
         <Route path="/teacher/classes/:id/gradebook" element={<TeacherGradebook />} />
         <Route path="/teacher/classes/:id/attendance" element={<TeacherAttendance />} />
