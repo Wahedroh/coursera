@@ -13,12 +13,12 @@ const asgInTerm = (w: TermWindow) => and(gte(assignments.createdAt, w.start), lt
 
 export const assignmentNotFound = () => apiError('assignment_not_found', 'ไม่พบงานนี้', 404)
 
-export async function createAssignments(db: Db, classIds: string[], input: AssignmentInput): Promise<string[]> {
+export async function createAssignments(db: Db, classIds: string[], input: AssignmentInput, sched?: Map<string, { published: boolean; publishAt: number | null }>): Promise<string[]> {
   const unique = [...new Set(classIds)]
   const found = await db.select({ id: classes.id }).from(classes).where(inArray(classes.id, unique))
   if (found.length !== unique.length) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const t = now()
-  const rows = unique.map((classId) => ({ id: newId(), classId, ...input, createdAt: t, updatedAt: t }))
+  const rows = unique.map((classId) => ({ id: newId(), classId, ...input, ...(sched?.get(classId) ?? {}), createdAt: t, updatedAt: t }))
   for (const r of rows) await db.insert(assignments).values(r)
   return rows.map((r) => r.id)
 }
@@ -33,6 +33,8 @@ export async function listForClass(db: Db, classId: string, win?: TermWindow): P
       maxScore: assignments.maxScore,
       submitMode: assignments.submitMode,
       createdAt: assignments.createdAt,
+      published: assignments.published,
+      publishAt: assignments.publishAt,
     })
     .from(assignments)
     .where(and(eq(assignments.classId, classId), asgInTerm(w)))
@@ -170,7 +172,7 @@ export async function gradebook(db: Db, classId: string, win?: TermWindow): Prom
   const [cls] = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.id, classId))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const w = win ?? (await termWindow(db))
-  const list = (await listForClass(db, classId, w)).map(({ id, title, dueAt, maxScore }) => ({ id, title, dueAt, maxScore }))
+  const list = (await listForClass(db, classId, w)).map(({ id, title, dueAt, maxScore, published, publishAt }) => ({ id, title, dueAt, maxScore, published, publishAt }))
   const roster = await db
     .select({ id: students.id, zipgradeId: students.zipgradeId, title: students.title, firstName: students.firstName, lastName: students.lastName })
     .from(students)

@@ -127,6 +127,9 @@ export default function TeacherGradebook() {
                           {a.title}
                         </Link>
                         <span className="block font-normal">{formatDue(a.dueAt).replace('กำหนดส่ง ', '')}</span>
+                        {a.published === false && (
+                          <span className="block font-normal text-violet-700">{a.publishAt ? `⏰ เผยแพร่ ${formatDue(a.publishAt).replace('กำหนดส่ง ', '')}` : 'ร่าง (นักเรียนยังไม่เห็น)'}</span>
+                        )}
                         <button type="button" onClick={() => copyMissing(a.id)} className="mt-1 rounded-md border border-line px-1.5 py-0.5 font-normal" aria-label={`คัดลอกรายชื่อคนยังไม่ส่ง ${a.title}`}>
                           📋 ยังไม่ส่ง
                         </button>

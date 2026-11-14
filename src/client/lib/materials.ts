@@ -36,7 +36,7 @@ export function groupByDate<T extends { lessonDate: string }>(items: T[]): [stri
   return [...m]
 }
 
-export type UploadMeta = { title: string; topic: string; kind: 'blank' | 'notes'; lessonDate: string; notify: boolean; classIds: string[] }
+export type UploadMeta = { title: string; topic: string; kind: 'blank' | 'notes'; lessonDate: string; notify: boolean; classIds: string[]; publishMode?: string; publishAt?: number | null }
 
 export async function uploadMaterial(file: File, meta: UploadMeta): Promise<string[]> {
   const qs = new URLSearchParams({
@@ -45,6 +45,8 @@ export async function uploadMaterial(file: File, meta: UploadMeta): Promise<stri
     kind: meta.kind,
     lessonDate: meta.kind === 'notes' ? meta.lessonDate : '',
     notify: meta.kind === 'notes' && meta.notify ? '1' : '0',
+    publishMode: meta.publishMode ?? 'now',
+    publishAt: meta.publishAt ? String(meta.publishAt) : '',
     classIds: meta.classIds.join(','),
     name: file.name,
   })

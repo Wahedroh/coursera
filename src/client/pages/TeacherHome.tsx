@@ -5,6 +5,7 @@ import { Card, ErrorBox, Loading } from '../ui'
 import { OverviewMenu } from '../components/ClassMenu'
 import TeacherToday from '../components/TeacherToday'
 import TermCard from '../components/TermCard'
+import NowCard from '../components/NowCard'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -56,6 +57,7 @@ export default function TeacherHome() {
           </Card>
         </Link>
       )}
+      {classCount > 0 && <NowCard classes={schools!.flatMap((s) => s.classes)} />}
       {classCount > 0 && <TeacherToday />}
       {classCount > 0 && (
         <Card className="p-4 flex flex-col gap-3">

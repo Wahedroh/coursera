@@ -169,6 +169,13 @@
       "when": 1794544458264,
       "tag": "0023_submission_excused_late",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794636818542,
+      "tag": "0024_timetable_schedule",
+      "breakpoints": true
     }
   ]
 }

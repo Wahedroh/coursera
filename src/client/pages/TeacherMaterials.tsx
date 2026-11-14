@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { fileUrl } from '../lib/upload'
 import { fileIcon, fmtSize, groupByDate, groupByTopic, uploadMaterial } from '../lib/materials'
 import { MATERIAL_ACCEPT, MATERIAL_KIND_LABEL, MAX_MATERIAL_BYTES, materialExt, splitMaterials, type MaterialKind, type TeacherMaterial } from '../../shared/materials'
 import { todayBangkok } from '../../shared/attendance'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
+import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
+import CopyButton from '../components/CopyDialog'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -25,8 +27,12 @@ export default function TeacherMaterials() {
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
-  const [tab, setTab] = useState<MaterialKind>('blank')
-  const [kind, setKind] = useState<MaterialKind>('blank')
+  // จากปุ่ม “อัปที่จด” ในหน้าแรก (?kind=notes)
+  const [params] = useSearchParams()
+  const startKind: MaterialKind = params.get('kind') === 'notes' ? 'notes' : 'blank'
+  const [tab, setTab] = useState<MaterialKind>(startKind)
+  const [kind, setKind] = useState<MaterialKind>(startKind)
+  const [pub, setPub] = useState<PublishValue>(PUBLISH_NOW)
   const [lessonDate, setLessonDate] = useState(() => todayBangkok(Date.now()))
   const [notify, setNotify] = useState(true)
   const [classIds, setClassIds] = useState<string[]>([id])
@@ -64,7 +70,7 @@ export default function TeacherMaterials() {
     setError(null)
     setFlash(null)
     try {
-      const ids = await uploadMaterial(file, { title, topic, kind, lessonDate, notify, classIds })
+      const ids = await uploadMaterial(file, { title, topic, kind, lessonDate, notify, classIds, ...publishBody(pub) })
       setFlash(`อัปโหลด "${title}" แล้ว ${ids.length} ห้อง · ${MATERIAL_KIND_LABEL[kind]}`)
       setTab(kind)
       setFile(null)
@@ -136,9 +142,10 @@ export default function TeacherMaterials() {
                           {m.kind === 'notes' && m.topic ? `${m.topic} · ` : ''}
                           {m.fileName} · {fmtSize(m.size)}
                         </div>
-                        <div className="mt-1">{m.published ? <Chip tone="green">นักเรียนเห็น</Chip> : <Chip>ซ่อนอยู่</Chip>}</div>
+                        <div className="mt-1">{m.published ? <Chip tone="green">นักเรียนเห็น</Chip> : m.publishAt ? <ScheduleChip published={false} publishAt={m.publishAt} /> : <Chip>ซ่อนอยู่</Chip>}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
+                        <CopyButton type="material" id={m.id} title={m.title} fromClass={id} onCopied={setFlash} />
                         <a className={small} href={fileUrl(m.fileKey)} target="_blank" rel="noreferrer">
                           เปิด
                         </a>
@@ -232,7 +239,10 @@ export default function TeacherMaterials() {
               ))}
             </fieldset>
           ))}
-          <Button type="submit" disabled={busy || !file || !!fileError || classIds.length === 0}>
+          <div className="border-t border-stone-100 pt-2">
+            <PublishPicker value={pub} onChange={setPub} allowDraft={false} />
+          </div>
+          <Button type="submit" disabled={busy || !file || !!fileError || classIds.length === 0 || !publishValid(pub)}>
             {busy ? 'กำลังอัปโหลด…' : 'อัปโหลด'}
           </Button>
         </Card>

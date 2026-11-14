@@ -1,3 +1,4 @@
+import { releaseDue } from '../timetable/release'
 import { sql } from 'drizzle-orm'
 import { getDb } from '../db/client'
 import type { Env } from '../env'
@@ -23,7 +24,8 @@ export async function enqueueDueReminders(env: Pick<Env, 'DB'>, t: number): Prom
 
 /** งานตามเวลา (ทุก 30 นาที): เตือนงานใกล้ครบกำหนด แล้วส่ง push ที่ค้าง */
 export async function runCron(env: Pick<Env, 'DB'>, t: number, send?: PushSender) {
+  const released = await releaseDue(getDb(env), t, true)
   const reminders = await enqueueDueReminders(env, t)
   const events = await enqueueEventReminders(getDb(env), t)
-  return { reminders, events, ...(await drain(getDb(env), t, send)) }
+  return { released, reminders, events, ...(await drain(getDb(env), t, send)) }
 }

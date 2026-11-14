@@ -26,6 +26,8 @@ export type AssignmentSummary = {
   maxScore: number
   submitMode: SubmitMode
   counts: Record<StudentStatus, number>
+  published?: boolean
+  publishAt?: number | null
 }
 
 export type StudentAssignment = {
@@ -50,7 +52,7 @@ export type SubmissionInput = z.infer<typeof submissionInputSchema>
 export type GradebookCell = { status: StudentStatus; score: number | null; submissionId: string | null; onPaper?: boolean }
 export type Gradebook = {
   class: { id: string; name: string }
-  assignments: { id: string; title: string; dueAt: number | null; maxScore: number }[]
+  assignments: { id: string; title: string; dueAt: number | null; maxScore: number; published?: boolean; publishAt?: number | null }[]
   students: { id: string; zipgradeId: string; title: string | null; firstName: string; lastName: string; cells: Record<string, GradebookCell> }[]
 }
 

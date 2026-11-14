@@ -4,6 +4,9 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
+import { publishSchema } from '../../shared/timetable'
+import { resolvePublish } from '../timetable/service'
+import { invalidateRelease } from '../timetable/release'
 import { enqueue, enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
 import {
@@ -25,9 +28,13 @@ export const teacherAssignmentRoutes = new Hono<AppEnv>()
 teacherAssignmentRoutes.use('*', requireTeacher)
 
 teacherAssignmentRoutes.post('/assignments', async (c) => {
-  const { classIds, ...input } = await parseBody(c, createAssignmentsSchema)
-  const ids = await createAssignments(getDb(c.env), classIds, input)
-  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: '📝 งานใหม่', body: input.title, url: '/me?sheet=pending' }, now()))
+  const { classIds, publishMode, publishAt, ...input } = await parseBody(c, createAssignmentsSchema.extend(publishSchema.shape))
+  const db = getDb(c.env)
+  const sched = await resolvePublish(db, classIds, { publishMode, publishAt }, now())
+  const ids = await createAssignments(db, classIds, input, sched)
+  const nowIds = classIds.filter((id) => sched.get(id)?.published)
+  if (nowIds.length < classIds.length) invalidateRelease()
+  if (nowIds.length) await pushInBackground(c, (d) => enqueueForClasses(d, nowIds, { title: '📝 งานใหม่', body: input.title, url: '/me?sheet=pending' }, now()))
   return c.json({ ids })
 })
 

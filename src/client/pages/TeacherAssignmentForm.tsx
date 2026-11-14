@@ -4,6 +4,8 @@ import { api, ApiClientError } from '../api'
 import type { SubmitMode } from '../../shared/assignments'
 import { DEFAULT_ASSIGNMENT_EXP, lateExp } from '../../shared/points'
 import { epochToLocal, localToEpoch } from '../lib/format'
+import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, type PublishValue } from '../components/PublishPicker'
+import CopyButton from '../components/CopyDialog'
 import { resizeImage } from '../lib/image'
 import { fileUrl, uploadImage } from '../lib/upload'
 import { Button, Card, ErrorBox } from '../ui'
@@ -17,6 +19,8 @@ const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
 
 export default function TeacherAssignmentForm() {
   const { id } = useParams()
+  const [pub, setPub] = useState<PublishValue>(PUBLISH_NOW)
+  const [copied, setCopied] = useState<string | null>(null)
   const [search] = useSearchParams()
   const navigate = useNavigate()
   const handle = useTeacherErrorHandler()
@@ -72,8 +76,8 @@ export default function TeacherAssignmentForm() {
         await api(`/api/teacher/assignments/${id}`, { method: 'PUT', body })
         navigate(`/teacher/classes/${existingClass}/gradebook`, { state: { flash: 'บันทึกการแก้ไขแล้ว' } })
       } else {
-        const { ids } = await api<{ ids: string[] }>('/api/teacher/assignments', { body: { ...body, classIds } })
-        setDone(`สร้างงานแล้ว ${ids.length} ห้อง`)
+        const { ids } = await api<{ ids: string[] }>('/api/teacher/assignments', { body: { ...body, classIds, ...publishBody(pub) } })
+        setDone(`สร้างงานแล้ว ${ids.length} ห้อง${pub.mode === 'now' ? '' : pub.mode === 'draft' ? ' · เก็บเป็นร่าง (ไปเผยแพร่ที่หน้า “รอเผยแพร่”)' : ' · ตั้งเวลาเผยแพร่แล้ว'}`)
         setTitle('')
         setInstructions('')
         setAttachmentKeys([])
@@ -182,10 +186,20 @@ export default function TeacherAssignmentForm() {
                   ))}
                 </fieldset>
               ))}
+              <div className="border-t border-stone-100 pt-2">
+                <PublishPicker value={pub} onChange={setPub} />
+              </div>
             </>
           )}
+          {id && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <CopyButton type="assignment" id={id} title={title} fromClass={existingClass ?? undefined} onCopied={setCopied} />
+              <span className="text-xs text-stone-500">คัดลอกงานนี้ไปห้องอื่น</span>
+            </div>
+          )}
+          {copied && <p className="text-sm font-semibold text-board">{copied}</p>}
           <ErrorBox message={error} />
-          <Button type="submit" disabled={busy || (!id && classIds.length === 0)}>
+          <Button type="submit" disabled={busy || (!id && classIds.length === 0) || (!id && !publishValid(pub))}>
             {id ? 'บันทึก' : 'สร้างงาน'}
           </Button>
           {id && (

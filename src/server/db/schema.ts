@@ -74,6 +74,8 @@ export const assignments = sqliteTable('assignments', {
   expReward: integer('exp_reward').notNull().default(30),
   submitMode: text('submit_mode', { enum: ['text', 'image', 'both'] }).notNull(),
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  /** ตั้งเวลาเผยแพร่: published = false จนถึงเวลานี้ แล้วระบบเปิดให้เอง (null = ไม่ได้ตั้งเวลา) */
+  publishAt: integer('publish_at'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => [index('assignments_class_idx').on(t.classId)])
@@ -234,6 +236,8 @@ export const videos = sqliteTable('videos', {
   /** คำถามท้ายคลิป (ต้องตอบถูกทุกข้อจึงได้ EXP) */
   questions: text('questions', { mode: 'json' }).$type<{ q: string; choices: string[]; answer: number }[]>().notNull().default(sql`'[]'`),
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  /** ตั้งเวลาเผยแพร่: published = false จนถึงเวลานี้ แล้วระบบเปิดให้เอง (null = ไม่ได้ตั้งเวลา) */
+  publishAt: integer('publish_at'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('videos_class_idx').on(t.classId)])
 
@@ -251,6 +255,8 @@ export const materials = sqliteTable('materials', {
   fileName: text('file_name').notNull(),
   size: integer('size').notNull(),
   published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  /** ตั้งเวลาเผยแพร่: published = false จนถึงเวลานี้ แล้วระบบเปิดให้เอง (null = ไม่ได้ตั้งเวลา) */
+  publishAt: integer('publish_at'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('materials_class_idx').on(t.classId)])
 
@@ -263,6 +269,9 @@ export const announcements = sqliteTable('announcements', {
   body: text('body').notNull().default(''),
   pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
   expiresOn: text('expires_on'),
+  published: integer('published', { mode: 'boolean' }).notNull().default(true),
+  /** ตั้งเวลาเผยแพร่ (ดู assignments.publishAt) */
+  publishAt: integer('publish_at'),
   createdAt: integer('created_at').notNull(),
 }, (t) => [index('announcements_class_idx').on(t.classId)])
 
@@ -450,4 +459,22 @@ export const studentNotes = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [uniqueIndex('student_notes_unique').on(t.studentId, t.termId)],
+)
+
+/** ตารางสอนของครู: คาบประจำสัปดาห์ (เวลาไทย) */
+export const timetableSlots = sqliteTable(
+  'timetable_slots',
+  {
+    id: text('id').primaryKey(),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    /** 1 = จันทร์ … 7 = อาทิตย์ */
+    weekday: integer('weekday').notNull(),
+    /** HH:MM */
+    start: text('start').notNull(),
+    end: text('end').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('timetable_class_idx').on(t.classId)],
 )
