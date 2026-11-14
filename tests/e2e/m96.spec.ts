@@ -117,7 +117,25 @@ test('เอกสารที่จดในห้อง: วางรูปจ
       el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
     }, color)
   await paste('#fde68a')
-  await paste('#bfdbfe')
+  // ไม่มีรูป (มีแต่ข้อความ) → บอกชนิดข้อมูลที่พบ
+  await zone.evaluate((el) => {
+    const dt = new DataTransfer()
+    dt.setData('text/plain', 'ข้อความ')
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+  })
+  await expect(t.getByText(/ไม่พบรูปในคลิปบอร์ด \(พบข้อมูลชนิด: text\/plain\)/)).toBeVisible()
+  // รูปที่ฝังมาใน HTML (data URI)
+  await zone.evaluate((el) => {
+    const cv = document.createElement('canvas')
+    cv.width = 300
+    cv.height = 400
+    const ctx = cv.getContext('2d')!
+    ctx.fillStyle = '#bfdbfe'
+    ctx.fillRect(0, 0, 300, 400)
+    const dt = new DataTransfer()
+    dt.setData('text/html', `<img src="${cv.toDataURL('image/png')}">`)
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+  })
   await expect(t.getByTestId('pasted-pages').getByRole('img')).toHaveCount(2)
   await expect(t.getByLabel('ชื่อเอกสาร')).toHaveValue(/^จดในห้อง /)
   await t.getByLabel('ชื่อเอกสาร').fill('จดบนกระดาน (วาง)')
