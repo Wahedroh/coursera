@@ -43,7 +43,7 @@ export default function TeacherTimetable() {
   const classes = schools.flatMap((s) => s.classes.map((c) => ({ ...c, school: s.schoolName })))
   const nameOf = (id: string) => classes.find((c) => c.id === id)?.name ?? '—'
   const tone = (id: string) => TONES[Math.max(0, classes.findIndex((c) => c.id === id)) % TONES.length]
-  const days = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => slots?.some((s) => s.weekday === d) || weekday === d)]
+  const days = [1, 2, 3, 4, 5, 6, 7]
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
@@ -86,7 +86,7 @@ export default function TeacherTimetable() {
       {!slots && !error && <Loading />}
       {slots && (
         <Card className="p-3 overflow-x-auto">
-          <div className="grid gap-2 min-w-[640px]" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }} data-testid="timetable-grid">
+          <div className="grid gap-2 min-w-[840px]" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }} data-testid="timetable-grid">
             {days.map((d) => (
               <div key={d} className="flex flex-col gap-1.5">
                 <div className="text-center font-bold text-stone-600 text-sm">{WEEKDAY_LABEL[d]}</div>

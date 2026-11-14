@@ -19,6 +19,7 @@ test('ตารางสอน: เพิ่มคาบที่กำลัง
   const t = await teacherPage(browser)
   await t.getByRole('link', { name: 'ตารางสอน', exact: true }).click()
   await expect(t.getByRole('heading', { name: 'ตารางสอน' })).toBeVisible()
+  for (const d of ['จันทร์', 'ศุกร์', 'เสาร์', 'อาทิตย์']) await expect(t.getByTestId('timetable-grid').getByText(d, { exact: true })).toBeVisible()
   await t.getByLabel('ห้องของคาบ').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
   await t.getByLabel('วันของคาบ').selectOption({ label: WEEKDAY[new Date(now + 7 * 3600_000).getUTCDay()] })
   await t.getByLabel('เวลาเริ่มคาบ').fill(start)
