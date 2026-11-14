@@ -8,24 +8,35 @@ export async function downloadA4Pdf(el: HTMLElement, fileName: string): Promise<
   pdf.save(fileName)
 }
 
-/** รวมรูปหลายหน้า (เช่น หน้าที่จดใน GoodNotes ที่คัดลอกมาวาง) เป็น PDF ไฟล์เดียว · แต่ละหน้าขนาดตามรูป */
-export async function imagesToPdf(images: Blob[]): Promise<Blob> {
-  const [{ jsPDF }, { resizeImage }] = await Promise.all([import('jspdf'), import('./image')])
-  let pdf: InstanceType<typeof jsPDF> | null = null
-  for (const img of images) {
-    const jpg = await resizeImage(img, 2000, 0.85)
-    const bmp = await createImageBitmap(jpg)
-    const { width, height } = bmp
-    bmp.close()
-    const data = new Uint8Array(await jpg.arrayBuffer())
-    // หน่วย pt · กว้าง 595 (A4) สูงตามสัดส่วนรูป
-    const w = 595
-    const h = Math.round((height / width) * w)
-    const orientation = w > h ? 'landscape' : 'portrait'
-    if (!pdf) pdf = new jsPDF({ unit: 'pt', format: [w, h], orientation })
-    else pdf.addPage([w, h], orientation)
-    pdf.addImage(data, 'JPEG', 0, 0, w, h)
+/**
+ * รวมหลายชิ้น (PDF ที่ลากมาจาก GoodNotes และ/หรือรูป) เป็น PDF ไฟล์เดียวตามลำดับ
+ * มี PDF ชิ้นเดียว = ใช้ไฟล์เดิมเลย (ไม่แปลงซ้ำ)
+ */
+export async function combineToPdf(items: { blob: Blob; kind: 'image' | 'pdf' }[]): Promise<Blob> {
+  if (items.length === 1 && items[0].kind === 'pdf') return items[0].blob
+  const [{ PDFDocument }, { resizeImage }] = await Promise.all([import('pdf-lib'), import('./image')])
+  const out = await PDFDocument.create()
+  for (const it of items) {
+    if (it.kind === 'pdf') {
+      const src = await PDFDocument.load(await it.blob.arrayBuffer(), { ignoreEncryption: true })
+      for (const page of await out.copyPages(src, src.getPageIndices())) out.addPage(page)
+    } else {
+      const jpg = await out.embedJpg(await (await resizeImage(it.blob, 2000, 0.85)).arrayBuffer())
+      const w = 595
+      const h = Math.round((jpg.height / jpg.width) * w)
+      out.addPage([w, h]).drawImage(jpg, { x: 0, y: 0, width: w, height: h })
+    }
   }
-  if (!pdf) throw new Error('ไม่มีหน้าให้รวม')
-  return pdf.output('blob')
+  const bytes = await out.save()
+  return new Blob([bytes.slice()], { type: 'application/pdf' })
+}
+
+/** จำนวนหน้าของไฟล์ PDF (อ่านไม่ได้ = null) */
+export async function pdfPageCount(blob: Blob): Promise<number | null> {
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    return (await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true })).getPageCount()
+  } catch {
+    return null
+  }
 }
