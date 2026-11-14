@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { fileUrl } from '../lib/upload'
-import { fileIcon, fmtSize, groupByDate, groupByTopic, uploadMaterial } from '../lib/materials'
+import { fileIcon, fmtSize, groupByDate, groupByTopic, lessonDateLabel, uploadMaterial } from '../lib/materials'
 import { MATERIAL_ACCEPT, MATERIAL_KIND_LABEL, MAX_MATERIAL_BYTES, materialExt, splitMaterials, type MaterialKind, type TeacherMaterial } from '../../shared/materials'
 import { todayBangkok } from '../../shared/attendance'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
 import CopyButton from '../components/CopyDialog'
+import PasteZone, { type PastedPage } from '../components/PasteZone'
+import { imagesToPdf } from '../lib/pdf'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -25,6 +27,7 @@ export default function TeacherMaterials() {
   const [flash, setFlash] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
+  const [pages, setPages] = useState<PastedPage[]>([])
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
   // จากปุ่ม “อัปที่จด” ในหน้าแรก (?kind=notes)
@@ -63,17 +66,30 @@ export default function TeacherMaterials() {
     if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ''))
   }
 
+  // วางหน้าที่จด → ตั้งชื่อให้เอง (แก้ได้)
+  function onPages(p: PastedPage[]) {
+    setPages(p)
+    if (p.length && !title) setTitle(`จดในห้อง ${lessonDateLabel(lessonDate)}`)
+  }
+
   async function create(e: React.FormEvent) {
     e.preventDefault()
-    if (!file) return
+    if (!file && !pages.length) return
     setBusy(true)
     setError(null)
     setFlash(null)
     try {
-      const ids = await uploadMaterial(file, { title, topic, kind, lessonDate, notify, classIds, ...publishBody(pub) })
+      // หน้าที่วางมา → รวมเป็น PDF ไฟล์เดียว
+      const upload = pages.length
+        ? new File([await imagesToPdf(pages.map((p) => p.blob))], `จดในห้อง-${lessonDate}.pdf`, { type: 'application/pdf' })
+        : file!
+      if (upload.size > MAX_MATERIAL_BYTES) throw new Error('ไฟล์รวมใหญ่เกิน 25MB — ลองแบ่งเป็นหลายครั้ง')
+      const ids = await uploadMaterial(upload, { title, topic, kind, lessonDate, notify, classIds, ...publishBody(pub) })
       setFlash(`อัปโหลด "${title}" แล้ว ${ids.length} ห้อง · ${MATERIAL_KIND_LABEL[kind]}`)
       setTab(kind)
       setFile(null)
+      pages.forEach((p) => URL.revokeObjectURL(p.url))
+      setPages([])
       setTitle('')
       setFormKey((k) => k + 1)
       load()
@@ -204,11 +220,14 @@ export default function TeacherMaterials() {
                 <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
                 แจ้งเตือนนักเรียนว่ามีเอกสารที่จดในห้องใหม่
               </label>
+              <PasteZone pages={pages} onPages={onPages} onFile={(f) => pick(f)} autoFocus={startKind === 'notes'} />
+              {file && !pages.length && <p className="text-xs text-stone-600">ไฟล์ที่เลือก: {file.name}</p>}
+              {file && pages.length > 0 && <p className="text-xs text-amber-700">มีทั้งไฟล์และหน้าที่วาง — ระบบจะใช้หน้าที่วาง ({pages.length} หน้า)</p>}
             </div>
           )}
           <label className="text-sm font-semibold">
-            ไฟล์ (PDF, Word, PowerPoint หรือรูป ไม่เกิน 25MB)
-            <input className={input} type="file" required accept={MATERIAL_ACCEPT} onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+            {kind === 'notes' ? 'หรือเลือกไฟล์ (PDF, Word, PowerPoint หรือรูป ไม่เกิน 25MB)' : 'ไฟล์ (PDF, Word, PowerPoint หรือรูป ไม่เกิน 25MB)'}
+            <input className={input} type="file" required={!pages.length && !file} accept={MATERIAL_ACCEPT} onChange={(e) => pick(e.target.files?.[0] ?? null)} />
             {fileError && <span className="text-xs text-red-600">{fileError}</span>}
           </label>
           <label className="text-sm font-semibold">
@@ -242,7 +261,7 @@ export default function TeacherMaterials() {
           <div className="border-t border-stone-100 pt-2">
             <PublishPicker value={pub} onChange={setPub} allowDraft={false} />
           </div>
-          <Button type="submit" disabled={busy || !file || !!fileError || classIds.length === 0 || !publishValid(pub)}>
+          <Button type="submit" disabled={busy || (!file && !pages.length) || (!pages.length && !!fileError) || classIds.length === 0 || !publishValid(pub)}>
             {busy ? 'กำลังอัปโหลด…' : 'อัปโหลด'}
           </Button>
         </Card>
