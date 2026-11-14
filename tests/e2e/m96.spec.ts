@@ -93,3 +93,47 @@ test('คัดลอกคลิปไปห้องอื่นจากป�
   await t.getByRole('button', { name: /คัดลอกไป 1 ห้อง/ }).click()
   await expect(t.getByText(/คัดลอกประกาศแล้ว 1 ชิ้น \(รอเผยแพร่ 1\)/)).toBeVisible()
 })
+
+test('เอกสารที่จดในห้อง: วางรูปจากคลิปบอร์ด 2 หน้า → รวมเป็น PDF ไฟล์เดียว → นักเรียนเปิดได้', async ({ browser }) => {
+  const t = await teacherPage(browser)
+  await t.goto('/teacher/menu/materials')
+  await t.getByRole('link', { name: 'เอกสารเรียน โรงเรียนทดสอบ ชั้น 1' }).click()
+  await t.waitForURL(/materials/)
+  await t.goto(t.url() + '?kind=notes')
+  const zone = t.getByTestId('paste-zone')
+  await expect(zone).toBeVisible()
+  // จำลองการวางรูปจากคลิปบอร์ด (เหมือนคัดลอกหน้าจาก GoodNotes)
+  const paste = (color: string) =>
+    zone.evaluate(async (el, c) => {
+      const cv = document.createElement('canvas')
+      cv.width = 600
+      cv.height = 800
+      const ctx = cv.getContext('2d')!
+      ctx.fillStyle = c
+      ctx.fillRect(0, 0, 600, 800)
+      const blob: Blob = await new Promise((r) => cv.toBlob((b) => r(b!), 'image/png'))
+      const dt = new DataTransfer()
+      dt.items.add(new File([blob], 'image.png', { type: 'image/png' }))
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    }, color)
+  await paste('#fde68a')
+  await paste('#bfdbfe')
+  await expect(t.getByTestId('pasted-pages').getByRole('img')).toHaveCount(2)
+  await expect(t.getByLabel('ชื่อเอกสาร')).toHaveValue(/^จดในห้อง /)
+  await t.getByLabel('ชื่อเอกสาร').fill('จดบนกระดาน (วาง)')
+  await t.getByRole('button', { name: 'อัปโหลด', exact: true }).click()
+  await expect(t.getByText(/อัปโหลด "จดบนกระดาน \(วาง\)" แล้ว 1 ห้อง · เอกสารที่จดในห้อง/)).toBeVisible()
+
+  const s = await (await browser.newContext()).newPage()
+  await s.goto('/')
+  await s.getByLabel('รหัสนักเรียน (ZipGrade ID)').fill('3')
+  await s.getByRole('button', { name: 'ถัดไป' }).click()
+  for (const d of '1357') await s.getByRole('button', { name: d, exact: true }).click()
+  await expect(s.getByText(/สวัสดี/)).toBeVisible()
+  const list = await (await s.request.get('/api/student/materials')).json()
+  const m = list.find((x: { title: string }) => x.title === 'จดบนกระดาน (วาง)')
+  expect(m).toMatchObject({ kind: 'notes', fileName: expect.stringMatching(/\.pdf$/) })
+  const res = await s.request.get(`/api/files/${m.fileKey}`)
+  expect(res.headers()['content-type']).toBe('application/pdf')
+  expect((await res.body()).subarray(0, 5).toString()).toBe('%PDF-')
+})
