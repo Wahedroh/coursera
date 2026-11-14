@@ -9,18 +9,18 @@ export const videoNotFound = () => apiError('video_not_found', 'ไม่พบ�
 
 const toRow = (input: VideoInput) => ({ title: input.title, description: input.description, youtubeId: parseYouTubeId(input.url)!, questions: input.questions ?? [] })
 
-export async function createVideos(db: Db, classIds: string[], input: VideoInput, t: number): Promise<string[]> {
+export async function createVideos(db: Db, classIds: string[], input: VideoInput, t: number, sched?: Map<string, { published: boolean; publishAt: number | null }>): Promise<string[]> {
   const unique = [...new Set(classIds)]
   for (const id of unique) {
     const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, id))
     if (!c) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   }
-  const rows = unique.map((classId) => ({ id: newId(), classId, ...toRow(input), createdAt: t }))
+  const rows = unique.map((classId) => ({ id: newId(), classId, ...toRow(input), ...(sched?.get(classId) ?? {}), createdAt: t }))
   for (const r of rows) await db.insert(videos).values(r)
   return rows.map((r) => r.id)
 }
 
-const cols = { id: videos.id, title: videos.title, description: videos.description, youtubeId: videos.youtubeId, published: videos.published, createdAt: videos.createdAt, questions: videos.questions }
+const cols = { id: videos.id, title: videos.title, description: videos.description, youtubeId: videos.youtubeId, published: videos.published, publishAt: videos.publishAt, createdAt: videos.createdAt, questions: videos.questions }
 
 export async function listVideos(db: Db, classId: string): Promise<TeacherVideo[]> {
   return db.select(cols).from(videos).where(eq(videos.classId, classId)).orderBy(desc(videos.createdAt))
@@ -39,7 +39,7 @@ export async function updateVideo(db: Db, id: string, input: VideoInput): Promis
 
 export async function setVideoPublished(db: Db, id: string, published: boolean): Promise<void> {
   await getVideo(db, id)
-  await db.update(videos).set({ published }).where(eq(videos.id, id))
+  await db.update(videos).set({ published, publishAt: null }).where(eq(videos.id, id))
 }
 
 export async function deleteVideo(db: Db, id: string): Promise<void> {

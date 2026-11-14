@@ -5,6 +5,9 @@ import { hitRateLimit } from '../auth/rate-limit'
 import { getDb, now } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
 import { apiError, parseBody } from '../http'
+import { publishSchema } from '../../shared/timetable'
+import { resolvePublish } from '../timetable/service'
+import { invalidateRelease } from '../timetable/release'
 import { enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
 import { createMaterials, deleteMaterial, invalidMaterial, listMaterials, materialsForStudent, setMaterialPublished, updateMaterial } from './service'
@@ -20,9 +23,14 @@ teacherMaterialRoutes.post('/materials', async (c) => {
   const db = getDb(c.env)
   if (await hitRateLimit(db, 'upload:teacher', 600, 60 * 60 * 1000)) throw apiError('too_many_uploads', 'อัปโหลดบ่อยเกินไป กรุณารอสักครู่', 429)
   const classIds = (c.req.query('classIds') ?? '').split(',').filter(Boolean).slice(0, 50)
-  const ids = await createMaterials(db, c.env.BUCKET, classIds, meta.data, c.req.query('name') ?? '', await c.req.arrayBuffer(), now())
-  if (meta.data.kind === 'notes' && c.req.query('notify') === '1') {
-    await pushInBackground(c, (d) => enqueueForClasses(d, classIds, { title: `📒 เอกสารที่จดในห้อง: ${meta.data.title}`, body: meta.data.topic, url: '/me/materials?tab=notes' }, now()))
+  const pub = publishSchema.safeParse({ publishMode: c.req.query('publishMode') || undefined, publishAt: c.req.query('publishAt') ? Number(c.req.query('publishAt')) : undefined })
+  if (!pub.success) throw apiError('invalid_request', 'เวลาเผยแพร่ไม่ถูกต้อง', 400)
+  const sched = await resolvePublish(db, classIds, pub.data, now())
+  const ids = await createMaterials(db, c.env.BUCKET, classIds, meta.data, c.req.query('name') ?? '', await c.req.arrayBuffer(), now(), sched)
+  const nowIds = classIds.filter((id) => sched.get(id)?.published)
+  if (nowIds.length < classIds.length) invalidateRelease()
+  if (meta.data.kind === 'notes' && c.req.query('notify') === '1' && nowIds.length) {
+    await pushInBackground(c, (d) => enqueueForClasses(d, nowIds, { title: `📒 เอกสารที่จดในห้อง: ${meta.data.title}`, body: meta.data.topic, url: '/me/materials?tab=notes' }, now()))
   }
   return c.json({ ids })
 })

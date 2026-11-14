@@ -38,8 +38,8 @@ export const materialMetaSchema = z
 export type MaterialMeta = z.infer<typeof materialMetaSchema>
 export const materialPublishSchema = z.object({ published: z.boolean() })
 
-export type TeacherMaterial = { id: string; title: string; topic: string; kind: MaterialKind; lessonDate: string; fileKey: string; fileName: string; size: number; published: boolean; createdAt: number }
-export type StudentMaterial = Omit<TeacherMaterial, 'published'>
+export type TeacherMaterial = { id: string; title: string; topic: string; kind: MaterialKind; lessonDate: string; publishAt: number | null; fileKey: string; fileName: string; size: number; published: boolean; createdAt: number }
+export type StudentMaterial = Omit<TeacherMaterial, 'published' | 'publishAt'>
 
 /** แยกเอกสารเปล่า (เรียงตามที่เพิ่มล่าสุด) กับเอกสารที่จดในห้อง (เรียงตามวันที่สอน ใหม่สุดก่อน) */
 export function splitMaterials<T extends { kind: MaterialKind; lessonDate: string; createdAt: number }>(items: T[]): { blank: T[]; notes: T[] } {

@@ -4,7 +4,10 @@ import { api } from '../api'
 
 const NAV = [
   { to: '/teacher', label: 'หน้าแรก', end: true },
+  { to: '/teacher/timetable', label: 'ตารางสอน', end: false },
   { to: '/teacher/assignments/new', label: 'สร้างงาน', end: false },
+  { to: '/teacher/scheduled', label: 'รอเผยแพร่', end: false },
+  { to: '/teacher/library', label: 'คลังของครู', end: false },
   { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', end: false },
   { to: '/teacher/calendar', label: 'ปฏิทิน', end: false },
   { to: '/teacher/card-game', label: 'เกมการ์ด QR', end: false },

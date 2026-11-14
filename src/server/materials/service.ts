@@ -33,7 +33,16 @@ export function checkMaterial(body: ArrayBuffer, fileName: string) {
 }
 
 /** อัปโหลดไฟล์ครั้งเดียว แล้วผูกกับหลายห้องได้ (ทุกห้องใช้ไฟล์เดียวกัน) */
-export async function createMaterials(db: Db, bucket: R2Bucket, classIds: string[], meta: MaterialMeta, fileName: string, body: ArrayBuffer, t: number): Promise<string[]> {
+export async function createMaterials(
+  db: Db,
+  bucket: R2Bucket,
+  classIds: string[],
+  meta: MaterialMeta,
+  fileName: string,
+  body: ArrayBuffer,
+  t: number,
+  sched?: Map<string, { published: boolean; publishAt: number | null }>,
+): Promise<string[]> {
   const unique = [...new Set(classIds)]
   if (!unique.length) throw apiError('invalid_request', 'กรุณาเลือกห้องเรียน', 400)
   for (const id of unique) {
@@ -46,12 +55,12 @@ export async function createMaterials(db: Db, bucket: R2Bucket, classIds: string
   await bucket.put(key, body, { httpMetadata: { contentType: type } })
   await recordFile(db, key, body.byteLength, t)
   const name = fileName.trim().slice(-200)
-  const rows = unique.map((classId) => ({ id: newId(), classId, ...meta, fileKey: key, fileName: name, size: body.byteLength, createdAt: t }))
+  const rows = unique.map((classId) => ({ id: newId(), classId, ...meta, ...(sched?.get(classId) ?? {}), fileKey: key, fileName: name, size: body.byteLength, createdAt: t }))
   for (const r of rows) await db.insert(materials).values(r)
   return rows.map((r) => r.id)
 }
 
-const cols = { id: materials.id, title: materials.title, topic: materials.topic, kind: materials.kind, lessonDate: materials.lessonDate, fileKey: materials.fileKey, fileName: materials.fileName, size: materials.size, published: materials.published, createdAt: materials.createdAt }
+const cols = { id: materials.id, title: materials.title, topic: materials.topic, kind: materials.kind, lessonDate: materials.lessonDate, publishAt: materials.publishAt, fileKey: materials.fileKey, fileName: materials.fileName, size: materials.size, published: materials.published, createdAt: materials.createdAt }
 
 export async function listMaterials(db: Db, classId: string): Promise<TeacherMaterial[]> {
   return db.select(cols).from(materials).where(eq(materials.classId, classId)).orderBy(desc(materials.createdAt))
@@ -70,7 +79,7 @@ export async function updateMaterial(db: Db, id: string, meta: MaterialMeta): Pr
 
 export async function setMaterialPublished(db: Db, id: string, published: boolean): Promise<void> {
   await getMaterial(db, id)
-  await db.update(materials).set({ published }).where(eq(materials.id, id))
+  await db.update(materials).set({ published, publishAt: null }).where(eq(materials.id, id))
 }
 
 /** ลบเอกสาร; ถ้าไม่มีห้องอื่นใช้ไฟล์นี้แล้ว ลบไฟล์ออกจากพื้นที่ด้วย */
@@ -82,6 +91,6 @@ export async function deleteMaterial(db: Db, bucket: R2Bucket, id: string): Prom
 }
 
 export async function materialsForStudent(db: Db, classId: string): Promise<StudentMaterial[]> {
-  const { published: _p, ...studentCols } = cols
+  const { published: _p, publishAt: _a, ...studentCols } = cols
   return db.select(studentCols).from(materials).where(and(eq(materials.classId, classId), eq(materials.published, true))).orderBy(desc(materials.createdAt))
 }

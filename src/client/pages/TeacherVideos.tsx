@@ -4,6 +4,8 @@ import { api } from '../api'
 import ProtectedYouTube from '../components/ProtectedYouTube'
 import { parseYouTubeId, type TeacherVideo, type VideoQuestion } from '../../shared/videos'
 import VideoQuestionsEditor from '../components/VideoQuestionsEditor'
+import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
+import CopyButton from '../components/CopyDialog'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -27,6 +29,7 @@ export default function TeacherVideos() {
   const [questions, setQuestions] = useState<VideoQuestion[]>([])
   const [classIds, setClassIds] = useState<string[]>([id])
   const [busy, setBusy] = useState(false)
+  const [pub, setPub] = useState<PublishValue>(PUBLISH_NOW)
 
   const load = useCallback(() => {
     api<TeacherVideo[]>(`/api/teacher/classes/${id}/videos`).then(setItems).catch((e) => setError(handle(e)))
@@ -49,8 +52,8 @@ export default function TeacherVideos() {
     setBusy(true)
     setError(null)
     try {
-      const { ids } = await api<{ ids: string[] }>('/api/teacher/videos', { body: { title, url, description, questions, classIds } })
-      setFlash(`เพิ่มคลิปแล้ว ${ids.length} ห้อง`)
+      const { ids } = await api<{ ids: string[] }>('/api/teacher/videos', { body: { title, url, description, questions, classIds, ...publishBody(pub) } })
+      setFlash(`เพิ่มคลิปแล้ว ${ids.length} ห้อง${pub.mode === 'now' ? '' : ' · ตั้งเวลาเผยแพร่แล้ว'}`)
       setTitle('')
       setUrl('')
       setDescription('')
@@ -95,11 +98,12 @@ export default function TeacherVideos() {
                   <div className="font-bold">{v.title}</div>
                   {v.description && <div className="text-xs text-stone-500 line-clamp-2">{v.description}</div>}
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {v.published ? <Chip tone="green">นักเรียนเห็น</Chip> : <Chip>ซ่อนอยู่</Chip>}
+                    {v.published ? <Chip tone="green">นักเรียนเห็น</Chip> : v.publishAt ? <ScheduleChip published={false} publishAt={v.publishAt} /> : <Chip>ซ่อนอยู่</Chip>}
                     {v.questions.length > 0 && <Chip tone="purple">คำถามท้ายคลิป {v.questions.length} ข้อ</Chip>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
+                  <CopyButton type="video" id={v.id} title={v.title} fromClass={id} onCopied={setFlash} />
                   <button type="button" className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold" onClick={() => setEditing(editing === v.id ? null : v.id)}>
                     แก้
                   </button>
@@ -169,7 +173,10 @@ export default function TeacherVideos() {
               ))}
             </fieldset>
           ))}
-          <Button type="submit" disabled={busy || classIds.length === 0 || !urlOk}>
+          <div className="border-t border-stone-100 pt-2">
+            <PublishPicker value={pub} onChange={setPub} allowDraft={false} />
+          </div>
+          <Button type="submit" disabled={busy || classIds.length === 0 || !urlOk || !publishValid(pub)}>
             เพิ่มคลิป
           </Button>
         </Card>

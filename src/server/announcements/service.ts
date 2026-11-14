@@ -7,13 +7,13 @@ import { apiError } from '../http'
 
 export const announcementNotFound = () => apiError('announcement_not_found', 'ไม่พบประกาศนี้', 404)
 
-export async function createAnnouncements(db: Db, classIds: string[], input: AnnouncementInput, t: number): Promise<string[]> {
+export async function createAnnouncements(db: Db, classIds: string[], input: AnnouncementInput, t: number, sched?: Map<string, { published: boolean; publishAt: number | null }>): Promise<string[]> {
   const unique = [...new Set(classIds)]
   for (const id of unique) {
     const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, id))
     if (!c) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   }
-  const rows = unique.map((classId) => ({ id: newId(), classId, ...input, createdAt: t }))
+  const rows = unique.map((classId) => ({ id: newId(), classId, ...input, ...(sched?.get(classId) ?? {}), createdAt: t }))
   for (const r of rows) await db.insert(announcements).values(r)
   return rows.map((r) => r.id)
 }
@@ -45,6 +45,8 @@ export async function listAnnouncements(db: Db, classId: string, t: number): Pro
       pinned: a.pinned,
       expiresOn: a.expiresOn,
       createdAt: a.createdAt,
+      published: a.published,
+      publishAt: a.publishAt,
       readCount: roster.length - unread.length,
       total: roster.length,
       unread: unread.map((s) => `${s.firstName} ${s.lastName}`),
@@ -69,7 +71,8 @@ export async function deleteAnnouncement(db: Db, id: string): Promise<void> {
   await db.batch([db.delete(announcementReads).where(eq(announcementReads.announcementId, id)), db.delete(announcements).where(eq(announcements.id, id))])
 }
 
-const activeFor = (classId: string, t: number) => and(eq(announcements.classId, classId), or(isNull(announcements.expiresOn), gte(announcements.expiresOn, todayBangkok(t))))
+const activeFor = (classId: string, t: number) =>
+  and(eq(announcements.classId, classId), eq(announcements.published, true), or(isNull(announcements.expiresOn), gte(announcements.expiresOn, todayBangkok(t))))
 
 export async function announcementsForStudent(db: Db, studentId: string, classId: string, t: number): Promise<StudentAnnouncement[]> {
   const rows = await db

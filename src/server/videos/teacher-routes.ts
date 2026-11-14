@@ -4,14 +4,20 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
+import { publishSchema } from '../../shared/timetable'
+import { resolvePublish } from '../timetable/service'
+import { invalidateRelease } from '../timetable/release'
 import { createVideos, deleteVideo, listVideos, setVideoPublished, updateVideo } from './service'
 
 export const teacherVideoRoutes = new Hono<AppEnv>()
 teacherVideoRoutes.use('*', requireTeacher)
 
 teacherVideoRoutes.post('/videos', async (c) => {
-  const { classIds, ...input } = await parseBody(c, createVideosSchema)
-  return c.json({ ids: await createVideos(getDb(c.env), classIds, input, now()) })
+  const { classIds, publishMode, publishAt, ...input } = await parseBody(c, createVideosSchema.extend(publishSchema.shape))
+  const db = getDb(c.env)
+  const sched = await resolvePublish(db, classIds, { publishMode, publishAt }, now())
+  invalidateRelease()
+  return c.json({ ids: await createVideos(db, classIds, input, now(), sched) })
 })
 teacherVideoRoutes.get('/classes/:id/videos', async (c) => c.json(await listVideos(getDb(c.env), c.req.param('id'))))
 teacherVideoRoutes.put('/videos/:id', async (c) => {

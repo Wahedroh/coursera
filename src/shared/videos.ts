@@ -47,7 +47,7 @@ export type VideoInput = z.infer<typeof videoInputSchema>
 export const createVideosSchema = videoInputSchema.extend({ classIds: z.array(z.string()).min(1).max(50) })
 export const videoPublishSchema = z.object({ published: z.boolean() })
 
-export type TeacherVideo = { id: string; title: string; description: string; youtubeId: string; published: boolean; createdAt: number; questions: VideoQuestion[] }
+export type TeacherVideo = { id: string; title: string; description: string; youtubeId: string; published: boolean; publishAt: number | null; createdAt: number; questions: VideoQuestion[] }
 /** นักเรียนเห็นคำถามแต่ไม่เห็นเฉลย */
 export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number; rewarded: boolean; quiz: { q: string; image?: string; choices: string[] }[] }
 /** ดูคลิปแล้ว: วินาทีที่ดูจริง (ไม่นับซ้ำ) และความยาวคลิป · answers = คำตอบคำถามท้ายคลิป (ถ้ามี) */

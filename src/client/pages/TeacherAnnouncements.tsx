@@ -4,6 +4,8 @@ import { api } from '../api'
 import type { AnnouncementInput, TeacherAnnouncement } from '../../shared/announcements'
 import { formatDate } from '../lib/format'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
+import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
+import CopyButton from '../components/CopyDialog'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
@@ -25,6 +27,7 @@ export default function TeacherAnnouncements() {
   const [editing, setEditing] = useState<string | null>(null)
   const [showUnread, setShowUnread] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [pub, setPub] = useState<PublishValue>(PUBLISH_NOW)
 
   const load = useCallback(() => {
     api<TeacherAnnouncement[]>(`/api/teacher/classes/${id}/announcements`).then(setItems).catch((e) => setError(handle(e)))
@@ -45,8 +48,8 @@ export default function TeacherAnnouncements() {
     setBusy(true)
     setError(null)
     try {
-      const { ids } = await api<{ ids: string[] }>('/api/teacher/announcements', { body: { ...form, classIds } })
-      setFlash(`ประกาศ "${form.title}" แล้ว ${ids.length} ห้อง`)
+      const { ids } = await api<{ ids: string[] }>('/api/teacher/announcements', { body: { ...form, classIds, ...publishBody(pub) } })
+      setFlash(`${pub.mode === 'now' ? 'ประกาศ' : pub.mode === 'draft' ? 'เก็บร่าง' : 'ตั้งเวลาประกาศ'} "${form.title}" แล้ว ${ids.length} ห้อง`)
       setForm(EMPTY)
       load()
     } catch (err) {
@@ -90,15 +93,22 @@ export default function TeacherAnnouncements() {
                   </div>
                   {a.body && <p className="text-sm text-stone-600 whitespace-pre-line">{a.body}</p>}
                   <div className="mt-1 flex flex-wrap gap-1 items-center text-xs text-stone-500">
-                    <Chip tone={a.readCount === a.total ? 'green' : 'amber'}>
-                      อ่านแล้ว {a.readCount}/{a.total}
-                    </Chip>
+                    {a.published ? (
+                      <Chip tone={a.readCount === a.total ? 'green' : 'amber'}>
+                        อ่านแล้ว {a.readCount}/{a.total}
+                      </Chip>
+                    ) : a.publishAt ? (
+                      <ScheduleChip published={false} publishAt={a.publishAt} />
+                    ) : (
+                      <Chip>ร่าง · ยังไม่เผยแพร่</Chip>
+                    )}
                     {a.expired ? <Chip>หมดอายุแล้ว</Chip> : a.expiresOn && <span>แสดงถึง {formatDate(a.expiresOn)}</span>}
                     <span>· ประกาศเมื่อ {new Date(a.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {a.unread.length > 0 && (
+                  <CopyButton type="announcement" id={a.id} title={a.title} fromClass={id} onCopied={setFlash} />
+                  {a.published && a.unread.length > 0 && (
                     <button type="button" className={small} onClick={() => setShowUnread(showUnread === a.id ? null : a.id)}>
                       ใครยังไม่อ่าน
                     </button>
@@ -148,7 +158,10 @@ export default function TeacherAnnouncements() {
               ))}
             </fieldset>
           ))}
-          <Button type="submit" disabled={busy || classIds.length === 0 || !form.title.trim()}>
+          <div className="border-t border-stone-100 pt-2">
+            <PublishPicker value={pub} onChange={setPub} />
+          </div>
+          <Button type="submit" disabled={busy || classIds.length === 0 || !form.title.trim() || !publishValid(pub)}>
             ประกาศ
           </Button>
         </Card>

@@ -1,6 +1,8 @@
+import { releaseDue } from '../timetable/release'
+import { drain } from '../push/service'
 import { getCookie } from 'hono/cookie'
 import { createMiddleware } from 'hono/factory'
-import { getDb } from '../db/client'
+import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { apiError } from '../http'
 import { readSession } from './sessions'
@@ -23,6 +25,16 @@ export const requireTeacher = createMiddleware<AppEnv>(async (c, next) => {
 
 export const requireStudent = createMiddleware<AppEnv>(async (c, next) => {
   if (c.get('session')?.kind !== 'student') throw unauthorized()
+  // ของที่ครูตั้งเวลาเผยแพร่ไว้ ถึงเวลาแล้วเปิดก่อนนักเรียนดู (ตรวจไม่เกินนาทีละครั้ง)
+  const db = getDb(c.env)
+  if (await releaseDue(db, now())) {
+    const p = drain(db, now()).catch((e) => console.error('push failed', e))
+    try {
+      c.executionCtx.waitUntil(p)
+    } catch {
+      await p
+    }
+  }
   await next()
 })
 

@@ -4,6 +4,9 @@ import { requireStudent, requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
 import { parseBody } from '../http'
+import { publishSchema } from '../../shared/timetable'
+import { resolvePublish } from '../timetable/service'
+import { invalidateRelease } from '../timetable/release'
 import { enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
 import { announcementsForStudent, createAnnouncements, deleteAnnouncement, listAnnouncements, markRead, updateAnnouncement } from './service'
@@ -12,9 +15,13 @@ export const teacherAnnouncementRoutes = new Hono<AppEnv>()
 teacherAnnouncementRoutes.use('*', requireTeacher)
 
 teacherAnnouncementRoutes.post('/announcements', async (c) => {
-  const { classIds, ...input } = await parseBody(c, createAnnouncementsSchema)
-  const ids = await createAnnouncements(getDb(c.env), classIds, input, now())
-  await pushInBackground(c, (db) => enqueueForClasses(db, classIds, { title: `📢 ${input.title}`, body: input.body, url: '/me' }, now()))
+  const { classIds, publishMode, publishAt, ...input } = await parseBody(c, createAnnouncementsSchema.extend(publishSchema.shape))
+  const db = getDb(c.env)
+  const sched = await resolvePublish(db, classIds, { publishMode, publishAt }, now())
+  const ids = await createAnnouncements(db, classIds, input, now(), sched)
+  const nowIds = classIds.filter((id) => sched.get(id)?.published)
+  if (nowIds.length < classIds.length) invalidateRelease()
+  if (nowIds.length) await pushInBackground(c, (d) => enqueueForClasses(d, nowIds, { title: `📢 ${input.title}`, body: input.body, url: '/me' }, now()))
   return c.json({ ids })
 })
 teacherAnnouncementRoutes.get('/classes/:id/announcements', async (c) => c.json(await listAnnouncements(getDb(c.env), c.req.param('id'), now())))

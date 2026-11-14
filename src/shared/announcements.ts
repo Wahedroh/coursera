@@ -11,5 +11,5 @@ export const announcementInputSchema = z.object({
 export type AnnouncementInput = z.infer<typeof announcementInputSchema>
 export const createAnnouncementsSchema = announcementInputSchema.extend({ classIds: z.array(z.string()).min(1).max(50) })
 
-export type TeacherAnnouncement = AnnouncementInput & { id: string; createdAt: number; readCount: number; total: number; unread: string[]; expired: boolean }
+export type TeacherAnnouncement = AnnouncementInput & { id: string; createdAt: number; published: boolean; publishAt: number | null; readCount: number; total: number; unread: string[]; expired: boolean }
 export type StudentAnnouncement = { id: string; title: string; body: string; pinned: boolean; createdAt: number; read: boolean }
