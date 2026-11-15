@@ -183,6 +183,13 @@
       "when": 1794650889876,
       "tag": "0025_teacher_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1794748572020,
+      "tag": "0026_card_device_answers",
+      "breakpoints": true
     }
   ]
 }

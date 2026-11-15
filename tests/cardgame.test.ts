@@ -202,3 +202,65 @@ describe('ตั้งเวลารายข้อ', () => {
     expect(await recordScans(db(), id, 1, [{ zipgradeId: '501', answer: 1 }], t0 + 10 * 60_000)).toMatchObject({ accepted: 1 })
   })
 })
+
+describe('ตอบในเครื่องตัวเอง (iPad/มือถือ)', () => {
+  it('เห็นเกมของห้องตัวเอง · ไม่เห็นเฉลยก่อนครูกด · เปลี่ยนคำตอบได้ · การ์ดไม่ทับคำตอบในเครื่อง · รวมผลกับการ์ด', async () => {
+    const { teacher, classId, st, quizId } = await setup()
+    const [fa, phum] = [await studentCookie(st[0].id), await studentCookie(st[1].id)]
+    const outsider = await studentCookie((await seedStudent(db(), (await seedClass(db(), { name: 'ห้องอื่น' })).classId)).id)
+    expect(await json(await getJson('/api/student/card-games/active', fa))).toBeNull()
+    const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    expect(await json(await getJson('/api/student/card-games/active', fa))).toEqual({ id, quizTitle: 'กฎของนิวตัน' })
+    expect(await json(await getJson('/api/student/card-games/active', outsider))).toBeNull()
+    expect((await getJson(`/api/student/card-games/${id}`, outsider)).status).toBe(404)
+
+    const v = await json(await getJson(`/api/student/card-games/${id}`, fa))
+    expect(v).toMatchObject({ current: 0, total: 3, revealed: false, correct: null, mine: null, ended: false, question: { choices: ['คงสภาพ', 'เร่ง', 'ช้าลง', 'วน'] } })
+    expect(JSON.stringify(v)).not.toContain('"answer"')
+
+    const answer = (c: string, qIndex: number, a: number) => putJson(`/api/student/card-games/${id}/answer`, { qIndex, answer: a }, c)
+    expect((await answer(fa, 0, 1)).status).toBe(200)
+    expect((await answer(fa, 0, 0)).status).toBe(200) // เปลี่ยนใจ
+    expect((await answer(fa, 1, 0)).status).toBe(409) // ไม่ใช่ข้อปัจจุบัน
+    expect((await answer(outsider, 0, 0)).status).toBe(404)
+    // ครูสแกนการ์ดของฟ้าใส (ตอบ D) → ไม่ทับ · ภูมิตอบด้วยการ์ด
+    await postJson(`/api/teacher/card-games/${id}/scans`, { qIndex: 0, scans: [{ zipgradeId: '34101', answer: 3 }, { zipgradeId: '34102', answer: 2 }] }, { cookie: teacher })
+    const s = await json(await getJson(`/api/teacher/card-games/${id}`, teacher))
+    expect(s.answers).toEqual({ [st[0].id]: 0, [st[1].id]: 2 })
+    expect(s.devices).toEqual([st[0].id])
+    // ภูมิเปิดเครื่องทีหลัง → คำตอบในเครื่องแทนการ์ด
+    expect((await answer(phum, 0, 0)).status).toBe(200)
+    expect((await json(await getJson(`/api/teacher/card-games/${id}`, teacher))).devices.sort()).toEqual([st[0].id, st[1].id].sort())
+
+    await postJson(`/api/teacher/card-games/${id}/reveal`, {}, { cookie: teacher })
+    expect((await answer(fa, 0, 2)).status).toBe(409)
+    expect(await json(await getJson(`/api/student/card-games/${id}`, fa))).toMatchObject({ revealed: true, correct: 0, mine: 0 })
+
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 1 }, { cookie: teacher })
+    expect(await json(await getJson(`/api/student/card-games/${id}`, fa))).toMatchObject({ current: 1, revealed: false, correct: null, mine: null })
+    expect((await answer(fa, 1, 3)).status).toBe(400) // ข้อนี้มี 2 ตัวเลือก
+    await answer(fa, 1, 1)
+
+    const r = await json(await postJson(`/api/teacher/card-games/${id}/end`, { saveScore: false, attendance: false }, { cookie: teacher }))
+    expect(r.players.find((p: { id: string }) => p.id === st[0].id)).toMatchObject({ correct: 1, answered: 2 })
+    expect(await json(await getJson(`/api/student/card-games/${id}`, fa))).toMatchObject({ ended: true, summary: { correct: 1, answered: 2, exp: 4 } })
+    expect(await json(await getJson('/api/student/card-games/active', fa))).toBeNull()
+    expect((await answer(fa, 1, 0)).status).toBe(409)
+  })
+
+  it('รูปโจทย์ข้อปัจจุบัน: นักเรียนในห้องเปิดได้ · ห้องอื่นเปิดไม่ได้ · หมดเวลาแล้วไม่รับ', async () => {
+    const { teacher, classId, st } = await setup()
+    const { key } = await json(await uploadFile('kind=quiz', TINY_JPEG, 'image/jpeg', teacher))
+    const { id: quizId } = await json(await postJson('/api/teacher/card-quizzes', { title: 'รูป', questions: [{ q: '', image: key, choices: ['', ''], answer: 1, seconds: 10 }] }, { cookie: teacher }))
+    const fa = await studentCookie(st[0].id)
+    const outsider = await studentCookie((await seedStudent(db(), (await seedClass(db(), { name: 'ห้องอื่น' })).classId)).id)
+    expect((await getJson(`/api/files/${key}`, fa)).status).toBe(404)
+    const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    expect((await getJson(`/api/files/${key}`, fa)).status).toBe(200)
+    expect((await getJson(`/api/files/${key}`, outsider)).status).toBe(404)
+    const { answerOnDevice } = await import('../src/server/cardgame/service')
+    const me = { studentId: st[0].id, classId }
+    await expect(answerOnDevice(db(), id, me, 0, 1, Date.now() + 13_000)).rejects.toMatchObject({ status: 409 })
+    expect(await answerOnDevice(db(), id, me, 0, 1, Date.now() + 5_000)).toEqual({ ok: true })
+  })
+})

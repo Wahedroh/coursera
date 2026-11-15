@@ -1,11 +1,11 @@
 import { Hono } from 'hono'
-import { requireTeacher } from '../auth/middleware'
+import { requireStudent, requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
-import type { AppEnv } from '../env'
+import type { AppEnv, SessionInfo } from '../env'
 import { parseBody } from '../http'
-import { cardQuizInputSchema, endGameSchema, scanBatchSchema, startGameSchema } from '../../shared/cardgame'
+import { cardQuizInputSchema, deviceAnswerSchema, endGameSchema, scanBatchSchema, startGameSchema } from '../../shared/cardgame'
 import { z } from 'zod'
-import { classCards, createQuiz, deleteGame, deleteQuiz, endGame, gameResult, gameState, getQuiz, goTo, listQuizzes, recentGames, recordScans, reveal, startGame, updateQuiz } from './service'
+import { activeGameFor, answerOnDevice, classCards, createQuiz, deleteGame, deleteQuiz, endGame, gameResult, gameState, getQuiz, goTo, listQuizzes, recentGames, recordScans, reveal, startGame, studentGameView, updateQuiz } from './service'
 
 export const teacherCardRoutes = new Hono<AppEnv>()
 teacherCardRoutes.use('*', requireTeacher)
@@ -45,3 +45,14 @@ teacherCardRoutes.post('/card-games/:id/goto', async (c) => {
 teacherCardRoutes.delete('/card-games/:id', async (c) => c.json(await deleteGame(getDb(c.env), c.req.param('id'))))
 teacherCardRoutes.get('/card-games/:id/result', async (c) => c.json(await gameResult(getDb(c.env), c.req.param('id'))))
 teacherCardRoutes.post('/card-games/:id/end', async (c) => c.json(await endGame(getDb(c.env), c.req.param('id'), await parseBody(c, endGameSchema), now())))
+
+/** นักเรียนตอบเกมการ์ดในเครื่องตัวเอง (iPad/มือถือ) แทนการชูการ์ด */
+export const studentCardRoutes = new Hono<AppEnv>()
+studentCardRoutes.use('*', requireStudent)
+const me = (c: { get: (k: 'session') => SessionInfo }) => c.get('session') as Extract<SessionInfo, { kind: 'student' }>
+studentCardRoutes.get('/active', async (c) => c.json(await activeGameFor(getDb(c.env), me(c).classId, now())))
+studentCardRoutes.get('/:id', async (c) => c.json(await studentGameView(getDb(c.env), c.req.param('id'), me(c), now())))
+studentCardRoutes.put('/:id/answer', async (c) => {
+  const { qIndex, answer } = await parseBody(c, deviceAnswerSchema)
+  return c.json(await answerOnDevice(getDb(c.env), c.req.param('id'), me(c), qIndex, answer, now()))
+})

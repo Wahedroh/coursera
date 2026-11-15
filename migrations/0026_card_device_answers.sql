@@ -1,0 +1,1 @@
+ALTER TABLE `card_answers` ADD `via` text DEFAULT 'card' NOT NULL;

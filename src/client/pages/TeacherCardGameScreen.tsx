@@ -39,6 +39,7 @@ export default function TeacherCardGameScreen() {
   if (!state) return error ? <ErrorBox message={error} /> : <Loading />
   const q = state.questions[state.current]
   const answered = state.roster.filter((r) => state.answers[r.id] !== undefined)
+  const onDevice = new Set(state.devices)
   const counts = q.choices.map((_, k) => answered.filter((r) => state.answers[r.id] === k).length)
   const scanUrl = `${location.origin}/teacher/card-games/${id}/scan`
   const qr = qrSvg(scanUrl, 'Byte')
@@ -58,10 +59,16 @@ export default function TeacherCardGameScreen() {
           <div className="flex items-center gap-4">
             <Countdown left={left} big />
             <span className="text-xl">
-              ข้อ <b>{state.current + 1}</b> / {state.questions.length} · สแกนแล้ว{' '}
+              ข้อ <b>{state.current + 1}</b> / {state.questions.length} · ตอบแล้ว{' '}
               <b data-testid="scanned-count">
                 {answered.length} / {state.roster.length}
               </b>
+              {onDevice.size > 0 && (
+                <span className="opacity-80 text-base" data-testid="device-count">
+                  {' '}
+                  (📱 {onDevice.size} · 🃏 {answered.length - onDevice.size})
+                </span>
+              )}
             </span>
             <Link to={`/teacher/card-games/${id}/scan`} className="flex items-center gap-2 rounded-xl bg-white text-stone-900 p-1.5 pr-3 text-xs font-bold" title="สแกน QR นี้ด้วยมือถือครู เพื่อเปิดกล้อง">
               <svg viewBox={`0 0 ${qr.n} ${qr.n}`} className="w-16 h-16" shapeRendering="crispEdges" aria-hidden>
@@ -132,13 +139,14 @@ export default function TeacherCardGameScreen() {
             <div>
               <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }} data-testid="answered-grid">
                 {state.roster.map((r) => (
-                  <div key={r.id} title={r.name} className={`h-11 rounded-lg px-2 flex items-center justify-center gap-1 font-bold text-sm truncate ${state.answers[r.id] !== undefined ? 'bg-green-400 text-green-950' : 'bg-white/10 text-white/60'}`}>
-                    {state.answers[r.id] !== undefined && '✓ '}
+                  <div key={r.id} title={r.name} className={`h-11 rounded-lg px-2 flex items-center justify-center gap-1 font-bold text-sm truncate ${onDevice.has(r.id) ? 'bg-sky-300 text-sky-950' : state.answers[r.id] !== undefined ? 'bg-green-400 text-green-950' : 'bg-white/10 text-white/60'}`}>
+                    {onDevice.has(r.id) ? '📱 ' : state.answers[r.id] !== undefined && '✓ '}
                     {r.name.split(' ')[0]} <span className="font-normal opacity-80">({r.zipgradeId})</span>
                   </div>
                 ))}
               </div>
-              <p className="text-sm opacity-75 mt-2">ช่องเขียว = สแกนแล้ว (ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย)</p>
+              <p className="text-sm opacity-75 mt-2">เขียว ✓ = ครูสแกนการ์ดแล้ว · ฟ้า 📱 = ตอบในเครื่องตัวเอง · ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย</p>
+              <p className="mt-2 inline-block rounded-xl bg-white text-stone-900 px-3 py-1.5 text-sm font-bold">📱 มีมือถือ/iPad? เปิดแอป → แตะแบนเนอร์ 🃏 · ไม่มี → ชูการ์ด QR</p>
             </div>
           )}
           <GameControls state={state} reload={reload} onError={onError} onEnded={setResult} />

@@ -182,7 +182,7 @@ test('เกมการ์ด QR: สร้างชุดคำถาม → �
     await ctx.addCookies((await t.context().cookies()).map((c) => ({ ...c })))
     const phone = await ctx.newPage()
     await phone.goto(`/teacher/card-games/${gameId}/scan`)
-    await expect(phone.getByTestId('scan-status')).toContainText('สแกนแล้ว 3/', { timeout: 30_000 })
+    await expect(phone.getByTestId('scan-status')).toContainText('ตอบแล้ว 3/', { timeout: 30_000 })
     // ระบบได้รับคำตอบ
     await expect
       .poll(async () => {
@@ -386,4 +386,44 @@ test('ส่งสาย: ครูกด "นับว่าตรงเวล�
   // เก็บกวาด: ลบงานทดสอบ (ไม่ให้กระทบเทสต์ถัดไป)
   t.on('dialog', (d) => d.accept())
   await t.request.delete(`/api/teacher/assignments/${ids[0]}`)
+})
+
+test('เกมการ์ด: นักเรียนที่เปิดแอปอยู่ ตอบในเครื่องตัวเองได้ (ไม่ต้องชูการ์ด) → จอครูขึ้น 📱 → เฉลย → สรุปผล', async ({ browser }) => {
+  const t = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await t.getByRole('link', { name: 'โรงเรียนทดสอบ ชั้น 1', exact: true }).click()
+  const classId = new URL(t.url()).pathname.split('/').pop()!
+  const { id: quizId } = await (
+    await t.request.post('/api/teacher/card-quizzes', {
+      data: { title: 'ตอบในเครื่อง', questions: [{ q: 'ขนาดของ 3i + 4j', choices: ['5', '7', '12', '25'], answer: 0 }, { q: 'หน่วยของแรง', choices: ['จูล', 'นิวตัน'], answer: 1 }] },
+    })
+  ).json()
+  const { id: gameId } = await (await t.request.post('/api/teacher/card-games', { data: { quizId, classId } })).json()
+  await t.goto(`/teacher/card-games/${gameId}`)
+
+  const s = await studentPage(browser)
+  await s.getByTestId('card-game-banner').click()
+  await expect(s.getByTestId('device-q-no')).toHaveText('ข้อ 1 / 2')
+  await s.getByRole('button', { name: 'ตอบ B 7' }).click()
+  await expect(s.getByTestId('device-status')).toContainText('ส่งแล้ว ✓ เลือก B')
+  await s.getByRole('button', { name: 'ตอบ A 5' }).click()
+  await expect(s.getByTestId('device-status')).toContainText('เลือก A')
+  await expect(t.getByTestId('device-count')).toContainText('📱 1')
+
+  await t.getByRole('button', { name: /เฉลย/ }).first().click()
+  await expect(s.getByTestId('device-result')).toContainText('ถูกต้อง', { timeout: 10_000 })
+  await expect(s.getByRole('button', { name: 'ตอบ B 7' })).toBeDisabled()
+
+  await t.request.post(`/api/teacher/card-games/${gameId}/goto`, { data: { index: 1 } })
+  await expect(s.getByTestId('device-q-no')).toHaveText('ข้อ 2 / 2', { timeout: 10_000 })
+  await s.getByRole('button', { name: 'ตอบ A จูล' }).click()
+  await expect(s.getByTestId('device-status')).toContainText('เลือก A')
+  await t.request.post(`/api/teacher/card-games/${gameId}/end`, { data: { saveScore: false, attendance: false } })
+  await expect(s.getByTestId('device-summary')).toContainText('ถูก 1 / 2 ข้อ', { timeout: 10_000 })
+  await expect(s.getByTestId('device-summary')).toContainText('+4 EXP')
+  await s.getByRole('link', { name: 'กลับหน้าแรก' }).click()
+  await expect(s.getByRole('heading', { name: /สวัสดี/ })).toBeVisible()
+  await expect(s.getByTestId('card-game-banner')).toHaveCount(0)
 })
