@@ -1,6 +1,6 @@
-import { and, desc, eq, like, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, isNull, like, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
-import { CARD_EXP, TIME_GRACE_MS, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary } from '../../shared/cardgame'
+import { CARD_EXP, DEVICE_GAME_WINDOW_MS, TIME_GRACE_MS, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary, type StudentActiveGame, type StudentCardGame } from '../../shared/cardgame'
 import { newId, type Db } from '../db/client'
 import { attendanceDays, cardAnswers, cardGames, cardQuizzes, classes, pointEvents, scoreItems, scores, studentAvatars, students } from '../db/schema'
 import { apiError } from '../http'
@@ -80,7 +80,7 @@ export async function gameState(db: Db, id: string, t = Date.now()): Promise<Car
   const [quiz] = await db.select({ title: cardQuizzes.title }).from(cardQuizzes).where(eq(cardQuizzes.id, g.quizId))
   const [cls] = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.id, g.classId))
   const ans = await db
-    .select({ studentId: cardAnswers.studentId, answer: cardAnswers.answer })
+    .select({ studentId: cardAnswers.studentId, answer: cardAnswers.answer, via: cardAnswers.via })
     .from(cardAnswers)
     .where(and(eq(cardAnswers.gameId, id), eq(cardAnswers.qIndex, g.current)))
   return {
@@ -94,17 +94,22 @@ export async function gameState(db: Db, id: string, t = Date.now()): Promise<Car
     ended: g.endedAt !== null,
     roster: (await roster(db, g.classId)).map(({ id, no, zipgradeId, name }) => ({ id, no, zipgradeId, name })),
     answers: Object.fromEntries(ans.map((a) => [a.studentId, a.answer])),
+    devices: ans.filter((a) => a.via === 'device').map((a) => a.studentId),
   }
+}
+
+/** ยังรับคำตอบของข้อปัจจุบันไหม: ยังไม่เฉลย ยังไม่จบ และยังไม่หมดเวลา (เผื่อเวลาส่ง 2 วินาที) */
+function accepting(g: { endedAt: number | null; revealed: boolean; questions: { seconds?: number }[]; current: number; questionStartedAt: number | null }, t: number): boolean {
+  if (g.endedAt !== null || g.revealed) return false
+  const sec = g.questions[g.current]?.seconds ?? 0
+  return !sec || t <= (g.questionStartedAt ?? 0) + sec * 1000 + TIME_GRACE_MS
 }
 
 /** บันทึกคำตอบที่สแกนได้ของข้อปัจจุบัน — สแกนซ้ำทับคำตอบเดิม · หลังเฉลย/จบเกมไม่รับ · การ์ดที่ไม่ใช่ของห้องนี้ข้ามไป */
 export async function recordScans(db: Db, id: string, qIndex: number, scans: { zipgradeId: string; answer: number }[], t: number) {
   const g = await getGame(db, id)
   if (g.endedAt !== null) throw apiError('game_ended', 'เกมจบแล้ว', 409)
-  if (qIndex !== g.current || g.revealed) return { accepted: 0, unknown: [] as string[], locked: true }
-  // หมดเวลาแล้ว (เผื่อเวลาส่งจากมือถือ 2 วินาที) = ไม่รับคำตอบ
-  const left = remainingMs(g, t)
-  if (left !== null && left === 0 && t > (g.questionStartedAt ?? 0) + (g.questions[g.current].seconds ?? 0) * 1000 + TIME_GRACE_MS) return { accepted: 0, unknown: [] as string[], locked: true }
+  if (qIndex !== g.current || !accepting(g, t)) return { accepted: 0, unknown: [] as string[], locked: true }
   const nQ = g.questions[g.current].choices.length
   const rows = await roster(db, g.classId)
   // การ์ดพิมพ์ ID เป็นตัวพิมพ์ใหญ่ (โหมด QR ที่อ่านได้ไกล) → เทียบแบบไม่สนตัวพิมพ์
@@ -121,8 +126,65 @@ export async function recordScans(db: Db, id: string, qIndex: number, scans: { z
     await db
       .insert(cardAnswers)
       .values(values.slice(i, i + 15))
-      .onConflictDoUpdate({ target: [cardAnswers.gameId, cardAnswers.qIndex, cardAnswers.studentId], set: { answer: sql`excluded.answer`, scannedAt: t } })
+      // คนที่ตอบในเครื่องตัวเองแล้ว: การสแกนการ์ดไม่ทับคำตอบ
+      .onConflictDoUpdate({ target: [cardAnswers.gameId, cardAnswers.qIndex, cardAnswers.studentId], set: { answer: sql`excluded.answer`, scannedAt: t }, setWhere: sql`${cardAnswers.via} = 'card'` })
   return { accepted: values.length, unknown: [...new Set(unknown)], locked: false }
+}
+
+// ---------- นักเรียนตอบในเครื่องตัวเอง ----------
+/** เกมที่กำลังเล่นของห้องนี้ (ล่าสุด · ยังไม่จบ · เริ่มภายใน 3 ชั่วโมง) */
+export async function activeGameFor(db: Db, classId: string, t: number): Promise<StudentActiveGame> {
+  const [g] = await db
+    .select({ id: cardGames.id, quizTitle: cardQuizzes.title })
+    .from(cardGames)
+    .innerJoin(cardQuizzes, eq(cardQuizzes.id, cardGames.quizId))
+    .where(and(eq(cardGames.classId, classId), isNull(cardGames.endedAt), gt(cardGames.createdAt, t - DEVICE_GAME_WINDOW_MS)))
+    .orderBy(desc(cardGames.createdAt))
+    .limit(1)
+  return g ?? null
+}
+
+async function gameOfClass(db: Db, id: string, classId: string) {
+  const g = await getGame(db, id)
+  if (g.classId !== classId) throw gameNotFound()
+  return g
+}
+
+export async function studentGameView(db: Db, id: string, me: { studentId: string; classId: string }, t: number): Promise<StudentCardGame> {
+  const g = await gameOfClass(db, id, me.classId)
+  const [quiz] = await db.select({ title: cardQuizzes.title }).from(cardQuizzes).where(eq(cardQuizzes.id, g.quizId))
+  const mine = await db.select({ qIndex: cardAnswers.qIndex, answer: cardAnswers.answer }).from(cardAnswers).where(and(eq(cardAnswers.gameId, id), eq(cardAnswers.studentId, me.studentId)))
+  const q = g.questions[g.current]
+  const ended = g.endedAt !== null
+  const correct = mine.filter((a) => g.questions[a.qIndex]?.answer === a.answer).length
+  return {
+    id,
+    quizTitle: quiz?.title ?? '',
+    total: g.questions.length,
+    current: g.current,
+    question: { q: q.q, ...(q.image ? { image: q.image } : {}), choices: q.choices },
+    remainingMs: ended || g.revealed ? null : remainingMs(g, t),
+    revealed: g.revealed || ended,
+    correct: g.revealed || ended ? q.answer : null,
+    mine: mine.find((a) => a.qIndex === g.current)?.answer ?? null,
+    ended,
+    summary: ended ? { correct, answered: mine.length, exp: mine.length ? CARD_EXP.join + correct * CARD_EXP.correct : 0 } : null,
+  }
+}
+
+/** นักเรียนกดตอบในเครื่อง: เฉพาะข้อปัจจุบัน ก่อนเฉลย/หมดเวลา · เปลี่ยนคำตอบได้ · ทับคำตอบจากการ์ด */
+export async function answerOnDevice(db: Db, id: string, me: { studentId: string; classId: string }, qIndex: number, answer: number, t: number): Promise<{ ok: boolean }> {
+  const g = await gameOfClass(db, id, me.classId)
+  if (g.endedAt !== null) throw apiError('game_ended', 'เกมจบแล้ว', 409)
+  if (qIndex !== g.current || !accepting(g, t)) throw apiError('answer_locked', 'ข้อนี้ปิดรับคำตอบแล้ว', 409)
+  if (answer >= g.questions[g.current].choices.length) throw apiError('invalid_answer', 'ไม่มีตัวเลือกนี้', 400)
+  const [s] = await db.select({ active: students.active }).from(students).where(eq(students.id, me.studentId))
+  if (!s?.active) throw apiError('not_in_class', 'ไม่พบชื่อในห้องนี้', 403)
+  await db
+    .insert(cardAnswers)
+    .values({ gameId: id, qIndex, studentId: me.studentId, answer, scannedAt: t, via: 'device' })
+    .onConflictDoUpdate({ target: [cardAnswers.gameId, cardAnswers.qIndex, cardAnswers.studentId], set: { answer, scannedAt: t, via: 'device' } })
+  return { ok: true }
 }
 
 export async function reveal(db: Db, id: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 import StudentHome from './pages/StudentHome'
 import StudentCheckin from './pages/StudentCheckin'
+import StudentCardGame from './pages/StudentCardGame'
 import StudentLogin from './pages/StudentLogin'
 import StudentProgress from './pages/StudentProgress'
 import StudentScores from './pages/StudentScores'
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/me/calendar" element={<StudentCalendar />} />
         <Route path="/me/report" element={<StudentReport />} />
         <Route path="/me/videos/:id" element={<StudentVideo />} />
+        <Route path="/me/card-game/:id" element={<StudentCardGame />} />
         <Route path="/me/fees" element={<StudentFees />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />
         <Route path="/checkin" element={<StudentCheckin />} />

@@ -21,7 +21,7 @@ export async function putImage(bucket: R2Bucket, key: string, body: ArrayBuffer,
   await bucket.put(key, body, { httpMetadata: { contentType } })
 }
 
-/** ครูอ่านได้ทุกไฟล์; นักเรียนอ่านได้เฉพาะรูปที่ตัวเองส่ง รูปประกอบงานในห้องตัวเอง รูปที่ครูเขียนทับงานของตัวเอง และเอกสารเรียนที่แสดงในห้องตัวเอง */
+/** ครูอ่านได้ทุกไฟล์; นักเรียนอ่านได้เฉพาะรูปที่ตัวเองส่ง รูปประกอบงานในห้องตัวเอง รูปที่ครูเขียนทับงานของตัวเอง เอกสารเรียนที่แสดงในห้องตัวเอง และรูปโจทย์ข้อปัจจุบันของเกมการ์ดในห้องตัวเอง */
 export async function canRead(db: Db, session: SessionInfo, key: string): Promise<boolean> {
   if (session.kind === 'teacher') return true
   if (key.startsWith(`sub/${session.studentId}/`)) return true
@@ -31,6 +31,7 @@ export async function canRead(db: Db, session: SessionInfo, key: string): Promis
       OR EXISTS (SELECT 1 FROM submissions s, json_each(s.annotated_keys) j WHERE s.student_id = ${session.studentId} AND j.value = ${key})
       OR EXISTS (SELECT 1 FROM materials m WHERE m.class_id = ${session.classId} AND m.published = 1 AND m.file_key = ${key})
       OR EXISTS (SELECT 1 FROM settings st WHERE st.key = 'payment_info' AND (st.value ->> 'qrKey') = ${key})
-      OR EXISTS (SELECT 1 FROM videos v, json_each(v.questions) j WHERE v.class_id = ${session.classId} AND v.published = 1 AND (j.value ->> 'image') = ${key})`)
+      OR EXISTS (SELECT 1 FROM videos v, json_each(v.questions) j WHERE v.class_id = ${session.classId} AND v.published = 1 AND (j.value ->> 'image') = ${key})
+      OR EXISTS (SELECT 1 FROM card_games g, json_each(g.questions) j WHERE g.class_id = ${session.classId} AND j.key = g.current AND (j.value ->> 'image') = ${key})`)
   return !!row
 }

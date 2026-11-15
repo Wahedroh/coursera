@@ -33,7 +33,7 @@ import { studentQuestRoutes } from './quests/routes'
 import { studentPushRoutes } from './push/routes'
 import { teacherInsightRoutes } from './insights/routes'
 import { studentCalendarRoutes, teacherCalendarRoutes } from './calendar/routes'
-import { teacherCardRoutes } from './cardgame/routes'
+import { studentCardRoutes, teacherCardRoutes } from './cardgame/routes'
 import { studentReportRoutes, teacherAnalysisRoutes } from './analysis/routes'
 import { runCron } from './push/cron'
 import type { Env } from './env'
@@ -78,6 +78,7 @@ app.route('/api/student/announcements', studentAnnouncementRoutes)
 app.route('/api/student/fees', studentFeeRoutes)
 app.route('/api/student/quests', studentQuestRoutes)
 app.route('/api/student/push', studentPushRoutes)
+app.route('/api/student/card-games', studentCardRoutes)
 app.route('/api/student/calendar', studentCalendarRoutes)
 app.route('/api/student/report-card', studentReportRoutes)
 app.route('/api/student', studentPointsRoutes)

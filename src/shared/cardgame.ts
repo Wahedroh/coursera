@@ -69,6 +69,30 @@ export type CardGameState = {
   roster: { id: string; no: number; zipgradeId: string; name: string }[]
   /** คำตอบของข้อปัจจุบัน */
   answers: Record<string, number>
+  /** นักเรียนที่ตอบข้อปัจจุบันในเครื่องตัวเอง (ไม่ใช่การ์ด) */
+  devices: string[]
+}
+
+/** เกมที่นักเรียนเข้าร่วมในเครื่องตัวเองได้: เกมที่ยังไม่จบของห้อง ที่เริ่มภายใน 3 ชั่วโมง */
+export const DEVICE_GAME_WINDOW_MS = 3 * 3600_000
+export const deviceAnswerSchema = z.object({ qIndex: z.number().int().min(0), answer: z.number().int().min(0).max(3) })
+export type StudentActiveGame = { id: string; quizTitle: string } | null
+/** มุมมองเกมในเครื่องนักเรียน — ไม่มีเฉลยจนกว่าครูกดเฉลย */
+export type StudentCardGame = {
+  id: string
+  quizTitle: string
+  total: number
+  current: number
+  question: { q: string; image?: string; choices: string[] }
+  remainingMs: number | null
+  revealed: boolean
+  /** เฉลยของข้อปัจจุบัน (เฉพาะหลังเฉลย) */
+  correct: number | null
+  /** คำตอบของฉันในข้อปัจจุบัน */
+  mine: number | null
+  ended: boolean
+  /** สรุปของฉัน (เมื่อจบเกม) */
+  summary: { correct: number; answered: number; exp: number } | null
 }
 export type CardGameResult = {
   total: number

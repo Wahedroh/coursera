@@ -443,6 +443,8 @@ export const cardAnswers = sqliteTable(
       .references(() => students.id),
     answer: integer('answer').notNull(),
     scannedAt: integer('scanned_at').notNull(),
+    /** ที่มาของคำตอบ: ครูสแกนการ์ด หรือ นักเรียนกดในเครื่องตัวเอง (คำตอบจากเครื่องไม่ถูกการสแกนทับ) */
+    via: text('via').$type<'card' | 'device'>().notNull().default('card'),
   },
   (t) => [uniqueIndex('card_answers_unique').on(t.gameId, t.qIndex, t.studentId), index('card_answers_student_idx').on(t.studentId)],
 )

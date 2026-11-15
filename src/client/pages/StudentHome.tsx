@@ -9,6 +9,7 @@ import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
 import AppSetupCard from '../components/AppSetupCard'
+import CardGameBanner from '../components/CardGameBanner'
 import NotificationBell from '../components/NotificationBell'
 import ReportReadyCard from '../components/ReportReadyCard'
 import type { StudentBadge } from '../../shared/badges'
@@ -161,6 +162,7 @@ export default function StudentHome() {
           </Link>
         </div>
       </header>
+      <CardGameBanner />
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
         <ReportReadyCard />
