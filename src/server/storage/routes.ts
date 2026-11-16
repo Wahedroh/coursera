@@ -4,6 +4,7 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
+import { cloudflareUsage } from './cloudflare'
 import { purgeCandidates, purgeGraded, purgeOrphans, syncFromBucket, usage, storageBreakdown } from './service'
 
 export const teacherStorageRoutes = new Hono<AppEnv>()
@@ -16,6 +17,7 @@ teacherStorageRoutes.get('/storage', async (c) => {
   if (u.syncedAt === null) u = await syncFromBucket(db, c.env.BUCKET, now())
   return c.json({ usage: u, breakdown: await storageBreakdown(db), candidates: await purgeCandidates(db) })
 })
+teacherStorageRoutes.get('/storage/cloudflare', async (c) => c.json(await cloudflareUsage(c.env, now())))
 teacherStorageRoutes.get('/storage/usage', async (c) => c.json(await usage(getDb(c.env))))
 teacherStorageRoutes.post('/storage/sync', async (c) => c.json(await syncFromBucket(getDb(c.env), c.env.BUCKET, now())))
 
