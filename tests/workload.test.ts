@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { getDb, newId } from '../src/server/db/client'
 import { classes } from '../src/server/db/schema'
 import { generateTeacherNotifications } from '../src/server/teacherNotify/service'
-import { nextStop } from '../src/server/workload/service'
 import { countTrips, navUrl, parsePlace, slotPeriods } from '../src/shared/workload'
 import { del, getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
@@ -128,35 +127,15 @@ describe('ภาระสอน & การเดินทาง', () => {
   })
 })
 
-describe('นำทาง (CarPlay) และการแจ้งเตือน', () => {
-  it('จุดถัดไป: คาบที่ยังไม่เริ่ม ข้ามที่ปิด · ลิงก์ลับสำหรับคำสั่งลัด · ปฏิทิน', async () => {
-    const { cookie, a, b } = await setup()
+describe('ตำแหน่งและการแจ้งเตือน', () => {
+  it('ตำแหน่งโรงเรียนจากลิงก์แผนที่ → ปุ่มนำทางของจุดนั้น', async () => {
+    const { cookie, a } = await setup()
     const p = await json(await putJson(`/api/teacher/places/${a.schoolId}`, { mapUrl: 'https://www.google.com/maps/place/x/data=!3d6.41255!4d101.82411' }, cookie))
     expect(p).toMatchObject({ lat: 6.41255, lng: 101.82411 })
     expect((await json(await getJson('/api/teacher/places', cookie))).map((x: { name: string }) => x.name).sort()).toEqual(['ดรุณ', 'บำรุงอิสลาม'])
-
-    expect((await nextStop(db(), at('2030-01-07', '07:00')))?.nav).toBe('https://maps.apple.com/?daddr=6.41255,101.82411&dirflg=d')
-    expect((await nextStop(db(), at('2030-01-07', '09:00')))?.name).toBe('บำรุงอิสลาม') // กำลังสอนที่ดรุณ → ที่ถัดไป
-    expect(await nextStop(db(), at('2030-01-07', '16:00'))).toBeNull()
-    await postJson('/api/teacher/closures', { schoolId: a.schoolId, from: '2030-01-07', to: '2030-01-07', reason: 'exam', note: '' }, { cookie })
-    expect((await nextStop(db(), at('2030-01-07', '07:00')))?.name).toBe('บำรุงอิสลาม')
-
-    // ลิงก์ลับ
+    const d = await json(await getJson('/api/teacher/route/day?date=2030-01-07', cookie))
+    expect(d.stops[0].nav).toBe('https://maps.apple.com/?daddr=6.41255,101.82411&dirflg=d')
     expect((await SELF.fetch('http://x/api/nav/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/next')).status).toBe(404)
-    expect(await json(await getJson('/api/teacher/nav-token', cookie))).toEqual({ token: null })
-    const { token } = await json(await postJson('/api/teacher/nav-token', {}, { cookie }))
-    const res = await SELF.fetch(`http://x/api/nav/${token}/next`)
-    expect(res.status).toBe(200)
-    expect(res.headers.get('content-type')).toContain('text/plain')
-    const ics = await SELF.fetch(`http://x/api/nav/${token}/calendar.ics`)
-    expect(ics.headers.get('content-type')).toContain('text/calendar')
-    const body = await ics.text()
-    expect(body).toContain('BEGIN:VCALENDAR')
-    expect(body).toContain('X-WR-CALNAME')
-    // ออกลิงก์ใหม่ → ลิงก์เก่าใช้ไม่ได้
-    await postJson('/api/teacher/nav-token', {}, { cookie })
-    expect((await SELF.fetch(`http://x/api/nav/${token}/next`)).status).toBe(404)
-    expect(b).toBeTruthy()
   })
 
   it('โรงเรียนที่ปิดวันนี้: ไม่เตือนก่อนเข้าคาบ', async () => {

@@ -1,8 +1,6 @@
 import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
-import { bangkokClock } from '../../shared/timetable'
 import {
-  CLOSURE_LABEL,
   closureText,
   countTrips,
   navUrl,
@@ -302,76 +300,3 @@ export async function deleteAppointment(db: Db, id: string): Promise<void> {
   const r = await db.delete(teacherAppointments).where(eq(teacherAppointments.id, id)).returning({ id: teacherAppointments.id })
   if (!r.length) throw apiError('appointment_not_found', 'ไม่พบนัดนี้', 404)
 }
-
-// ---------- นำทาง (คำสั่งลัด iPhone / CarPlay) ----------
-const NAV_KEY = 'nav_token'
-export async function getNavToken(db: Db): Promise<string | null> {
-  const [r] = await db.select().from(settings).where(eq(settings.key, NAV_KEY))
-  return r?.value ?? null
-}
-export async function rotateNavToken(db: Db): Promise<string> {
-  const bytes = crypto.getRandomValues(new Uint8Array(24))
-  const value = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-  await db.insert(settings).values({ key: NAV_KEY, value }).onConflictDoUpdate({ target: settings.key, set: { value } })
-  return value
-}
-export async function checkNavToken(db: Db, token: string): Promise<boolean> {
-  const saved = await getNavToken(db)
-  if (!saved || saved.length !== token.length) return false
-  let diff = 0
-  for (let i = 0; i < saved.length; i++) diff |= saved.charCodeAt(i) ^ token.charCodeAt(i)
-  return diff === 0
-}
-
-/** จุดหมายถัดไปของวันนี้: คาบ/นัดที่ยังไม่เริ่ม (ข้ามที่ปิด) — คาบติดกันที่โรงเรียนเดิมนับเป็นจุดเดียว */
-export async function nextStop(db: Db, t: number): Promise<(Stop & { date: string }) | null> {
-  const date = todayBangkok(t)
-  const plan = await dayPlan(db, date)
-  const { minute } = bangkokClock(t)
-  const hhmm = `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`
-  const s = plan.stops.find((x) => !x.closed && x.start > hhmm)
-  return s ? { ...s, date } : null
-}
-
-/** ปฏิทิน (iCalendar) 7 วันย้อนหลังถึง 60 วันข้างหน้า: คาบสอนพร้อมสถานที่ · นัดพิเศษ · วันงดสอน */
-export async function navCalendar(db: Db, t: number): Promise<string> {
-  const today = todayBangkok(t)
-  const from = addDays(today, -7)
-  const to = addDays(today, 60)
-  const ctx = await loadCtx(db, from, to)
-  const paused = await isPaused(db)
-  const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
-  const stamp = (date: string, hhmm: string) => new Date(Date.parse(`${date}T${hhmm}:00+07:00`)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//classroom//teaching-route//TH', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:ตารางสอน & เดินทาง', 'X-WR-TIMEZONE:Asia/Bangkok']
-  const now = stamp(today, '00:00')
-  for (let d = from; d <= to; d = addDays(d, 1)) {
-    for (const s of planDay(ctx, d, paused).stops) {
-      const end = s.end ?? `${String(Math.min(23, Number(s.start.slice(0, 2)) + 1)).padStart(2, '0')}${s.start.slice(2)}`
-      const title = s.closed ? `งดสอน ${s.name}: ${CLOSURE_LABEL[s.closed.reason]}${s.closed.note ? ` (${s.closed.note})` : ''}` : s.kind === 'school' ? `สอน ${s.name} (${s.periods} คาบ)` : s.name
-      lines.push('BEGIN:VEVENT', `UID:${d}-${s.key}-${s.start}@classroom`, `DTSTAMP:${now}`, `DTSTART:${stamp(d, s.start)}`, `DTEND:${stamp(d, end)}`, `SUMMARY:${esc(title)}`)
-      if (s.kind === 'school') lines.push(`DESCRIPTION:${esc(s.classes.map((c) => `${c.name} ${c.periods} คาบ`).join('\n'))}`)
-      if (!s.closed) {
-        lines.push(`LOCATION:${esc(s.name)}`)
-        if (s.lat !== null && s.lng !== null) lines.push(`X-APPLE-STRUCTURED-LOCATION;VALUE=URI;X-APPLE-RADIUS=100;X-TITLE=${esc(s.name)}:geo:${s.lat},${s.lng}`, `GEO:${s.lat};${s.lng}`)
-      } else lines.push('TRANSP:TRANSPARENT')
-      lines.push('END:VEVENT')
-    }
-  }
-  lines.push('END:VCALENDAR')
-  // บรรทัดยาวเกิน 75 ไบต์ต้องพับ (RFC 5545)
-  const enc = new TextEncoder()
-  const fold = (line: string) => {
-    const out: string[] = []
-    let cur = ''
-    for (const ch of line) {
-      if (enc.encode(cur + ch).length > (out.length ? 74 : 75)) {
-        out.push(cur)
-        cur = ch
-      } else cur += ch
-    }
-    out.push(cur)
-    return out.join('\r\n ')
-  }
-  return lines.map(fold).join('\r\n') + '\r\n'
-}
-

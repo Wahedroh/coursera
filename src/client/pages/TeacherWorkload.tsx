@@ -90,7 +90,7 @@ export default function TeacherWorkload() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-2xl font-extrabold mr-auto">📊 ภาระสอน & การเดินทาง</h1>
         <Link to="/teacher/route" className="rounded-xl bg-board-soft text-board px-3 py-1.5 text-sm font-bold">
-          🧭 เส้นทาง · ปิดโรงเรียน · CarPlay
+          🧭 เส้นทาง · ปิดโรงเรียน
         </Link>
       </div>
       <ErrorBox message={error} />
