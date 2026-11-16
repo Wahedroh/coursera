@@ -17,6 +17,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TEACHER_PASSWORD: ${{ secrets.TEACHER_PASSWORD }}
       SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      CF_ANALYTICS_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,3 +38,8 @@ jobs:
         run: |
           node scripts/hash-password.mjs "$TEACHER_PASSWORD" | npx wrangler secret put TEACHER_PASSWORD_HASH
           printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET
+      - name: Set analytics secrets (optional · ดูการใช้งาน KV/Workers/D1 ในหน้าพื้นที่ไฟล์)
+        if: env.CF_ANALYTICS_TOKEN != ''
+        run: |
+          printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | npx wrangler secret put CF_ACCOUNT_ID
+          printf '%s' "$CF_ANALYTICS_TOKEN" | npx wrangler secret put CF_ANALYTICS_TOKEN

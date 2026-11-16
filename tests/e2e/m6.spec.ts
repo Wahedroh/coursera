@@ -8,6 +8,8 @@ test('ครูดูพื้นที่ไฟล์ แล้วลบรู�
   await teacher.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
   await teacher.getByRole('link', { name: 'พื้นที่ไฟล์' }).click()
   await expect(teacher.getByText(/ใช้ไป .* จาก 10.00 GB/)).toBeVisible()
+  await expect(teacher.getByRole('heading', { name: /โควตาวันนี้ของบัญชี Cloudflare/ })).toBeVisible()
+  await expect(teacher.getByText('CF_ANALYTICS_TOKEN')).toBeVisible()
   await expect(teacher.getByText('ใบงานเศษส่วน')).toBeVisible()
   teacher.on('dialog', (d) => d.accept())
   await teacher.getByRole('button', { name: /ลบรูปงาน ใบงานเศษส่วน/ }).click()

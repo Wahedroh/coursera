@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
+import { CF_FREE_LIMITS, type CloudflareUsage } from '../../shared/cloudflareUsage'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -97,6 +98,7 @@ export default function TeacherStorage() {
           นับพื้นที่ใหม่
         </button>
       </Card>
+      <CloudflareQuota />
 
       <Card className="p-4 flex flex-col gap-3">
         <h2 className="font-bold">ลบรูปงานที่ตรวจแล้ว</h2>
@@ -172,6 +174,71 @@ export default function TeacherStorage() {
 }
 
 type Backup = { name: string; size: number; uploadedAt: number }
+const num = new Intl.NumberFormat('th-TH')
+const hhmm = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
+
+function QuotaBar({ label, used, limit, hint }: { label: string; used: number; limit: number; hint?: string }) {
+  const pct = Math.min(100, (used / limit) * 100)
+  const tone = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-board'
+  return (
+    <li className="text-sm" data-testid={`quota-${label}`}>
+      <div className="flex justify-between gap-2">
+        <span>
+          {label}
+          {hint && <span className="text-xs text-stone-500"> · {hint}</span>}
+        </span>
+        <span className={`tabular-nums whitespace-nowrap ${pct >= 90 ? 'text-red-700 font-bold' : pct >= 70 ? 'text-amber-700 font-bold' : 'text-stone-600'}`}>
+          {num.format(used)} / {num.format(limit)} ({pct < 1 && used > 0 ? '<1' : Math.round(pct)}%)
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+        <div className={`h-full ${tone}`} style={{ width: `${Math.max(pct, used > 0 ? 0.5 : 0)}%` }} />
+      </div>
+    </li>
+  )
+}
+
+/** การใช้งานวันนี้ของทั้งบัญชี Cloudflare (KV · Workers · D1) — นับรวมทุกแอปในบัญชี */
+function CloudflareQuota() {
+  const [u, setU] = useState<CloudflareUsage | null>(null)
+  useEffect(() => {
+    api<CloudflareUsage>('/api/teacher/storage/cloudflare')
+      .then(setU)
+      .catch(() => setU(null))
+  }, [])
+  if (!u) return null
+  return (
+    <Card className="p-4 flex flex-col gap-2" data-testid="cf-usage">
+      <h2 className="font-bold">☁️ โควตาวันนี้ของบัญชี Cloudflare (แพ็กเกจฟรี)</h2>
+      {!u.configured ? (
+        <p className="text-sm text-stone-600">
+          ยังไม่ได้เชื่อม — ตั้ง GitHub secret <code className="bg-stone-100 px-1 rounded">CF_ANALYTICS_TOKEN</code> (Cloudflare API token สิทธิ์ “Account Analytics: Read” อย่างเดียว) แล้ว deploy ใหม่ จะเห็นการใช้ KV · Workers · D1 ของวันนี้ที่นี่
+        </p>
+      ) : (
+        <>
+          <p className="text-xs text-stone-500">
+            นับรวมทุกแอปในบัญชี · รีเซ็ตทุกวัน 07:00 น. · อัปเดต {hhmm.format(u.fetchedAt)} น. (ทุก ~5 นาที){u.error ? ` · ⚠️ ดึงข้อมูลไม่ได้: ${u.error}` : ''}
+          </p>
+          <b className="text-sm pt-1">KV</b>
+          <ul className="flex flex-col gap-1.5">
+            <QuotaBar label="KV อ่าน" used={u.kv.read} limit={CF_FREE_LIMITS.kvRead} />
+            <QuotaBar label="KV เขียน" used={u.kv.write} limit={CF_FREE_LIMITS.kvWrite} hint="เต็มเร็วที่สุด" />
+            <QuotaBar label="KV ลบ" used={u.kv.delete} limit={CF_FREE_LIMITS.kvDelete} />
+            <QuotaBar label="KV list" used={u.kv.list} limit={CF_FREE_LIMITS.kvList} />
+          </ul>
+          <p className="text-xs text-stone-500">พื้นที่ KV {fmtBytes(u.kv.storageBytes)} จาก 1 GB · {num.format(u.kv.keys)} คีย์ · แอปห้องเรียนไม่ได้ใช้ KV (ตัวเลขนี้มาจากแอปอื่นในบัญชี)</p>
+          <b className="text-sm pt-1">Workers และฐานข้อมูล</b>
+          <ul className="flex flex-col gap-1.5">
+            <QuotaBar label="Workers requests" used={u.workers.requests} limit={CF_FREE_LIMITS.workerRequests} hint={u.workers.byScript.map((x) => `${x.name} ${num.format(x.requests)}`).join(' · ')} />
+            <QuotaBar label="D1 อ่านแถว" used={u.d1.rowsRead} limit={CF_FREE_LIMITS.d1RowsRead} />
+            <QuotaBar label="D1 เขียนแถว" used={u.d1.rowsWritten} limit={CF_FREE_LIMITS.d1RowsWritten} />
+          </ul>
+        </>
+      )}
+    </Card>
+  )
+}
+
 const when = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 /** ไฟล์สำรองฐานข้อมูลรายสัปดาห์ (GitHub Actions เขียนลง R2 ส่วนตัว) */
