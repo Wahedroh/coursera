@@ -71,7 +71,7 @@ export function parsePlace(text: string): LatLng | null {
   return null
 }
 
-/** ลิงก์นำทางของ Apple Maps (เปิดแอปแผนที่/CarPlay) — ไม่มีพิกัดใช้ชื่อค้นหาแทน */
+/** ลิงก์นำทางของ Apple Maps (เปิดแอปแผนที่) — ไม่มีพิกัดใช้ชื่อค้นหาแทน */
 export function navUrl(place: { lat: number | null; lng: number | null; name: string }): string {
   const dest = place.lat !== null && place.lng !== null ? `${place.lat},${place.lng}` : encodeURIComponent(place.name)
   return `https://maps.apple.com/?daddr=${dest}&dirflg=d`

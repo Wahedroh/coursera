@@ -15,7 +15,7 @@ const short = (d: string) => new Intl.DateTimeFormat('th-TH', { day: 'numeric', 
 
 type CloseTarget = { schoolId: string | null; name: string }
 
-/** เส้นทางรายวัน · ปิดโรงเรียน (พร้อมหมายเหตุ) · นัดพิเศษ · ตำแหน่งโรงเรียน · ตั้งค่า CarPlay (คำสั่งลัด iPhone) */
+/** เส้นทางรายวัน · ปิดโรงเรียน (พร้อมหมายเหตุ) · นัดพิเศษ · ตำแหน่งโรงเรียน */
 export default function TeacherRoute() {
   const handle = useTeacherErrorHandler()
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +26,6 @@ export default function TeacherRoute() {
   const [appts, setAppts] = useState<Appointment[]>([])
   const [places, setPlaces] = useState<SchoolPlace[] | null>(null)
   const [closing, setClosing] = useState<CloseTarget | null>(null)
-  const [token, setToken] = useState<string | null | undefined>(undefined)
 
   const fail = useCallback((e: unknown) => setError(handle(e)), [handle])
   const loadDay = useCallback(() => api<DayPlan>(`/api/teacher/route/day?date=${date}`).then(setPlan).catch(fail), [date, fail])
@@ -38,9 +37,6 @@ export default function TeacherRoute() {
   useEffect(() => {
     loadLists()
     api<SchoolPlace[]>('/api/teacher/places').then(setPlaces).catch(fail)
-    api<{ token: string | null }>('/api/teacher/nav-token')
-      .then((r) => setToken(r.token))
-      .catch(fail)
   }, [loadLists, fail])
   const reload = () => {
     void loadDay()
@@ -66,11 +62,10 @@ export default function TeacherRoute() {
     }
   }
 
-  const base = token ? `${location.origin}/api/nav/${token}` : ''
   return (
     <TeacherLayout>
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-extrabold mr-auto">🧭 เส้นทาง & CarPlay</h1>
+        <h1 className="text-2xl font-extrabold mr-auto">🧭 เส้นทาง & ปิดโรงเรียน</h1>
         <Link to="/teacher/workload" className="rounded-xl bg-board-soft text-board px-3 py-1.5 text-sm font-bold">
           📊 ภาระสอน & การเดินทาง
         </Link>
@@ -205,55 +200,6 @@ export default function TeacherRoute() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Card className="p-4 flex flex-col gap-2">
-            <b>🚗 CarPlay: เสียบสายแล้วนำทางเอง</b>
-            <p className="text-xs text-stone-600">ใช้คำสั่งลัด (Shortcuts) บน iPhone — ไปคาบ/นัดถัดไปของวันนี้ที่ยังไม่เริ่ม ข้ามโรงเรียนที่ปิด · วันที่ไม่มีที่ไปจะไม่ทำอะไร</p>
-            {token === undefined ? (
-              <Loading />
-            ) : !token ? (
-              <Button type="button" onClick={() => void api<{ token: string }>('/api/teacher/nav-token', { body: {} }).then((r) => setToken(r.token)).catch(fail)}>
-                สร้างลิงก์สำหรับคำสั่งลัด
-              </Button>
-            ) : (
-              <>
-                <label className="text-xs font-bold">
-                  ลิงก์ “ไปไหนต่อ” (ลับ — ใช้ในคำสั่งลัดเท่านั้น)
-                  <input readOnly aria-label="ลิงก์คำสั่งลัด" className={`${input} w-full font-mono text-[11px] mt-1`} value={`${base}/next`} onFocus={(e) => e.target.select()} />
-                </label>
-                <button type="button" className="self-start rounded-lg bg-board-soft text-board px-2.5 py-1 text-xs font-bold" onClick={() => void navigator.clipboard?.writeText(`${base}/next`).then(() => setFlash('คัดลอกลิงก์แล้ว'))}>
-                  📋 คัดลอกลิงก์
-                </button>
-                <ol className="list-decimal pl-5 text-sm flex flex-col gap-1" data-testid="shortcut-steps">
-                  <li>
-                    เปิดแอป <b>คำสั่งลัด</b> → แท็บ <b>ระบบอัตโนมัติ</b> → <b>+</b> → <b>CarPlay</b> → <b>เชื่อมต่อ</b> → เลือก <b>เรียกใช้ทันที</b>
-                  </li>
-                  <li>
-                    เพิ่มการทำงาน <b>รับเนื้อหาของ URL</b> → วางลิงก์ด้านบน
-                  </li>
-                  <li>
-                    เพิ่ม <b>ถ้า</b> “เนื้อหาของ URL” <b>มีค่าใดๆ</b> → ข้างในใส่ <b>เปิด URL</b> (เนื้อหาของ URL)
-                  </li>
-                  <li>กดเสร็จสิ้น · ครั้งแรก iPhone อาจถามอนุญาตให้เชื่อมต่อเว็บนี้/เปิดแผนที่ ให้กดอนุญาตเสมอ</li>
-                </ol>
-                <p className="text-xs text-stone-500">อยากให้ทำทุกเช้าแทน: ตั้งระบบอัตโนมัติแบบ “เวลาของวัน” (เช่น 06:45) ด้วยขั้นตอนเดียวกัน · Apple Maps จะแสดงเส้นทาง แตะ “ไป” เพื่อเริ่มนำทาง</p>
-                <b className="pt-2 text-sm">📅 ปฏิทินบน iPhone (เสริม)</b>
-                <p className="text-xs text-stone-600">คาบสอน + สถานที่ + วันงดสอน ขึ้นในปฏิทิน · CarPlay/แผนที่แนะนำปลายทางนัดถัดไปให้</p>
-                <a href={`${base.replace(/^https?:/, 'webcal:')}/calendar.ics`} className="self-start rounded-lg bg-board text-white px-3 py-1.5 text-sm font-bold">
-                  สมัครรับปฏิทิน
-                </a>
-                <button
-                  type="button"
-                  className="self-start text-xs underline text-stone-500 pt-2"
-                  onClick={() => {
-                    if (window.confirm('ออกลิงก์ใหม่? ลิงก์เดิมในคำสั่งลัด/ปฏิทินจะใช้ไม่ได้ ต้องวางลิงก์ใหม่')) void api<{ token: string }>('/api/teacher/nav-token', { body: {} }).then((r) => setToken(r.token)).catch(fail)
-                  }}
-                >
-                  ออกลิงก์ใหม่ (ยกเลิกลิงก์เดิม)
-                </button>
-              </>
-            )}
-          </Card>
-
           <Card className="p-4 flex flex-col gap-2">
             <b>📍 ตำแหน่งโรงเรียน</b>
             <p className="text-xs text-stone-600">เปิด Google Maps หรือ Apple Maps → ค้นหาโรงเรียน → แชร์ → คัดลอกลิงก์ → วางที่ช่อง (หรือพิมพ์ “ละติจูด, ลองจิจูด”)</p>

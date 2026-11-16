@@ -1,5 +1,5 @@
 import { teacherNotifyRoutes } from './teacherNotify/routes'
-import { navRoutes, teacherWorkloadRoutes } from './workload/routes'
+import { teacherWorkloadRoutes } from './workload/routes'
 import { teacherTimetableRoutes } from './timetable/routes'
 import { teacherCopyRoutes } from './copy/routes'
 import { teacherOverviewRoutes } from './overview/routes'
@@ -70,7 +70,6 @@ app.route('/api/teacher', teacherTimetableRoutes)
 app.route('/api/teacher', teacherCopyRoutes)
 app.route('/api/teacher', teacherNotifyRoutes)
 app.route('/api/teacher', teacherWorkloadRoutes)
-app.route('/api/nav', navRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)

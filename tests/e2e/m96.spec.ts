@@ -221,7 +221,7 @@ test('แจ้งเตือนครู: กระดิ่งในแถบ
   await expect(t.getByLabel('ลิงก์ยืนยันการสอน')).toHaveValue('https://change-classroom1.base44.app/')
 })
 
-test('ภาระสอน: ตั้งเป้าคาบ → แก้จำนวนคาบของช่วง → เส้นทางรายวัน ปิดโรงเรียนพร้อมหมายเหตุ → ตำแหน่ง + ลิงก์คำสั่งลัด CarPlay', async ({ browser }) => {
+test('ภาระสอน: ตั้งเป้าคาบ → แก้จำนวนคาบของช่วง → เส้นทางรายวัน ปิดโรงเรียนพร้อมหมายเหตุ → ตำแหน่งโรงเรียน', async ({ browser }) => {
   const t = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })).newPage()
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
@@ -241,7 +241,7 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await expect(row).toContainText('✓ ครบ')
   await expect(t.getByTestId('month-totals')).toContainText('คาบ')
 
-  await t.getByRole('link', { name: 'เส้นทาง & CarPlay' }).click()
+  await t.getByRole('link', { name: 'เส้นทาง & ปิดโรงเรียน' }).click()
   await t.getByLabel('วันที่').fill('2030-01-07')
   await expect(t.getByTestId('day-stops')).toContainText('โรงเรียนทดสอบ (3 คาบ)')
   await expect(t.getByTestId('day-summary')).toContainText('3 คาบ · 🚗 1 ที่')
@@ -257,11 +257,6 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await link.fill('6.4123, 101.8234')
   await link.press('Enter')
   await expect(t.getByTestId('place-ok-โรงเรียนทดสอบ')).toBeVisible()
-  await t.getByRole('button', { name: 'สร้างลิงก์สำหรับคำสั่งลัด' }).click()
-  await expect(t.getByTestId('shortcut-steps')).toContainText('CarPlay')
-  const url = await t.getByLabel('ลิงก์คำสั่งลัด').inputValue()
-  const res = await t.request.get(url)
-  expect(res.status()).toBe(200)
 
   // เก็บกวาด
   t.once('dialog', (d) => void d.accept())
