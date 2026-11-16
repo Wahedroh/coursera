@@ -1,31 +1,51 @@
 import { eq, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import { weekStartBangkok } from '../../shared/quests'
-import { bangkokClock, currentSlot, nextClassStart, slotTimes, upcomingSlots, type PublishInput, type Slot, type SlotInput } from '../../shared/timetable'
+import { bangkokClock, currentSlot, rangesOverlap, slotActiveOn, nextClassStart, slotTimes, upcomingSlots, type PublishInput, type Slot, type SlotInput } from '../../shared/timetable'
 import { newId, type Db } from '../db/client'
 import { classes, settings, timetableSlots } from '../db/schema'
 import { apiError } from '../http'
-import { closedChecker } from '../workload/service'
+import { closedChecker, makeupsOn } from '../workload/service'
 
 const PAUSE_KEY = 'timetable_paused'
 
-export async function listSlots(db: Db): Promise<Slot[]> {
+/** ทุกคาบในตารางสอน (ทุกช่วงเวลา · เฉพาะห้องที่ยังใช้งาน) */
+export async function listAllSlots(db: Db): Promise<Slot[]> {
   return db
-    .select({ id: timetableSlots.id, classId: timetableSlots.classId, weekday: timetableSlots.weekday, start: timetableSlots.start, end: timetableSlots.end })
+    .select({ id: timetableSlots.id, classId: timetableSlots.classId, weekday: timetableSlots.weekday, start: timetableSlots.start, end: timetableSlots.end, periods: timetableSlots.periods, validFrom: timetableSlots.validFrom, validTo: timetableSlots.validTo })
     .from(timetableSlots)
     .innerJoin(classes, eq(classes.id, timetableSlots.classId))
     .where(eq(classes.archived, false))
     .orderBy(timetableSlots.weekday, timetableSlots.start)
 }
 
+/** คาบที่ใช้อยู่ในวันที่ date (ค่าเริ่มต้น = วันนี้) */
+export async function listSlots(db: Db, date = todayBangkok(Date.now())): Promise<Slot[]> {
+  return (await listAllSlots(db)).filter((s) => slotActiveOn(s, date))
+}
+
 export async function addSlot(db: Db, input: SlotInput, t: number): Promise<string> {
   const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, input.classId))
   if (!c) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
-  const clash = (await listSlots(db)).find((s) => s.weekday === input.weekday && s.start < input.end && input.start < s.end)
+  const range = { validFrom: input.validFrom ?? null, validTo: null }
+  const clash = (await listAllSlots(db)).find((s) => s.weekday === input.weekday && s.start < input.end && input.start < s.end && rangesOverlap(s, range))
   if (clash) throw apiError('slot_overlap', 'เวลานี้ซ้อนกับคาบอื่นในวันเดียวกัน', 409)
   const id = newId()
-  await db.insert(timetableSlots).values({ id, ...input, createdAt: t })
+  await db.insert(timetableSlots).values({ id, classId: input.classId, weekday: input.weekday, start: input.start, end: input.end, validFrom: range.validFrom, createdAt: t })
   return id
+}
+
+/** เลิกใช้คาบนี้ตั้งแต่วันที่ from (คาบก่อนหน้านั้นยังนับในยอดย้อนหลัง) · ถ้ายังไม่เคยเริ่มใช้ = ลบทิ้ง */
+export async function endSlot(db: Db, id: string, from: string): Promise<'ended' | 'deleted'> {
+  const [s] = await db.select().from(timetableSlots).where(eq(timetableSlots.id, id))
+  if (!s) throw apiError('slot_not_found', 'ไม่พบคาบนี้', 404)
+  if (s.validFrom && s.validFrom >= from) {
+    await db.delete(timetableSlots).where(eq(timetableSlots.id, id))
+    return 'deleted'
+  }
+  const validTo = new Date(Date.parse(`${from}T00:00:00Z`) - 86400_000).toISOString().slice(0, 10)
+  await db.update(timetableSlots).set({ validTo }).where(eq(timetableSlots.id, id))
+  return 'ended'
 }
 
 export async function deleteSlot(db: Db, id: string): Promise<void> {
@@ -54,14 +74,22 @@ export type TimetableNow = {
 }
 
 export async function timetableNow(db: Db, t: number): Promise<TimetableNow> {
-  const slots = await listSlots(db)
+  const slots = await listSlots(db, todayBangkok(t))
   const paused = await isPaused(db)
   if (!slots.length || paused) return { paused, hasSlots: slots.length > 0, current: null, upcoming: [], missingAttendance: [], currentDayId: null }
   // วันที่โรงเรียนปิด/งดสอน: ไม่นับเป็นคาบที่กำลังสอน/คาบถัดไป/ลืมเช็กชื่อ
   const closed = await closedChecker(db, todayBangkok(t - 7 * 86400_000), todayBangkok(t + 8 * 86400_000))
   const dateOf = (at: number) => todayBangkok(at)
   const cur = currentSlot(slots, t)
-  const current = cur && !closed(cur.classId, dateOf(cur.startAt)) ? cur : null
+  let current = cur && !closed(cur.classId, dateOf(cur.startAt)) ? cur : null
+  if (!current) {
+    // คาบสอนชดเชยที่กำลังสอนอยู่
+    const { weekday, dayStart } = bangkokClock(t)
+    for (const m of await makeupsOn(db, todayBangkok(t))) {
+      const occ = slotTimes(m, dayStart)
+      if (occ.start <= t && t < occ.end) current = { id: `mk:${m.id}`, classId: m.classId, weekday, start: m.start, end: m.end, startAt: occ.start, endAt: occ.end }
+    }
+  }
   const upcoming = upcomingSlots(slots, t, 12)
     .filter((s) => (!current || s.id !== current.id || s.startAt !== current.startAt) && !closed(s.classId, dateOf(s.startAt)))
     .slice(0, 6)
@@ -90,7 +118,7 @@ export async function timetableNow(db: Db, t: number): Promise<TimetableNow> {
 export async function resolvePublish(db: Db, classIds: string[], p: PublishInput | undefined, t: number): Promise<Map<string, { published: boolean; publishAt: number | null }>> {
   const out = new Map<string, { published: boolean; publishAt: number | null }>()
   const mode = p?.publishMode ?? 'now'
-  const slots = mode === 'next-period' ? await listSlots(db) : []
+  const slots = mode === 'next-period' ? await listSlots(db, todayBangkok(t)) : []
   for (const id of classIds) {
     if (mode === 'draft') out.set(id, { published: false, publishAt: null })
     else if (mode === 'at') {

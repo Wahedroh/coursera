@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { WEEKDAY_SHORT } from '../../shared/timetable'
-import { CLOSURE_LABEL, type WorkloadRange, type WorkloadTargets } from '../../shared/workload'
+import { CLOSURE_LABEL, type MakeupSummary, type WorkloadRange, type WorkloadTargets } from '../../shared/workload'
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -28,15 +28,24 @@ export default function TeacherWorkload() {
   const [targets, setTargets] = useState<WorkloadTargets | null>(null)
   const [month, setMonth] = useState(todayStr().slice(0, 7))
   const [range, setRange] = useState<WorkloadRange | null>(null)
+  const [makeup, setMakeup] = useState<MakeupSummary | null>(null)
 
   const loadTargets = useCallback(() => api<WorkloadTargets>('/api/teacher/workload/targets').then(setTargets).catch((e) => setError(handle(e))), [handle])
   useEffect(() => void loadTargets(), [loadTargets])
   useEffect(() => {
     const { from, to } = monthRange(month)
     setRange(null)
+    let live = true
     api<WorkloadRange>(`/api/teacher/workload?from=${from}&to=${to}`)
-      .then(setRange)
+      .then((r) => live && setRange(r))
       .catch((e) => setError(handle(e)))
+    api<MakeupSummary>(`/api/teacher/workload/makeup?from=${from}&to=${to}`)
+      .then((r) => live && setMakeup(r))
+      .catch((e) => setError(handle(e)))
+    // เปลี่ยนเดือนเร็ว ๆ: ผลของเดือนก่อนที่มาช้าไม่ทับ
+    return () => {
+      live = false
+    }
   }, [month, handle])
 
   async function setTarget(classId: string, raw: string) {
@@ -72,20 +81,21 @@ export default function TeacherWorkload() {
 
   function downloadCsv() {
     if (!range) return
-    const rows = [['วันที่', 'วัน', 'สถานที่ (ตามลำดับ)', 'คาบที่สอน', 'คาบที่งด (ปิด)', 'การเดินทาง (ครั้ง)', 'หมายเหตุการปิด']]
+    const rows = [['วันที่', 'วัน', 'สถานที่ (ตามลำดับ)', 'คาบที่สอน', 'คาบที่งด (ปิด)', 'การเดินทาง (ครั้ง)', 'ชดเชย (คาบ)', 'หมายเหตุการปิด']]
     for (const d of range.days) {
       if (!d.stops.length) continue
       rows.push([
         d.date,
         WEEKDAY_SHORT[d.weekday],
-        d.stops.map((s) => `${s.name}${s.kind === 'school' ? ` ${s.periods} คาบ` : ''}${s.closed ? ' (ปิด)' : ''}`).join(' → '),
+        d.stops.map((s) => `${s.makeup ? (s.makeup.mode === 'online' ? 'ชดเชยออนไลน์ ' : 'ชดเชย ') : ''}${s.name}${s.kind !== 'appointment' ? ` ${s.periods} คาบ` : ''}${s.closed ? ' (ปิด)' : ''}`).join(' → '),
         String(d.periods),
         String(d.closedPeriods),
         String(d.trips),
+        String(d.stops.filter((s) => s.makeup && s.countPeriods).reduce((n, s) => n + s.periods, 0) || ''),
         [...new Set(d.stops.filter((s) => s.closed).map((s) => `${s.name}: ${CLOSURE_LABEL[s.closed!.reason]}${s.closed!.note ? ` ${s.closed!.note}` : ''}`))].join(' · '),
       ])
     }
-    rows.push(['รวม', '', '', String(range.planned.periods), String(range.planned.closedPeriods), String(range.planned.trips), ''])
+    rows.push(['รวม', '', '', String(range.planned.periods), String(range.planned.closedPeriods), String(range.planned.trips), String(range.planned.makeupPeriods), ''])
     const csv = '﻿' + rows.map((r) => r.map((x) => `"${x.replace(/"/g, '""')}"`).join(',')).join('\r\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
@@ -160,6 +170,7 @@ export default function TeacherWorkload() {
                 <div className="rounded-xl bg-board-soft p-2.5">
                   <span className="text-xs">สอนแล้ว{range.to > range.today ? ' (ถึงวันนี้)' : ''}</span>
                   <b className="block text-2xl tabular-nums">{range.done.periods} คาบ</b>
+                  {range.done.makeupPeriods > 0 && <span className="block text-xs text-stone-600">รวมชดเชย {range.done.makeupPeriods}{range.done.onlinePeriods ? ` · ออนไลน์ ${range.done.onlinePeriods}` : ''}</span>}
                   {range.to > range.today && <span className="text-xs text-stone-500">ทั้งเดือนตามแผน {range.planned.periods}</span>}
                 </div>
                 <div className="rounded-xl bg-amber-50 p-2.5">
@@ -189,12 +200,13 @@ export default function TeacherWorkload() {
                         <span key={i} className="inline-flex items-center gap-1">
                           {i > 0 && <span className="text-stone-300">→</span>}
                           <span
-                            className={`rounded-lg px-2 py-0.5 text-xs font-bold ${s.closed ? 'bg-rose-100 text-rose-800 line-through' : s.kind === 'school' ? (s.countPeriods || s.countTrips ? 'bg-board-soft text-board' : 'bg-stone-100 text-stone-500') : 'bg-blue-50 text-blue-800'}`}
+                            className={`rounded-lg px-2 py-0.5 text-xs font-bold ${s.closed ? 'bg-rose-100 text-rose-800 line-through' : s.makeup ? (s.makeup.mode === 'online' ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-900') : s.kind === 'school' ? (s.countPeriods || s.countTrips ? 'bg-board-soft text-board' : 'bg-stone-100 text-stone-500') : 'bg-blue-50 text-blue-800'}`}
                             title={s.kind === 'school' && (!s.countPeriods || !s.countTrips) ? [!s.countPeriods && 'ไม่นับคาบ', !s.countTrips && 'ไม่นับการเดินทาง'].filter(Boolean).join(' · ') : undefined}
                           >
                             {s.kind === 'appointment' ? '📍 ' : ''}
-                            {s.name}
-                            {s.kind === 'school' ? (s.countPeriods ? ` ${s.periods}` : ' (ไม่นับคาบ)') : ''}
+                            {s.makeup ? (s.makeup.mode === 'online' ? '💻 ' : '↺ ') : ''}
+                            {s.makeup ? s.classes.map((c) => c.name).join(', ') : s.name}
+                            {s.kind !== 'appointment' ? (s.countPeriods ? ` ${s.periods}` : ' (ไม่นับคาบ)') : ''}
                             {s.kind === 'school' && !s.countTrips ? ' 🚫🚗' : ''}
                           </span>
                           {s.closed && <span className="text-[11px] text-rose-700">ปิด: {CLOSURE_LABEL[s.closed.reason]}{s.closed.note ? ` · ${s.closed.note}` : ''}</span>}
@@ -204,11 +216,61 @@ export default function TeacherWorkload() {
                     </li>
                   ))}
               </ul>
-              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · 🚫🚗 = โรงเรียนที่ตั้งไม่นับการเดินทาง · คิดจากตารางสอนปัจจุบัน</p>
+              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · 🚫🚗 = โรงเรียนที่ตั้งไม่นับการเดินทาง · แต่ละวันคิดจากตารางสอนที่ใช้ในวันนั้น</p>
             </>
           )}
         </Card>
       </div>
+      {makeup && makeup.closures.length > 0 && (
+        <Card className="p-4" >
+          <div className="flex flex-wrap items-baseline gap-2">
+            <b>↺ คาบชดเชย · {monthLabel(month)}</b>
+            <span className="text-sm" data-testid="makeup-owed">
+              {makeup.totals.owed ? <b className="text-red-700">ค้าง {makeup.totals.owed} คาบ</b> : <b className="text-green-700">✓ ไม่มีค้าง</b>} · งด {makeup.totals.closed} · ชดเชยแล้ว {makeup.totals.madeUp}
+              {makeup.totals.online ? ` (ออนไลน์ ${makeup.totals.online})` : ''} · ไม่ต้องชดเชย {makeup.totals.notNeeded}
+            </span>
+            <Link to="/teacher/route" className="ml-auto text-sm underline text-board">
+              นัดสอนชดเชยที่หน้าเส้นทาง →
+            </Link>
+          </div>
+          <table className="w-full text-sm mt-2">
+            <thead>
+              <tr className="text-left text-stone-500 border-b-2 border-stone-100">
+                <th className="py-1 font-semibold">การปิด</th>
+                <th className="py-1 font-semibold">ห้อง</th>
+                <th className="py-1 font-semibold text-right">งด</th>
+                <th className="py-1 font-semibold text-right">ชดเชยแล้ว</th>
+                <th className="py-1 pl-3 font-semibold">ค้าง</th>
+              </tr>
+            </thead>
+            <tbody>
+              {makeup.closures.flatMap((c) =>
+                c.classes.map((r, i) => (
+                  <tr key={`${c.id}-${r.id}`} className="border-b border-stone-100">
+                    <td className="py-1 pr-2 text-xs text-stone-600">
+                      {i === 0 && (
+                        <>
+                          {c.from === c.to ? c.from.slice(8).replace(/^0/, '') : `${c.from.slice(8).replace(/^0/, '')}–${c.to.slice(8).replace(/^0/, '')}`} · {c.schoolName ?? 'ทุกโรงเรียน'} · {c.note || CLOSURE_LABEL[c.reason]}
+                        </>
+                      )}
+                    </td>
+                    <td className="py-1">{r.name}</td>
+                    <td className="py-1 text-right tabular-nums">{r.closed}</td>
+                    <td className="py-1 text-right tabular-nums">
+                      {r.madeUp}
+                      {r.online ? ` (💻 ${r.online})` : ''}
+                    </td>
+                    <td className="py-1 pl-3 whitespace-nowrap">
+                      {!c.makeupNeeded ? <span className="text-stone-500">ไม่ต้องชดเชย</span> : r.madeUp >= r.closed ? <b className="text-green-700">✓ ครบ</b> : <b className="text-red-700">ค้าง {r.closed - r.madeUp}</b>}
+                    </td>
+                  </tr>
+                )),
+              )}
+            </tbody>
+          </table>
+          <p className="text-xs text-stone-500 pt-1">ปิดเพราะ “วันหยุดราชการ” ตั้งเป็นไม่ต้องชดเชยให้อัตโนมัติ (เปลี่ยนได้ที่หน้าเส้นทาง)</p>
+        </Card>
+      )}
     </TeacherLayout>
   )
 }

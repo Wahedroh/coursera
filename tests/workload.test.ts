@@ -90,7 +90,7 @@ describe('ภาระสอน & การเดินทาง', () => {
     ])
     expect([mon.periods, mon.trips]).toEqual([6, 2])
     expect([w.days[1].periods, w.days[1].trips]).toEqual([3, 3]) // บำรุง → ดรุณ → บำรุง
-    expect(w.planned).toEqual({ periods: 9, trips: 5, closedPeriods: 0 })
+    expect(w.planned).toMatchObject({ periods: 9, trips: 5, closedPeriods: 0 })
 
     await postJson('/api/teacher/closures', { schoolId: a.schoolId, from: '2030-01-07', to: '2030-01-07', reason: 'school-event', note: 'กีฬาสี' }, { cookie })
     const { id: allId } = await json(await postJson('/api/teacher/closures', { schoolId: null, from: '2030-01-08', to: '2030-01-08', reason: 'holiday', note: '' }, { cookie }))
@@ -98,7 +98,7 @@ describe('ภาระสอน & การเดินทาง', () => {
     expect(w.days[0].stops[0].closed).toMatchObject({ reason: 'school-event', note: 'กีฬาสี', allSchools: false })
     expect([w.days[0].periods, w.days[0].closedPeriods, w.days[0].trips]).toEqual([3, 3, 1])
     expect([w.days[1].periods, w.days[1].closedPeriods, w.days[1].trips]).toEqual([0, 3, 0])
-    expect(w.planned).toEqual({ periods: 3, trips: 1, closedPeriods: 6 })
+    expect(w.planned).toMatchObject({ periods: 3, trips: 1, closedPeriods: 6 })
 
     // ยกเลิกการปิด → นับกลับมา
     await del(`/api/teacher/closures/${allId}`, cookie)
@@ -149,7 +149,7 @@ describe('ตั้งรายโรงเรียน: นับคาบ / �
     await putJson(`/api/teacher/schools/${a.schoolId}/counting`, { countPeriods: false, countTrips: true }, cookie)
     w = await get()
     expect([w.days[0].periods, w.days[0].trips]).toEqual([3, 1])
-    expect(w.planned).toEqual({ periods: 5, trips: 2, closedPeriods: 0 })
+    expect(w.planned).toMatchObject({ periods: 5, trips: 2, closedPeriods: 0 })
     const tg = await json(await getJson('/api/teacher/workload/targets', cookie))
     expect(tg.schools.find((x: { name: string }) => x.name === 'ดรุณ')).toMatchObject({ countPeriods: false, countTrips: true })
     expect([tg.target, tg.scheduled]).toEqual([5, 5]) // เฉพาะบำรุงอิสลาม
@@ -176,5 +176,93 @@ describe('ตำแหน่งและการแจ้งเตือน', (
     const titles = (await json(await getJson('/api/teacher/notifications', cookie))).items.map((n: { title: string; body: string }) => n.body)
     expect(titles.some((x: string) => x.includes('ดรุณ'))).toBe(false)
     expect(titles.some((x: string) => x.includes('บำรุงอิสลาม'))).toBe(true)
+  })
+})
+
+describe('ตารางสอนตามช่วงเวลา', () => {
+  it('เลิกใช้คาบตั้งแต่วันที่ → ยอดก่อนหน้ายังนับ · คาบใหม่ช่วงเดียวกันไม่ชน · ช่วงซ้อนกัน = ชน', async () => {
+    const cookie = await loginTeacher()
+    const k = await seedClass(db(), { schoolName: 'คัมภีร์', name: 'คัมภีร์ ชั้น 4', grade: 4 })
+    const add = (body: Record<string, unknown>) => postJson('/api/teacher/timetable', { classId: k.classId, ...body }, { cookie })
+    const { id: oldId } = await json(await add({ weekday: 2, start: '13:00', end: '14:40', validFrom: '2030-01-01' })) // อังคาร 2 คาบ
+    const month = async () => json(await getJson('/api/teacher/workload?from=2030-01-01&to=2030-01-31', cookie))
+    expect((await month()).planned.periods).toBe(10) // 5 วันอังคาร
+
+    expect(await json(await putJson(`/api/teacher/timetable/${oldId}/end`, { from: '2030-01-16' }, cookie))).toEqual({ result: 'ended' })
+    expect((await add({ weekday: 3, start: '13:00', end: '16:20', validFrom: '2030-01-16' })).status).toBe(200) // พุธ 4 คาบ
+    const w = await month()
+    // อังคาร 1, 8, 15 = 6 · พุธ 16, 23, 30 = 12
+    expect(w.planned.periods).toBe(18)
+    expect(w.days.find((d: { date: string }) => d.date === '2030-01-15').periods).toBe(2)
+    expect(w.days.find((d: { date: string }) => d.date === '2030-01-22').periods).toBe(0)
+
+    // คาบอังคารเดิมเลิกใช้แล้ว → ใส่คาบใหม่เวลาเดิมตั้งแต่ 16 ได้ · แต่ซ้อนช่วงเดิมไม่ได้
+    expect((await add({ weekday: 2, start: '13:00', end: '13:50', validFrom: '2030-01-20' })).status).toBe(200)
+    expect((await add({ weekday: 2, start: '13:00', end: '13:50', validFrom: '2030-01-10' })).status).toBe(409)
+    // ตารางสอนแสดงทุกช่วง (หน้าเว็บกรองตามวันที่เลือก)
+    const all = (await json(await getJson('/api/teacher/timetable', cookie))).slots
+    expect(all.find((x: { id: string }) => x.id === oldId)).toMatchObject({ validFrom: '2030-01-01', validTo: '2030-01-15' })
+    // เลิกใช้ก่อนวันเริ่ม = ลบทิ้ง
+    const { id: future } = await json(await add({ weekday: 5, start: '08:30', end: '09:20', validFrom: '2030-03-01' }))
+    expect(await json(await putJson(`/api/teacher/timetable/${future}/end`, { from: '2030-02-01' }, cookie))).toEqual({ result: 'deleted' })
+  })
+})
+
+describe('สอนชดเชย', () => {
+  it('ค้างชดเชย → นัดที่โรงเรียน (นับเดินทาง) + ออนไลน์ Meet (ไม่นับเดินทาง) → ครบ · วันหยุดราชการไม่ต้องชดเชย', async () => {
+    const { cookie, a, a2, b } = await setup()
+    const s1 = await seedStudent(db(), a2)
+    const { id: cid } = await json(await postJson('/api/teacher/closures', { schoolId: a.schoolId, from: '2030-01-07', to: '2030-01-07', reason: 'school-event', note: 'กีฬาสี' }, { cookie }))
+    const summary = async () => json(await getJson('/api/teacher/workload/makeup?from=2030-01-01&to=2030-01-31', cookie))
+    let m = await summary()
+    expect(m.closures[0]).toMatchObject({ id: cid, schoolName: 'ดรุณ', makeupNeeded: true })
+    expect(m.closures[0].classes.map((c: { name: string; closed: number }) => [c.name, c.closed])).toEqual([
+      ['ดรุณ ชั้น 1', 1],
+      ['ดรุณ ชั้น 5', 2],
+    ])
+    expect(m.totals).toMatchObject({ closed: 3, madeUp: 0, owed: 3 })
+
+    // ส. 12 ม.ค.: ม.5 ที่โรงเรียน 2 คาบ · ม.1 ออนไลน์ 1 คาบ (ประกาศให้นักเรียน พร้อมลิงก์ Meet)
+    expect((await postJson('/api/teacher/makeups', { closureId: cid, classIds: [a.classId], date: '2030-01-12', start: '09:00', end: '10:40', mode: 'onsite' }, { cookie })).status).toBe(200)
+    expect((await postJson('/api/teacher/makeups', { closureId: cid, classIds: [a2], date: '2030-01-12', start: '19:00', end: '19:50', mode: 'online', meetUrl: 'http://meet' }, { cookie })).status).toBe(400)
+    const { ids } = await json(await postJson('/api/teacher/makeups', { closureId: cid, classIds: [a2], date: '2030-01-12', start: '19:00', end: '19:50', mode: 'online', meetUrl: 'https://meet.google.com/abc-defg-hij', notifyStudents: true }, { cookie }))
+    const ann = await json(await getJson('/api/student/announcements', await studentCookie(s1.id)))
+    expect(ann[0]).toMatchObject({ title: expect.stringContaining('สอนชดเชย'), body: expect.stringContaining('https://meet.google.com/abc-defg-hij') })
+
+    const w = await json(await getJson('/api/teacher/workload?from=2030-01-12&to=2030-01-12', cookie))
+    const sat = w.days[0]
+    expect(sat.stops.map((s: { kind: string; makeup: { mode: string } }) => [s.kind, s.makeup.mode])).toEqual([
+      ['makeup', 'onsite'],
+      ['makeup', 'online'],
+    ])
+    expect(sat.stops[1].nav).toBe('https://meet.google.com/abc-defg-hij')
+    expect([sat.periods, sat.trips]).toEqual([3, 1])
+    expect(w.planned).toMatchObject({ makeupPeriods: 3, onlinePeriods: 1 })
+    m = await summary()
+    expect(m.totals).toMatchObject({ closed: 3, madeUp: 3, online: 1, owed: 0 })
+
+    // ลบคาบชดเชยออนไลน์ → ประกาศหายด้วย · ค้าง 1
+    await del(`/api/teacher/makeups/${ids[0]}`, cookie)
+    expect(await json(await getJson('/api/student/announcements', await studentCookie(s1.id)))).toEqual([])
+    expect((await summary()).totals.owed).toBe(1)
+    // ไม่ต้องชดเชย
+    await putJson(`/api/teacher/closures/${cid}/makeup`, { needed: false }, cookie)
+    expect((await summary()).totals).toMatchObject({ owed: 0, notNeeded: 3 })
+
+    // วันหยุดราชการ = ไม่ต้องชดเชยโดยปริยาย
+    await postJson('/api/teacher/closures', { schoolId: b.schoolId, from: '2030-01-14', to: '2030-01-14', reason: 'holiday', note: '' }, { cookie })
+    const h = (await summary()).closures.find((c: { schoolName: string }) => c.schoolName === 'บำรุงอิสลาม')
+    expect(h).toMatchObject({ makeupNeeded: false })
+    // ลบการปิด → คาบชดเชยที่สอนไปยังนับอยู่
+    await del(`/api/teacher/closures/${cid}`, cookie)
+    expect((await json(await getJson('/api/teacher/workload?from=2030-01-12&to=2030-01-12', cookie))).days[0].periods).toBe(2)
+  })
+
+  it('คาบชดเชยวันนี้: เตือนก่อนเข้าคาบ', async () => {
+    const { cookie, a } = await setup()
+    await postJson('/api/teacher/makeups', { closureId: null, classIds: [a.classId], date: '2030-01-12', start: '09:00', end: '10:40', mode: 'onsite' }, { cookie })
+    await generateTeacherNotifications(db(), at('2030-01-12', '08:52'))
+    const items = (await json(await getJson('/api/teacher/notifications', cookie))).items
+    expect(items[0]).toMatchObject({ title: expect.stringMatching(/^⏰ อีก/), body: expect.stringContaining('ดรุณ ชั้น 5') })
   })
 })

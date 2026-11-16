@@ -88,12 +88,47 @@ export const appointmentInputSchema = z.object({
   mapUrl: z.string().trim().max(1000).default(''),
 })
 export type AppointmentInput = z.infer<typeof appointmentInputSchema>
+
+// ---------- สอนชดเชย ----------
+export const MAKEUP_MODES = ['onsite', 'online'] as const
+export type MakeupMode = (typeof MAKEUP_MODES)[number]
+export const makeupInputSchema = z
+  .object({
+    closureId: z.string().min(1).nullable(),
+    classIds: z.array(z.string().min(1)).min(1).max(20),
+    date: dateSchema,
+    start: z.string().regex(HHMM),
+    end: z.string().regex(HHMM),
+    mode: z.enum(MAKEUP_MODES),
+    meetUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .refine((u) => u === '' || /^https:\/\/[^\s]+$/.test(u), 'ลิงก์ต้องขึ้นต้นด้วย https://')
+      .default(''),
+    notifyStudents: z.boolean().default(false),
+  })
+  .refine((x) => x.start < x.end, { message: 'เวลาจบต้องหลังเวลาเริ่ม' })
+export type MakeupInput = z.infer<typeof makeupInputSchema>
+export type MakeupSummary = {
+  closures: {
+    id: string
+    schoolName: string | null
+    from: string
+    to: string
+    reason: ClosureReason
+    note: string
+    makeupNeeded: boolean
+    classes: { id: string; name: string; closed: number; madeUp: number; online: number }[]
+  }[]
+  totals: { closed: number; madeUp: number; online: number; notNeeded: number; owed: number }
+}
 export type Appointment = { id: string; date: string; start: string; title: string; mapUrl: string | null; lat: number | null; lng: number | null }
 
 // ---------- แผนรายวัน ----------
 /** จุดแวะในวันหนึ่ง: คาบที่ติดกันในโรงเรียนเดียวกันรวมเป็นจุดเดียว · นัดพิเศษเป็นจุดของตัวเอง */
 export type Stop = {
-  kind: 'school' | 'appointment'
+  kind: 'school' | 'appointment' | 'makeup'
   /** โรงเรียน = schoolId · นัด = appointment id */
   key: string
   name: string
@@ -101,13 +136,15 @@ export type Stop = {
   end: string | null
   periods: number
   classes: { id: string; name: string; periods: number }[]
-  closed: { reason: ClosureReason; note: string; closureId: string; allSchools: boolean } | null
+  closed: { reason: ClosureReason; note: string; closureId: string; allSchools: boolean; makeupNeeded: boolean } | null
   lat: number | null
   lng: number | null
   nav: string
   /** โรงเรียนนี้นับคาบ / นับการเดินทางไหม (ครูตั้งรายโรงเรียน) */
   countPeriods: boolean
   countTrips: boolean
+  /** คาบสอนชดเชย */
+  makeup?: { id: string; mode: MakeupMode; meetUrl: string | null; forDate: string | null; reason: ClosureReason | null; note: string }
 }
 export type DayPlan = { date: string; weekday: number; stops: Stop[]; periods: number; closedPeriods: number; trips: number }
 
@@ -136,8 +173,8 @@ export type WorkloadRange = {
   today: string
   days: DayPlan[]
   /** รวมถึงวันนี้ (สอนจริง) และทั้งช่วง (ตามแผน) */
-  done: { periods: number; trips: number; closedPeriods: number }
-  planned: { periods: number; trips: number; closedPeriods: number }
+  done: { periods: number; trips: number; closedPeriods: number; makeupPeriods: number; onlinePeriods: number }
+  planned: { periods: number; trips: number; closedPeriods: number; makeupPeriods: number; onlinePeriods: number }
   bySchool: { id: string; name: string; periods: number; trips: number; closedPeriods: number }[]
 }
 export const weeklyPeriodsSchema = z.object({ weeklyPeriods: z.number().int().min(0).max(60).nullable() })

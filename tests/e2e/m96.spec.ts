@@ -46,6 +46,7 @@ test('ตารางสอน: เพิ่มคาบที่กำลัง
   await t.goto('/teacher/timetable')
   t.on('dialog', (d) => d.accept())
   await t.getByTestId('timetable-grid').getByRole('button', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('button', { name: 'ลบทิ้ง (ใส่ผิด)' }).click()
   await expect(t.getByTestId('timetable-grid')).not.toContainText('โรงเรียนทดสอบ ชั้น 1')
 })
 
@@ -222,6 +223,7 @@ test('แจ้งเตือนครู: กระดิ่งในแถบ
 })
 
 test('ภาระสอน: ตั้งเป้าคาบ → แก้จำนวนคาบของช่วง → เส้นทางรายวัน ปิดโรงเรียนพร้อมหมายเหตุ → ตำแหน่งโรงเรียน', async ({ browser }) => {
+  test.setTimeout(120_000)
   const t = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false })).newPage()
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
@@ -256,6 +258,17 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await expect(t.getByTestId('day-stops')).toContainText('⛔ ปิด: กิจกรรมโรงเรียน · กีฬาสี')
   await expect(t.getByTestId('day-summary')).toContainText('0 คาบ · 🚗 0 ที่')
   await expect(t.getByTestId('closures')).toContainText('กีฬาสี')
+  // นัดสอนชดเชยออนไลน์ (Google Meet) วันถัดไป
+  await t.getByRole('button', { name: '↺ นัดสอนชดเชย…' }).click()
+  await t.getByRole('radio', { name: '💻 ออนไลน์ (Google Meet)' }).click()
+  await t.getByLabel('ลิงก์ Google Meet').fill('https://meet.google.com/abc-defg-hij')
+  await t.getByRole('button', { name: 'บันทึกคาบชดเชย' }).click()
+  await expect(t.getByText(/นัดสอนชดเชยออนไลน์/)).toBeVisible()
+  await t.getByRole('button', { name: 'วันถัดไป' }).click()
+  await expect(t.getByTestId('day-stops')).toContainText('💻 สอนชดเชยออนไลน์ โรงเรียนทดสอบ ชั้น 1 (2 คาบ)')
+  await expect(t.getByRole('link', { name: '🎥 เปิด Meet' })).toHaveAttribute('href', 'https://meet.google.com/abc-defg-hij')
+  await expect(t.getByTestId('day-summary')).toContainText('2 คาบ · 🚗 0 ที่')
+  await t.getByRole('button', { name: 'วันก่อน' }).click()
 
   const link = t.getByLabel('ลิงก์แผนที่ โรงเรียนทดสอบ')
   await link.fill('6.4123, 101.8234')
@@ -266,5 +279,11 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   t.once('dialog', (d) => void d.accept())
   await t.getByRole('button', { name: 'ยกเลิกการปิด' }).click()
   await expect(t.getByTestId('day-summary')).toContainText('3 คาบ')
+  // เลิกใช้คาบตั้งแต่วันนี้ (เก็บประวัติ) → ไม่แสดงในตารางปัจจุบัน
+  await t.goto('/teacher/timetable')
+  await t.getByTestId('timetable-grid').getByRole('button', { name: /โรงเรียนทดสอบ ชั้น 1/ }).click()
+  await t.getByRole('button', { name: 'เลิกใช้ตั้งแต่' }).click()
+  await expect(t.getByText(/เลิกใช้คาบ โรงเรียนทดสอบ ชั้น 1/)).toBeVisible()
+  await expect(t.getByTestId('timetable-grid')).not.toContainText('โรงเรียนทดสอบ ชั้น 1')
   await t.request.delete(`/api/teacher/timetable/${slotId}`)
 })
