@@ -105,23 +105,28 @@ export type Stop = {
   lat: number | null
   lng: number | null
   nav: string
+  /** โรงเรียนนี้นับคาบ / นับการเดินทางไหม (ครูตั้งรายโรงเรียน) */
+  countPeriods: boolean
+  countTrips: boolean
 }
 export type DayPlan = { date: string; weekday: number; stops: Stop[]; periods: number; closedPeriods: number; trips: number }
 
-/** นับการเดินทาง: จำนวนครั้งที่ย้ายไปอีกที่ (เช้า A + บ่าย B = 2 · A → B → A = 3) ไม่นับที่ที่ปิด */
-export function countTrips(stops: Pick<Stop, 'key' | 'closed'>[]): number {
+/** นับการเดินทาง: จำนวนครั้งที่ย้ายไปอีกที่ (เช้า A + บ่าย B = 2 · A → B → A = 3) ไม่นับที่ที่ปิด
+ *  ที่ที่ครูตั้ง "ไม่นับการเดินทาง": ไม่นับเที่ยวที่ไปที่นั้น แต่เที่ยวที่ออกจากที่นั้นไปที่อื่นยังนับ (A → B(ไม่นับ) → A = 2) */
+export function countTrips(stops: (Pick<Stop, 'key' | 'closed'> & { countTrips?: boolean })[]): number {
   let n = 0
   let prev: string | null = null
   for (const s of stops) {
     if (s.closed) continue
-    if (s.key !== prev) n++
+    if (s.key !== prev && s.countTrips !== false) n++
     prev = s.key
   }
   return n
 }
+export const schoolCountingSchema = z.object({ countPeriods: z.boolean(), countTrips: z.boolean() })
 
 export type WorkloadTargets = {
-  schools: { id: string; name: string; classes: { id: string; name: string; target: number | null; scheduled: number; slots: { id: string; weekday: number; start: string; end: string; periods: number; custom: boolean }[] }[]; target: number; scheduled: number }[]
+  schools: { id: string; name: string; countPeriods: boolean; countTrips: boolean; classes: { id: string; name: string; target: number | null; scheduled: number; slots: { id: string; weekday: number; start: string; end: string; periods: number; custom: boolean }[] }[]; target: number; scheduled: number }[]
   target: number
   scheduled: number
 }

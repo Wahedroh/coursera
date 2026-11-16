@@ -49,6 +49,18 @@ export default function TeacherWorkload() {
       setError(handle(e))
     }
   }
+  async function setCounting(schoolId: string, v: { countPeriods: boolean; countTrips: boolean }) {
+    try {
+      await api(`/api/teacher/schools/${schoolId}/counting`, { method: 'PUT', body: v })
+      void loadTargets()
+      const { from, to } = monthRange(month)
+      api<WorkloadRange>(`/api/teacher/workload?from=${from}&to=${to}`)
+        .then(setRange)
+        .catch((e) => setError(handle(e)))
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
   async function setSlot(slotId: string, raw: string) {
     try {
       await api(`/api/teacher/timetable/${slotId}/periods`, { method: 'PUT', body: { periods: raw === '' ? null : Number(raw) } })
@@ -111,10 +123,10 @@ export default function TeacherWorkload() {
               </thead>
               <tbody>
                 {targets.schools.map((s) => (
-                  <SchoolRows key={s.id} s={s} status={status} setTarget={setTarget} setSlot={setSlot} />
+                  <SchoolRows key={s.id} s={s} status={status} setTarget={setTarget} setSlot={setSlot} setCounting={setCounting} />
                 ))}
                 <tr className="border-t-2 border-stone-200 font-extrabold">
-                  <td className="py-2 pr-2">รวมทุกโรงเรียน</td>
+                  <td className="py-2 pr-2">รวม (เฉพาะที่นับคาบ)</td>
                   <td className="py-2 px-2 text-right tabular-nums">{targets.target}</td>
                   <td className="py-2 px-2 text-right tabular-nums" data-testid="scheduled-total">
                     {targets.scheduled}
@@ -176,10 +188,14 @@ export default function TeacherWorkload() {
                       {d.stops.map((s, i) => (
                         <span key={i} className="inline-flex items-center gap-1">
                           {i > 0 && <span className="text-stone-300">→</span>}
-                          <span className={`rounded-lg px-2 py-0.5 text-xs font-bold ${s.closed ? 'bg-rose-100 text-rose-800 line-through' : s.kind === 'school' ? 'bg-board-soft text-board' : 'bg-blue-50 text-blue-800'}`}>
+                          <span
+                            className={`rounded-lg px-2 py-0.5 text-xs font-bold ${s.closed ? 'bg-rose-100 text-rose-800 line-through' : s.kind === 'school' ? (s.countPeriods || s.countTrips ? 'bg-board-soft text-board' : 'bg-stone-100 text-stone-500') : 'bg-blue-50 text-blue-800'}`}
+                            title={s.kind === 'school' && (!s.countPeriods || !s.countTrips) ? [!s.countPeriods && 'ไม่นับคาบ', !s.countTrips && 'ไม่นับการเดินทาง'].filter(Boolean).join(' · ') : undefined}
+                          >
                             {s.kind === 'appointment' ? '📍 ' : ''}
                             {s.name}
-                            {s.kind === 'school' ? ` ${s.periods}` : ''}
+                            {s.kind === 'school' ? (s.countPeriods ? ` ${s.periods}` : ' (ไม่นับคาบ)') : ''}
+                            {s.kind === 'school' && !s.countTrips ? ' 🚫🚗' : ''}
                           </span>
                           {s.closed && <span className="text-[11px] text-rose-700">ปิด: {CLOSURE_LABEL[s.closed.reason]}{s.closed.note ? ` · ${s.closed.note}` : ''}</span>}
                         </span>
@@ -188,7 +204,7 @@ export default function TeacherWorkload() {
                     </li>
                   ))}
               </ul>
-              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · คิดจากตารางสอนปัจจุบัน</p>
+              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · 🚫🚗 = โรงเรียนที่ตั้งไม่นับการเดินทาง · คิดจากตารางสอนปัจจุบัน</p>
             </>
           )}
         </Card>
@@ -202,19 +218,34 @@ function SchoolRows({
   status,
   setTarget,
   setSlot,
+  setCounting,
 }: {
   s: WorkloadTargets['schools'][number]
   status: (t: number | null, n: number) => React.ReactNode
   setTarget: (id: string, v: string) => void
   setSlot: (id: string, v: string) => void
+  setCounting: (id: string, v: { countPeriods: boolean; countTrips: boolean }) => void
 }) {
+  const flags = { countPeriods: s.countPeriods, countTrips: s.countTrips }
   return (
     <>
-      <tr className="bg-stone-50 font-extrabold">
-        <td className="py-1.5 pr-2">{s.name}</td>
+      <tr className={`bg-stone-50 font-extrabold ${s.countPeriods ? '' : 'text-stone-400'}`}>
+        <td className="py-1.5 pr-2">
+          {s.name}
+          <div className="flex flex-wrap gap-3 pt-0.5 text-[11px] font-semibold text-stone-600">
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" checked={s.countPeriods} onChange={(e) => setCounting(s.id, { ...flags, countPeriods: e.target.checked })} aria-label={`นับคาบ ${s.name}`} />
+              นับคาบ
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input type="checkbox" checked={s.countTrips} onChange={(e) => setCounting(s.id, { ...flags, countTrips: e.target.checked })} aria-label={`นับการเดินทาง ${s.name}`} />
+              นับการเดินทาง
+            </label>
+          </div>
+        </td>
         <td className="py-1.5 px-2 text-right tabular-nums">{s.target}</td>
         <td className="py-1.5 px-2 text-right tabular-nums">{s.scheduled}</td>
-        <td className="py-1.5 pl-2 whitespace-nowrap">{status(s.classes.some((c) => c.target !== null) ? s.target : null, s.scheduled)}</td>
+        <td className="py-1.5 pl-2 whitespace-nowrap">{s.countPeriods ? status(s.classes.some((c) => c.target !== null) ? s.target : null, s.scheduled) : <span className="text-stone-400 font-semibold">ไม่นับในรวม</span>}</td>
       </tr>
       {s.classes.map((c) => (
         <tr key={c.id} className="border-b border-stone-100 align-top">

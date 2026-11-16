@@ -8,6 +8,9 @@ export const schools = sqliteTable('schools', {
   mapUrl: text('map_url'),
   lat: real('lat'),
   lng: real('lng'),
+  /** นับคาบของโรงเรียนนี้ในภาระสอน / นับการเดินทางไปโรงเรียนนี้ */
+  countPeriods: integer('count_periods', { mode: 'boolean' }).notNull().default(true),
+  countTrips: integer('count_trips', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at').notNull(),
 })
 

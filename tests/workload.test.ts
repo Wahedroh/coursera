@@ -26,6 +26,8 @@ describe('คำนวณ', () => {
     expect(countTrips([s('A'), s('A')])).toBe(1)
     expect(countTrips([s('A', true), s('B')])).toBe(1)
     expect(countTrips([])).toBe(0)
+    // ไม่นับการเดินทางไปที่ B: เที่ยวไป B ไม่นับ แต่เที่ยวกลับ A ยังนับ
+    expect(countTrips([s('A'), { key: 'B', closed: null, countTrips: false }, s('A')])).toBe(2)
   })
   it('อ่านพิกัดจากลิงก์แผนที่', () => {
     expect(parsePlace('https://www.google.com/maps/place/x/@6.4123,101.8234,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d6.41255!4d101.82411')).toEqual({ lat: 6.41255, lng: 101.82411 })
@@ -124,6 +126,34 @@ describe('ภาระสอน & การเดินทาง', () => {
     expect(list).toMatchObject([{ id, schoolName: 'ดรุณ', reason: 'disaster', note: 'น้ำท่วม' }])
     await del(`/api/teacher/closures/${id}`, cookie)
     expect(await json(await getJson('/api/student/announcements', await studentCookie(s.id)))).toEqual([])
+  })
+})
+
+describe('ตั้งรายโรงเรียน: นับคาบ / นับการเดินทาง', () => {
+  it('ปิดนับคาบ → ไม่รวมในยอดคาบและเป้ารวม · ปิดนับการเดินทาง → ไม่นับเที่ยวที่ไปที่นั้น', async () => {
+    const { cookie, a, b } = await setup()
+    const get = async () => json(await getJson('/api/teacher/workload?from=2030-01-07&to=2030-01-08', cookie))
+    let w = await get()
+    expect([w.days[0].periods, w.days[0].trips, w.days[1].periods, w.days[1].trips]).toEqual([6, 2, 3, 3])
+
+    // บำรุงอิสลาม: ไม่นับการเดินทาง (ยังนับคาบ)
+    expect((await putJson(`/api/teacher/schools/${b.schoolId}/counting`, { countPeriods: true, countTrips: false }, cookie)).status).toBe(200)
+    w = await get()
+    expect([w.days[0].periods, w.days[0].trips]).toEqual([6, 1]) // ดรุณ → บำรุง(ไม่นับ)
+    expect([w.days[1].periods, w.days[1].trips]).toEqual([3, 1]) // บำรุง(ไม่นับ) → ดรุณ → บำรุง(ไม่นับ)
+    expect(w.days[0].stops[1]).toMatchObject({ name: 'บำรุงอิสลาม', countPeriods: true, countTrips: false })
+
+    // ดรุณ: ไม่นับคาบ (ยังนับการเดินทาง)
+    await putJson(`/api/teacher/classes/${a.classId}/weekly-periods`, { weeklyPeriods: 4 }, cookie)
+    await putJson(`/api/teacher/classes/${b.classId}/weekly-periods`, { weeklyPeriods: 5 }, cookie)
+    await putJson(`/api/teacher/schools/${a.schoolId}/counting`, { countPeriods: false, countTrips: true }, cookie)
+    w = await get()
+    expect([w.days[0].periods, w.days[0].trips]).toEqual([3, 1])
+    expect(w.planned).toEqual({ periods: 5, trips: 2, closedPeriods: 0 })
+    const tg = await json(await getJson('/api/teacher/workload/targets', cookie))
+    expect(tg.schools.find((x: { name: string }) => x.name === 'ดรุณ')).toMatchObject({ countPeriods: false, countTrips: true })
+    expect([tg.target, tg.scheduled]).toEqual([5, 5]) // เฉพาะบำรุงอิสลาม
+    expect((await putJson(`/api/teacher/schools/${a.schoolId}/counting`, { countPeriods: 'no' }, cookie)).status).toBe(400)
   })
 })
 
