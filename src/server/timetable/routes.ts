@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { slotInputSchema } from '../../shared/timetable'
+import { endSlotSchema, slotInputSchema } from '../../shared/timetable'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
@@ -11,20 +11,21 @@ import { pushInBackground } from '../push/routes'
 import { invalidateRelease } from './release'
 import { getNotifySettings, selfieDone } from '../teacherNotify/service'
 import { todayBangkok } from '../../shared/attendance'
-import { addSlot, deleteSlot, isPaused, listSlots, setPaused, timetableNow } from './service'
+import { addSlot, deleteSlot, endSlot, isPaused, listAllSlots, setPaused, timetableNow } from './service'
 
 export const teacherTimetableRoutes = new Hono<AppEnv>()
 teacherTimetableRoutes.use('*', requireTeacher)
 
 teacherTimetableRoutes.get('/timetable', async (c) => {
   const db = getDb(c.env)
-  return c.json({ slots: await listSlots(db), paused: await isPaused(db) })
+  return c.json({ slots: await listAllSlots(db), paused: await isPaused(db) })
 })
 teacherTimetableRoutes.post('/timetable', async (c) => c.json({ id: await addSlot(getDb(c.env), await parseBody(c, slotInputSchema), now()) }))
 teacherTimetableRoutes.delete('/timetable/:id', async (c) => {
   await deleteSlot(getDb(c.env), c.req.param('id'))
   return c.json({ ok: true })
 })
+teacherTimetableRoutes.put('/timetable/:id/end', async (c) => c.json({ result: await endSlot(getDb(c.env), c.req.param('id'), (await parseBody(c, endSlotSchema)).from) }))
 teacherTimetableRoutes.put('/timetable/paused', async (c) => {
   const { paused } = await parseBody(c, z.object({ paused: z.boolean() }))
   await setPaused(getDb(c.env), paused)

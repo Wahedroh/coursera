@@ -8,7 +8,7 @@ import { apiError } from '../http'
 import { httpPushSender, type PushSender } from '../push/service'
 import { isPushEndpoint, vapidAuthorization, vapidKeys } from '../push/vapid'
 import { isPaused, listSlots } from '../timetable/service'
-import { closedChecker } from '../workload/service'
+import { closedChecker, makeupsOn } from '../workload/service'
 
 const KEY = 'teacher_notify'
 const RECENT = 24 * 3600_000
@@ -82,7 +82,11 @@ export async function generateTeacherNotifications(db: Db, t: number): Promise<n
   if (!(await isPaused(db))) {
     // โรงเรียนที่ปิด/งดสอนวันนี้: ไม่เตือนก่อนคาบ ยืนยันการสอน หรือลืมเช็กชื่อ
     const closed = await closedChecker(db, date, date)
-    const slots = (await listSlots(db)).filter((x) => x.weekday === weekday && !closed(x.classId, date))
+    const slots: { id: string; classId: string; start: string; end: string; online?: boolean }[] = [
+      ...(await listSlots(db, date)).filter((x) => x.weekday === weekday && !closed(x.classId, date)),
+      // คาบสอนชดเชยวันนี้ (ออนไลน์ไม่เตือนยืนยันการสอนแบบเซลฟี)
+      ...(await makeupsOn(db, date)).map((m) => ({ id: `mk:${m.id}`, classId: m.classId, start: m.start, end: m.end, online: m.mode === 'online' })),
+    ]
     if (slots.length) {
       const classes = await db.all<{ id: string; name: string }>(sql`SELECT id, name FROM classes`)
       const name = (id: string) => classes.find((c) => c.id === id)?.name ?? ''
@@ -102,7 +106,7 @@ export async function generateTeacherNotifications(db: Db, t: number): Promise<n
             dedupeKey: `pre:${sl.id}:${date}`,
           })
         }
-        if (s.selfie.on && s.selfie.url && t >= occ.start && t < occ.end && !(await selfieDone(db, sl.id, date)))
+        if (s.selfie.on && s.selfie.url && !sl.online && t >= occ.start && t < occ.end && !(await selfieDone(db, sl.id, date)))
           await add({ kind: 'selfie', title: '📸 ยืนยันการสอน (เซลฟี + พิกัด)', body: `${name(sl.classId)} · ${sl.start}–${sl.end} · แตะเพื่อเปิดหน้ายืนยัน`, url: s.selfie.url, dedupeKey: `selfie:${sl.id}:${date}` })
         const after = occ.end + s.missedAttendance.afterMinutes * 60_000
         if (s.missedAttendance.on && t >= after && t < after + 3 * 3600_000 && !days.has(sl.classId))

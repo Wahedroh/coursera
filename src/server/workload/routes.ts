@@ -1,12 +1,17 @@
 import { Hono } from 'hono'
 import { dateSchema, todayBangkok } from '../../shared/attendance'
-import { appointmentInputSchema, closureInputSchema, schoolCountingSchema, placeInputSchema, slotPeriodsSchema, weeklyPeriodsSchema } from '../../shared/workload'
+import { z } from 'zod'
+import { appointmentInputSchema, closureInputSchema, makeupInputSchema, schoolCountingSchema, placeInputSchema, slotPeriodsSchema, weeklyPeriodsSchema } from '../../shared/workload'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { apiError, parseBody } from '../http'
 import {
   createAppointment,
+  createMakeups,
+  deleteMakeup,
+  makeupSummary,
+  setMakeupNeeded,
   createClosure,
   dayPlan,
   deleteAppointment,
@@ -70,5 +75,20 @@ teacherWorkloadRoutes.get('/appointments', async (c) => c.json(await listAppoint
 teacherWorkloadRoutes.post('/appointments', async (c) => c.json({ id: await createAppointment(getDb(c.env), await parseBody(c, appointmentInputSchema), now()) }))
 teacherWorkloadRoutes.delete('/appointments/:id', async (c) => {
   await deleteAppointment(getDb(c.env), c.req.param('id'))
+  return c.json({ ok: true })
+})
+
+teacherWorkloadRoutes.get('/workload/makeup', async (c) => {
+  const today = todayBangkok(now())
+  return c.json(await makeupSummary(getDb(c.env), date(c.req.query('from'), `${today.slice(0, 7)}-01`), date(c.req.query('to'), today)))
+})
+teacherWorkloadRoutes.put('/closures/:id/makeup', async (c) => {
+  const { needed } = await parseBody(c, z.object({ needed: z.boolean() }))
+  await setMakeupNeeded(getDb(c.env), c.req.param('id'), needed)
+  return c.json({ ok: true })
+})
+teacherWorkloadRoutes.post('/makeups', async (c) => c.json({ ids: await createMakeups(getDb(c.env), await parseBody(c, makeupInputSchema), now()) }))
+teacherWorkloadRoutes.delete('/makeups/:id', async (c) => {
+  await deleteMakeup(getDb(c.env), c.req.param('id'))
   return c.json({ ok: true })
 })

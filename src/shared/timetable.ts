@@ -7,16 +7,25 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
 export const WEEKDAY_LABEL = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัส', 'ศุกร์', 'เสาร์', 'อาทิตย์'] as const
 export const WEEKDAY_SHORT = ['', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'] as const
 
+const DATE = /^\d{4}-\d{2}-\d{2}$/
 export const slotInputSchema = z
   .object({
     classId: z.string().min(1),
     weekday: z.number().int().min(1).max(7),
     start: z.string().regex(HHMM),
     end: z.string().regex(HHMM),
+    /** ใช้คาบนี้ตั้งแต่วันที่ (ไม่ใส่ = ไม่จำกัด) */
+    validFrom: z.string().regex(DATE).nullable().optional(),
   })
   .refine((x) => x.start < x.end, { message: 'เวลาจบต้องหลังเวลาเริ่ม' })
 export type SlotInput = z.infer<typeof slotInputSchema>
-export type Slot = SlotInput & { id: string }
+export type Slot = Omit<SlotInput, 'validFrom'> & { id: string; validFrom?: string | null; validTo?: string | null; periods?: number | null }
+/** คาบนี้ใช้อยู่ในวันที่ date ไหม */
+export const slotActiveOn = (s: { validFrom?: string | null; validTo?: string | null }, date: string) => (!s.validFrom || s.validFrom <= date) && (!s.validTo || date <= s.validTo)
+/** ช่วงใช้งานสองช่วงซ้อนกันไหม */
+export const rangesOverlap = (a: { validFrom?: string | null; validTo?: string | null }, b: { validFrom?: string | null; validTo?: string | null }) =>
+  (!a.validFrom || !b.validTo || a.validFrom <= b.validTo) && (!b.validFrom || !a.validTo || b.validFrom <= a.validTo)
+export const endSlotSchema = z.object({ from: z.string().regex(DATE) })
 
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
 

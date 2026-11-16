@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { WEEKDAY_LABEL } from '../../shared/timetable'
@@ -26,9 +26,19 @@ export default function TeacherRoute() {
   const [appts, setAppts] = useState<Appointment[]>([])
   const [places, setPlaces] = useState<SchoolPlace[] | null>(null)
   const [closing, setClosing] = useState<CloseTarget | null>(null)
+  const [makingUp, setMakingUp] = useState<{ closureId: string; school: string; forDate: string; label: string; classes: { id: string; name: string; periods: number }[] } | null>(null)
 
   const fail = useCallback((e: unknown) => setError(handle(e)), [handle])
-  const loadDay = useCallback(() => api<DayPlan>(`/api/teacher/route/day?date=${date}`).then(setPlan).catch(fail), [date, fail])
+  // เปลี่ยนวันเร็ว ๆ: รับเฉพาะผลของวันที่เลือกล่าสุด (คำตอบของวันก่อนหน้าที่มาช้าไม่ทับ)
+  const latest = useRef(date)
+  latest.current = date
+  const loadDay = useCallback(
+    () =>
+      api<DayPlan>(`/api/teacher/route/day?date=${date}`)
+        .then((p) => p.date === latest.current && setPlan(p))
+        .catch(fail),
+    [date, fail],
+  )
   const loadLists = useCallback(() => {
     api<Closure[]>(`/api/teacher/closures?from=${addDays(todayStr(), -30)}`).then(setClosures).catch(fail)
     api<Appointment[]>('/api/teacher/appointments').then(setAppts).catch(fail)
@@ -48,6 +58,23 @@ export default function TeacherRoute() {
     try {
       await api(`/api/teacher/closures/${id}`, { method: 'DELETE' })
       setFlash('ยกเลิกการปิดแล้ว')
+      reload()
+    } catch (e) {
+      fail(e)
+    }
+  }
+  async function setNeeded(closureId: string, needed: boolean) {
+    try {
+      await api(`/api/teacher/closures/${closureId}/makeup`, { method: 'PUT', body: { needed } })
+      reload()
+    } catch (e) {
+      fail(e)
+    }
+  }
+  async function removeMakeup(id: string) {
+    if (!window.confirm('ลบคาบชดเชยนี้? (ประกาศให้นักเรียนจะถูกลบด้วย)')) return
+    try {
+      await api(`/api/teacher/makeups/${id}`, { method: 'DELETE' })
       reload()
     } catch (e) {
       fail(e)
@@ -96,7 +123,7 @@ export default function TeacherRoute() {
             {plan && !plan.stops.length && <p className="text-sm text-stone-500 py-3 text-center">วันนี้ไม่มีคาบสอนหรือนัด</p>}
             <ul className="flex flex-col gap-2" data-testid="day-stops">
               {plan?.stops.map((s) => (
-                <li key={`${s.key}-${s.start}`} className={`rounded-xl border-2 p-3 text-sm ${s.closed ? 'border-rose-200 bg-rose-50' : 'border-line bg-white'}`}>
+                <li key={`${s.key}-${s.start}`} className={`rounded-xl border-2 p-3 text-sm ${s.closed ? 'border-rose-200 bg-rose-50' : s.makeup?.mode === 'online' ? 'border-violet-300 bg-violet-50' : s.makeup ? 'border-blue-300 bg-blue-50' : 'border-line bg-white'}`}>
                   <div className="flex flex-wrap items-baseline gap-x-2">
                     <b className="text-board tabular-nums">
                       {s.start}
@@ -104,19 +131,58 @@ export default function TeacherRoute() {
                     </b>
                     <b className={s.closed ? 'line-through text-rose-800' : ''}>
                       {s.kind === 'appointment' ? '📍 ' : ''}
-                      {s.name}
-                      {s.kind === 'school' ? ` (${s.periods} คาบ)` : ''}
+                      {s.makeup ? (s.makeup.mode === 'online' ? '💻 สอนชดเชยออนไลน์ ' : '↺ สอนชดเชย ') : ''}
+                      {s.makeup ? s.classes.map((c) => c.name).join(', ') : s.name}
+                      {s.kind !== 'appointment' ? ` (${s.periods} คาบ)` : ''}
                     </b>
                     {s.kind === 'school' && <span className="text-xs text-stone-500">{s.classes.map((c) => `${c.name} ${c.periods}`).join(' · ')}</span>}
                   </div>
+                  {s.makeup && (
+                    <p className={`text-xs ${s.makeup.mode === 'online' ? 'text-violet-800' : 'text-blue-800'}`}>
+                      {s.makeup.mode === 'online' ? 'Google Meet · ไม่นับการเดินทาง · ' : ''}
+                      {s.makeup.forDate ? `แทนคาบที่ปิด ${new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(Date.parse(s.makeup.forDate))}${s.makeup.reason ? ` (${s.makeup.note || CLOSURE_LABEL[s.makeup.reason]})` : ''}` : 'คาบชดเชย'}
+                    </p>
+                  )}
                   {s.closed ? (
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <span className="text-rose-800">
                         ⛔ ปิด: {CLOSURE_LABEL[s.closed.reason]}
                         {s.closed.note ? ` · ${s.closed.note}` : ''} {s.closed.allSchools ? '(ทุกโรงเรียน)' : ''} — ไม่นับคาบ/การเดินทาง ไม่เตือน ไม่นำทาง
                       </span>
-                      <button type="button" className="rounded-lg bg-white border-2 border-line px-2 py-0.5 text-xs font-bold" onClick={() => void removeClosure(s.closed!.closureId)}>
-                        ยกเลิกการปิด
+                      {s.closed.makeupNeeded ? <b className="text-amber-700">ต้องสอนชดเชย</b> : <span className="text-stone-500">ไม่ต้องชดเชย</span>}
+                      <div className="flex flex-wrap gap-2 w-full">
+                        <button
+                          type="button"
+                          className="rounded-lg bg-blue-100 text-blue-900 px-2.5 py-1 text-xs font-bold"
+                          onClick={() => setMakingUp({ closureId: s.closed!.closureId, school: s.name, forDate: date, label: s.closed!.note || CLOSURE_LABEL[s.closed!.reason], classes: s.classes })}
+                        >
+                          ↺ นัดสอนชดเชย…
+                        </button>
+                        <button type="button" className="rounded-lg bg-white border-2 border-line px-2 py-0.5 text-xs font-bold" onClick={() => void setNeeded(s.closed!.closureId, !s.closed!.makeupNeeded)}>
+                          {s.closed.makeupNeeded ? 'ไม่ต้องชดเชย' : 'ต้องชดเชย'}
+                        </button>
+                        <button type="button" className="rounded-lg bg-white border-2 border-line px-2 py-0.5 text-xs font-bold" onClick={() => void removeClosure(s.closed!.closureId)}>
+                          ยกเลิกการปิด
+                        </button>
+                      </div>
+                    </div>
+                  ) : s.makeup ? (
+                    <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                      {s.makeup.mode === 'online' ? (
+                        s.nav ? (
+                          <a href={s.nav} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-600 text-white px-2.5 py-1 text-xs font-bold">
+                            🎥 เปิด Meet
+                          </a>
+                        ) : (
+                          <span className="text-xs text-violet-800">ยังไม่ได้ใส่ลิงก์ Meet</span>
+                        )
+                      ) : (
+                        <a href={s.nav} target="_blank" rel="noreferrer" className="rounded-lg bg-board text-white px-2.5 py-1 text-xs font-bold">
+                          🧭 นำทาง
+                        </a>
+                      )}
+                      <button type="button" className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-bold" onClick={() => void removeMakeup(s.makeup!.id)}>
+                        ลบคาบชดเชย
                       </button>
                     </div>
                   ) : (
@@ -144,6 +210,18 @@ export default function TeacherRoute() {
                 ⛔ ปิดทุกโรงเรียน…
               </button>
             </div>
+            {makingUp && (
+              <MakeupForm
+                target={makingUp}
+                onCancel={() => setMakingUp(null)}
+                onDone={(msg) => {
+                  setMakingUp(null)
+                  setFlash(msg)
+                  reload()
+                }}
+                onError={fail}
+              />
+            )}
             {closing && (
               <CloseForm
                 target={closing}
@@ -211,6 +289,84 @@ export default function TeacherRoute() {
         </div>
       </div>
     </TeacherLayout>
+  )
+}
+
+function MakeupForm({
+  target,
+  onCancel,
+  onDone,
+  onError,
+}: {
+  target: { closureId: string; school: string; forDate: string; label: string; classes: { id: string; name: string; periods: number }[] }
+  onCancel: () => void
+  onDone: (msg: string) => void
+  onError: (e: unknown) => void
+}) {
+  const [picked, setPicked] = useState<string[]>(target.classes.map((c) => c.id))
+  const [mode, setMode] = useState<'onsite' | 'online'>('onsite')
+  const [day, setDay] = useState(addDays(target.forDate, 1))
+  const [start, setStart] = useState('09:00')
+  const [end, setEnd] = useState('10:40')
+  const [meetUrl, setMeetUrl] = useState('')
+  const [notify, setNotify] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const mins = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5))
+  const periods = start < end ? Math.max(1, Math.round((mins(end) - mins(start)) / 50)) : 0
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api('/api/teacher/makeups', { body: { closureId: target.closureId, classIds: picked, date: day, start, end, mode, meetUrl, notifyStudents: notify } })
+      onDone(`นัดสอนชดเชย${mode === 'online' ? 'ออนไลน์' : ''} ${short(day)} ${start}–${end} แล้ว`)
+    } catch (err) {
+      onError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={save} className="rounded-2xl border-2 border-blue-300 bg-white p-3 flex flex-col gap-2 text-sm" data-testid="makeup-form">
+      <b>
+        นัดสอนชดเชย: {target.school} (ปิด {short(target.forDate)} · {target.label})
+      </b>
+      <div className="flex flex-wrap items-center gap-2">
+        ห้อง:
+        {target.classes.map((c) => (
+          <label key={c.id} className="inline-flex items-center gap-1 rounded-lg border-2 border-line px-2 py-0.5">
+            <input type="checkbox" checked={picked.includes(c.id)} onChange={(e) => setPicked((xs) => (e.target.checked ? [...xs, c.id] : xs.filter((x) => x !== c.id)))} />
+            {c.name} ({c.periods})
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="รูปแบบการสอนชดเชย">
+        {(['onsite', 'online'] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`rounded-full border-2 px-3 py-1 ${mode === m ? 'border-board bg-board-soft font-extrabold' : 'border-line'}`}>
+            {m === 'onsite' ? '🏫 ที่โรงเรียน' : '💻 ออนไลน์ (Google Meet)'}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        วันที่ <input type="date" aria-label="วันที่สอนชดเชย" className={input} value={day} onChange={(e) => setDay(e.target.value)} required />
+        เวลา <input type="time" aria-label="เวลาเริ่มสอนชดเชย" className={input} value={start} onChange={(e) => setStart(e.target.value)} required />–
+        <input type="time" aria-label="เวลาจบสอนชดเชย" className={input} value={end} onChange={(e) => setEnd(e.target.value)} required />
+        <b>= {periods} คาบ</b>
+      </div>
+      {mode === 'online' && <input aria-label="ลิงก์ Google Meet" className={input} placeholder="https://meet.google.com/…" value={meetUrl} onChange={(e) => setMeetUrl(e.target.value)} />}
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+        ประกาศให้นักเรียนห้องที่เลือก{mode === 'online' ? ' (พร้อมลิงก์ Meet)' : ''}
+      </label>
+      <p className="text-xs text-stone-500">{mode === 'online' ? 'นับคาบ · ไม่นับการเดินทาง' : 'นับคาบ + การเดินทางตามปกติ'} · เตือนก่อนเข้าคาบ/ลืมเช็กชื่อเหมือนคาบปกติ</p>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy || !picked.length || start >= end}>
+          บันทึกคาบชดเชย
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          ยกเลิก
+        </Button>
+      </div>
+    </form>
   )
 }
 

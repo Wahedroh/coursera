@@ -487,6 +487,9 @@ export const timetableSlots = sqliteTable(
     end: text('end').notNull(),
     /** จำนวนคาบในช่วงนี้ (null = คิดจากความยาว ช่วงละ 50 นาที) */
     periods: integer('periods'),
+    /** ช่วงที่ใช้คาบนี้ (YYYY-MM-DD รวมทั้งสองวัน · null = ไม่จำกัด) — เปลี่ยนตารางกลางเทอมแล้วยอดย้อนหลังไม่เพี้ยน */
+    validFrom: text('valid_from'),
+    validTo: text('valid_to'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('timetable_class_idx').on(t.classId)],
@@ -532,6 +535,8 @@ export const schoolClosures = sqliteTable(
     note: text('note').notNull().default(''),
     /** ประกาศ "งดเรียน" ที่สร้างให้นักเรียน (ลบการปิด = ลบประกาศ) */
     announcementIds: text('announcement_ids', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    /** ต้องสอนชดเชยไหม (วันหยุดราชการ = ไม่ต้อง โดยปริยาย) */
+    makeupNeeded: integer('makeup_needed', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('school_closures_dates_idx').on(t.fromDate, t.toDate)],
@@ -551,4 +556,25 @@ export const teacherAppointments = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('teacher_appointments_date_idx').on(t.date)],
+)
+
+/** คาบสอนชดเชย (แทนคาบที่โรงเรียนปิด) — ที่โรงเรียน (นับการเดินทาง) หรือออนไลน์ Google Meet (ไม่นับการเดินทาง) */
+export const makeupClasses = sqliteTable(
+  'makeup_classes',
+  {
+    id: text('id').primaryKey(),
+    closureId: text('closure_id').references(() => schoolClosures.id),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    date: text('date').notNull(),
+    start: text('start').notNull(),
+    end: text('end').notNull(),
+    periods: integer('periods'),
+    mode: text('mode').$type<'onsite' | 'online'>().notNull(),
+    meetUrl: text('meet_url'),
+    announcementId: text('announcement_id'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('makeup_classes_date_idx').on(t.date), index('makeup_classes_closure_idx').on(t.closureId)],
 )
