@@ -239,6 +239,10 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await expect(row).toContainText('ขาด 1')
   await t.getByLabel('จำนวนคาบ โรงเรียนทดสอบ ชั้น 1 จ. 06:00').selectOption('3')
   await expect(row).toContainText('✓ ครบ')
+  await t.getByLabel('นับคาบ โรงเรียนทดสอบ').click()
+  await expect(t.getByRole('row').filter({ has: t.getByLabel('นับคาบ โรงเรียนทดสอบ') })).toContainText('ไม่นับในรวม')
+  await t.getByLabel('นับคาบ โรงเรียนทดสอบ').click()
+  await expect(t.getByRole('row').filter({ has: t.getByLabel('นับคาบ โรงเรียนทดสอบ') })).not.toContainText('ไม่นับในรวม')
   await expect(t.getByTestId('month-totals')).toContainText('คาบ')
 
   await t.getByRole('link', { name: 'เส้นทาง & ปิดโรงเรียน' }).click()

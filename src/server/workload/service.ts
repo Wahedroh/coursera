@@ -38,7 +38,8 @@ const dateText = (from: string, to: string) => (from === to ? thaiDate.format(Da
 type ClassRow = { id: string; name: string; schoolId: string; weeklyPeriods: number | null }
 type SlotRow = { id: string; classId: string; weekday: number; start: string; end: string; periods: number | null }
 type ClosureRow = typeof schoolClosures.$inferSelect
-type Ctx = { classes: Map<string, ClassRow>; schools: Map<string, SchoolPlace>; slots: SlotRow[]; closures: ClosureRow[]; appts: Appointment[] }
+type SchoolRow = SchoolPlace & { countPeriods: boolean; countTrips: boolean }
+type Ctx = { classes: Map<string, ClassRow>; schools: Map<string, SchoolRow>; slots: SlotRow[]; closures: ClosureRow[]; appts: Appointment[] }
 
 async function activeClasses(db: Db): Promise<ClassRow[]> {
   return db.select({ id: classes.id, name: classes.name, schoolId: classes.schoolId, weeklyPeriods: classes.weeklyPeriods }).from(classes).where(eq(classes.archived, false)).orderBy(classes.name)
@@ -58,7 +59,7 @@ async function closuresBetween(db: Db, from: string, to: string): Promise<Closur
 async function loadCtx(db: Db, from: string, to: string, withSlots = true): Promise<Ctx> {
   const [cls, sch, slots, closures, appts] = await Promise.all([
     activeClasses(db),
-    db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng }).from(schools),
+    db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, countPeriods: schools.countPeriods, countTrips: schools.countTrips }).from(schools),
     withSlots ? allSlots(db) : Promise.resolve([]),
     closuresBetween(db, from, to),
     db
@@ -97,7 +98,7 @@ function planDay(ctx: Ctx, date: string, paused: boolean): DayPlan {
   for (const e of entries) {
     if (e.appt) {
       const a = e.appt
-      stops.push({ kind: 'appointment', key: `appt:${a.id}`, name: a.title, start: a.start, end: null, periods: 0, classes: [], closed: null, lat: a.lat, lng: a.lng, nav: navUrl({ lat: a.lat, lng: a.lng, name: a.title }) })
+      stops.push({ kind: 'appointment', key: `appt:${a.id}`, name: a.title, start: a.start, end: null, periods: 0, classes: [], closed: null, lat: a.lat, lng: a.lng, nav: navUrl({ lat: a.lat, lng: a.lng, name: a.title }), countPeriods: false, countTrips: true })
       continue
     }
     const s = e.slot!
@@ -126,15 +127,17 @@ function planDay(ctx: Ctx, date: string, paused: boolean): DayPlan {
       lat: sch?.lat ?? null,
       lng: sch?.lng ?? null,
       nav: navUrl({ lat: sch?.lat ?? null, lng: sch?.lng ?? null, name: sch?.name ?? '' }),
+      countPeriods: sch?.countPeriods ?? true,
+      countTrips: sch?.countTrips ?? true,
     })
   }
-  const open = stops.filter((s) => !s.closed)
+  const counted = stops.filter((s) => s.countPeriods)
   return {
     date,
     weekday,
     stops,
-    periods: open.reduce((n, s) => n + s.periods, 0),
-    closedPeriods: stops.filter((s) => s.closed).reduce((n, s) => n + s.periods, 0),
+    periods: counted.filter((s) => !s.closed).reduce((n, s) => n + s.periods, 0),
+    closedPeriods: counted.filter((s) => s.closed).reduce((n, s) => n + s.periods, 0),
     trips: countTrips(stops),
   }
 }
@@ -160,11 +163,15 @@ export async function workloadRange(db: Db, from: string, to: string, t: number)
         if (!s.closed) prev = s.key
         continue
       }
+      if (!s.countPeriods && !s.countTrips) {
+        if (!s.closed) prev = s.key
+        continue
+      }
       const row = bySchool.get(s.key) ?? { id: s.key, name: s.name, periods: 0, trips: 0, closedPeriods: 0 }
-      if (s.closed) row.closedPeriods += s.periods
+      if (s.closed) row.closedPeriods += s.countPeriods ? s.periods : 0
       else {
-        row.periods += s.periods
-        if (s.key !== prev) row.trips++
+        if (s.countPeriods) row.periods += s.periods
+        if (s.key !== prev && s.countTrips) row.trips++
         prev = s.key
       }
       bySchool.set(s.key, row)
@@ -175,7 +182,7 @@ export async function workloadRange(db: Db, from: string, to: string, t: number)
 
 /** เป้าคาบต่อสัปดาห์ เทียบกับคาบในตารางสอน */
 export async function workloadTargets(db: Db): Promise<WorkloadTargets> {
-  const [cls, sch, slots] = await Promise.all([activeClasses(db), db.select({ id: schools.id, name: schools.name }).from(schools), allSlots(db)])
+  const [cls, sch, slots] = await Promise.all([activeClasses(db), db.select({ id: schools.id, name: schools.name, countPeriods: schools.countPeriods, countTrips: schools.countTrips }).from(schools), allSlots(db)])
   const out: WorkloadTargets['schools'] = []
   for (const s of sch.sort((a, b) => a.name.localeCompare(b.name, 'th'))) {
     const rows = cls
@@ -185,9 +192,16 @@ export async function workloadTargets(db: Db): Promise<WorkloadTargets> {
         return { id: c.id, name: c.name, target: c.weeklyPeriods, scheduled: mine.reduce((n, x) => n + slotPeriods(x), 0), slots: mine.map((x) => ({ id: x.id, weekday: x.weekday, start: x.start, end: x.end, periods: slotPeriods(x), custom: x.periods !== null })) }
       })
     if (!rows.length) continue
-    out.push({ id: s.id, name: s.name, classes: rows, target: rows.reduce((n, r) => n + (r.target ?? 0), 0), scheduled: rows.reduce((n, r) => n + r.scheduled, 0) })
+    out.push({ id: s.id, name: s.name, countPeriods: s.countPeriods, countTrips: s.countTrips, classes: rows, target: rows.reduce((n, r) => n + (r.target ?? 0), 0), scheduled: rows.reduce((n, r) => n + r.scheduled, 0) })
   }
-  return { schools: out, target: out.reduce((n, s) => n + s.target, 0), scheduled: out.reduce((n, s) => n + s.scheduled, 0) }
+  const counted = out.filter((s) => s.countPeriods)
+  return { schools: out, target: counted.reduce((n, s) => n + s.target, 0), scheduled: counted.reduce((n, s) => n + s.scheduled, 0) }
+}
+
+/** ตั้งรายโรงเรียน: นับคาบ / นับการเดินทาง */
+export async function setSchoolCounting(db: Db, schoolId: string, v: { countPeriods: boolean; countTrips: boolean }): Promise<void> {
+  const r = await db.update(schools).set(v).where(eq(schools.id, schoolId)).returning({ id: schools.id })
+  if (!r.length) throw apiError('school_not_found', 'ไม่พบโรงเรียนนี้', 404)
 }
 
 export async function setWeeklyPeriods(db: Db, classId: string, weeklyPeriods: number | null): Promise<void> {
