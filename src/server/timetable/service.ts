@@ -5,6 +5,7 @@ import { bangkokClock, currentSlot, nextClassStart, slotTimes, upcomingSlots, ty
 import { newId, type Db } from '../db/client'
 import { classes, settings, timetableSlots } from '../db/schema'
 import { apiError } from '../http'
+import { closedChecker } from '../workload/service'
 
 const PAUSE_KEY = 'timetable_paused'
 
@@ -56,8 +57,14 @@ export async function timetableNow(db: Db, t: number): Promise<TimetableNow> {
   const slots = await listSlots(db)
   const paused = await isPaused(db)
   if (!slots.length || paused) return { paused, hasSlots: slots.length > 0, current: null, upcoming: [], missingAttendance: [], currentDayId: null }
-  const current = currentSlot(slots, t)
-  const upcoming = upcomingSlots(slots, t, 6).filter((s) => !current || s.id !== current.id || s.startAt !== current.startAt)
+  // วันที่โรงเรียนปิด/งดสอน: ไม่นับเป็นคาบที่กำลังสอน/คาบถัดไป/ลืมเช็กชื่อ
+  const closed = await closedChecker(db, todayBangkok(t - 7 * 86400_000), todayBangkok(t + 8 * 86400_000))
+  const dateOf = (at: number) => todayBangkok(at)
+  const cur = currentSlot(slots, t)
+  const current = cur && !closed(cur.classId, dateOf(cur.startAt)) ? cur : null
+  const upcoming = upcomingSlots(slots, t, 12)
+    .filter((s) => (!current || s.id !== current.id || s.startAt !== current.startAt) && !closed(s.classId, dateOf(s.startAt)))
+    .slice(0, 6)
   // คาบในสัปดาห์นี้ที่จบแล้ว (หรือกำลังสอน) แต่ยังไม่มีวันเช็กชื่อ
   const mon = weekStartBangkok(t)
   const days = await db.all<{ classId: string; date: string; id: string }>(sql`
@@ -70,7 +77,7 @@ export async function timetableNow(db: Db, t: number): Promise<TimetableNow> {
     const dayStart = mon + (s.weekday - 1) * 86400_000
     if (slotTimes(s, dayStart).end > t) continue
     const date = todayBangkok(dayStart + 12 * 3600_000)
-    if (!has.has(`${s.classId}|${date}`)) missingAttendance.push({ classId: s.classId, date, weekday: s.weekday })
+    if (!has.has(`${s.classId}|${date}`) && !closed(s.classId, date)) missingAttendance.push({ classId: s.classId, date, weekday: s.weekday })
   }
   const currentDayId = current ? (has.get(`${current.classId}|${todayBangkok(t)}`) ?? null) : null
   return { paused, hasSlots: true, current, upcoming, missingAttendance, currentDayId }

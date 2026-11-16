@@ -4,6 +4,10 @@ import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-or
 export const schools = sqliteTable('schools', {
   id: text('id').primaryKey(),
   name: text('name').notNull().unique(),
+  /** ลิงก์แผนที่ที่ครูวาง (Google/Apple Maps) และพิกัดที่อ่านได้ — ใช้นำทาง */
+  mapUrl: text('map_url'),
+  lat: real('lat'),
+  lng: real('lng'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -16,6 +20,8 @@ export const classes = sqliteTable('classes', {
   name: text('name').notNull().unique(),
   joinCode: text('join_code').notNull().unique(),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+  /** เป้าคาบสอนต่อสัปดาห์ (null = ยังไม่ตั้ง) */
+  weeklyPeriods: integer('weekly_periods'),
   createdAt: integer('created_at').notNull(),
 })
 
@@ -476,6 +482,8 @@ export const timetableSlots = sqliteTable(
     /** HH:MM */
     start: text('start').notNull(),
     end: text('end').notNull(),
+    /** จำนวนคาบในช่วงนี้ (null = คิดจากความยาว ช่วงละ 50 นาที) */
+    periods: integer('periods'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('timetable_class_idx').on(t.classId)],
@@ -507,4 +515,37 @@ export const teacherNotifications = sqliteTable(
     readAt: integer('read_at'),
   },
   (t) => [index('teacher_notifications_created_idx').on(t.createdAt)],
+)
+
+/** โรงเรียนปิด/งดสอน (schoolId = null คือปิดทุกโรงเรียน) — ไม่นับคาบ/การเดินทาง ไม่เตือน ไม่นำทาง */
+export const schoolClosures = sqliteTable(
+  'school_closures',
+  {
+    id: text('id').primaryKey(),
+    schoolId: text('school_id').references(() => schools.id),
+    fromDate: text('from_date').notNull(),
+    toDate: text('to_date').notNull(),
+    reason: text('reason').notNull(),
+    note: text('note').notNull().default(''),
+    /** ประกาศ "งดเรียน" ที่สร้างให้นักเรียน (ลบการปิด = ลบประกาศ) */
+    announcementIds: text('announcement_ids', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('school_closures_dates_idx').on(t.fromDate, t.toDate)],
+)
+
+/** นัด/สถานที่พิเศษรายวันของครู (นับการเดินทาง และนำทางได้) */
+export const teacherAppointments = sqliteTable(
+  'teacher_appointments',
+  {
+    id: text('id').primaryKey(),
+    date: text('date').notNull(),
+    start: text('start').notNull(),
+    title: text('title').notNull(),
+    mapUrl: text('map_url'),
+    lat: real('lat'),
+    lng: real('lng'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('teacher_appointments_date_idx').on(t.date)],
 )

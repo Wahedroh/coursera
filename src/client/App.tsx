@@ -41,6 +41,8 @@ import TeacherReportCards from './pages/TeacherReportCards'
 import TeacherHome from './pages/TeacherHome'
 import TeacherOverview from './pages/TeacherOverview'
 import TeacherTimetable from './pages/TeacherTimetable'
+import TeacherWorkload from './pages/TeacherWorkload'
+import TeacherRoute from './pages/TeacherRoute'
 import TeacherScheduled from './pages/TeacherScheduled'
 import TeacherLibrary from './pages/TeacherLibrary'
 import TeacherNotifications from './pages/TeacherNotifications'
@@ -73,6 +75,8 @@ export default function App() {
         <Route path="/teacher/import" element={<TeacherImport />} />
         <Route path="/teacher/menu/:kind" element={<TeacherOverview />} />
         <Route path="/teacher/timetable" element={<TeacherTimetable />} />
+        <Route path="/teacher/workload" element={<TeacherWorkload />} />
+        <Route path="/teacher/route" element={<TeacherRoute />} />
         <Route path="/teacher/scheduled" element={<TeacherScheduled />} />
         <Route path="/teacher/library" element={<TeacherLibrary />} />
         <Route path="/teacher/notifications" element={<TeacherNotifications />} />
