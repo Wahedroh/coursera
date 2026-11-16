@@ -8,6 +8,7 @@ import { apiError } from '../http'
 import { httpPushSender, type PushSender } from '../push/service'
 import { isPushEndpoint, vapidAuthorization, vapidKeys } from '../push/vapid'
 import { isPaused, listSlots } from '../timetable/service'
+import { closedChecker } from '../workload/service'
 
 const KEY = 'teacher_notify'
 const RECENT = 24 * 3600_000
@@ -79,7 +80,9 @@ export async function generateTeacherNotifications(db: Db, t: number): Promise<n
   }
 
   if (!(await isPaused(db))) {
-    const slots = (await listSlots(db)).filter((x) => x.weekday === weekday)
+    // โรงเรียนที่ปิด/งดสอนวันนี้: ไม่เตือนก่อนคาบ ยืนยันการสอน หรือลืมเช็กชื่อ
+    const closed = await closedChecker(db, date, date)
+    const slots = (await listSlots(db)).filter((x) => x.weekday === weekday && !closed(x.classId, date))
     if (slots.length) {
       const classes = await db.all<{ id: string; name: string }>(sql`SELECT id, name FROM classes`)
       const name = (id: string) => classes.find((c) => c.id === id)?.name ?? ''
