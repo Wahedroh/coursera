@@ -128,6 +128,13 @@ test('นักเรียน: ตัวละครเด่นบนหน้
   await login('1357')
   const art = s.getByTestId('avatar-stage').locator('svg')
   await expect(art).toBeVisible()
+  // คะแนนรวม + EXP บนหน้าแรก แตะดูที่มา
+  const totals = s.getByTestId('student-totals')
+  await totals.getByRole('button', { name: 'ดูที่มาของคะแนนรวม' }).click()
+  await expect(s.getByTestId('score-detail')).toContainText('งาน')
+  await expect(s.getByTestId('score-detail')).toContainText('ใบงานเศษส่วน')
+  await totals.getByRole('button', { name: 'ดูที่มาของ EXP' }).click()
+  await expect(s.getByTestId('exp-detail')).toContainText('📝 ส่งงาน')
   const box = await art.boundingBox()
   expect(box!.height).toBeGreaterThan(180)
   await expect(s.getByRole('link', { name: /^เลเวล \d+ · \d+ EXP$/ })).toBeVisible()

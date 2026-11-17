@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { assignGrades, DEFAULT_GRADING, finalGrade, fullSetEligible, gradingSchema, type ClassGrades, type GradingSettings, type StudentGrade } from '../../shared/grades'
+import { assignGrades, DEFAULT_GRADING, finalGrade, fullSetEligible, gradingSchema, type ClassGrades, type GradingSettings, type StudentGrade, type StudentScoreBreakdown } from '../../shared/grades'
 import type { Db } from '../db/client'
 import { classes, settings, students } from '../db/schema'
 import { apiError } from '../http'
@@ -177,4 +177,37 @@ export async function allClassGrades(db: Db): Promise<Map<string, Map<string, st
     out.set(classId, new Map(rows.map((r) => [r.id, finalGrade(graded.get(r.id)?.grade ?? null, fullSetEligible(full.has(r.id), examMin.get(r.id) ?? null, g), g)])))
   }
   return out
+}
+
+/** ที่มาของคะแนนรวมของนักเรียน (เทอมนี้): งานที่ตรวจแล้ว + คะแนนสอบที่ครูเผยแพร่ (ไม่รวมรายการที่ครูยังไม่เผยแพร่) */
+export async function scoreBreakdown(db: Db, studentId: string, classId: string): Promise<StudentScoreBreakdown> {
+  const { start, end } = await termWindow(db)
+  const asg = await db.all<{ id: string; title: string; maxScore: number; dueAt: number | null; status: string | null; score: number | null }>(sql`
+    SELECT a.id, a.title, a.max_score AS maxScore, a.due_at AS dueAt, s.status, s.score
+    FROM assignments a LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ${studentId}
+    WHERE a.class_id = ${classId} AND a.published = 1 AND a.created_at >= ${start} AND a.created_at < ${end}
+    ORDER BY a.created_at`)
+  const exams = await db.all<{ id: string; title: string; category: string; maxScore: number; takenOn: string; score: number | null; absent: number | null }>(sql`
+    SELECT i.id, i.title, i.category, i.max_score AS maxScore, i.taken_on AS takenOn, sc.score, sc.absent
+    FROM score_items i LEFT JOIN scores sc ON sc.item_id = i.id AND sc.student_id = ${studentId}
+    WHERE i.class_id = ${classId} AND i.published = 1 AND i.created_at >= ${start} AND i.created_at < ${end}
+    ORDER BY i.taken_on, i.created_at`)
+  const assignments = asg.map((a) => ({
+    id: a.id,
+    title: a.title,
+    maxScore: a.maxScore,
+    dueAt: a.dueAt,
+    status: (a.status ?? 'missing') as StudentScoreBreakdown['assignments'][number]['status'],
+    score: a.status === 'graded' ? a.score : null,
+  }))
+  const ex = exams.map((e) => ({ id: e.id, title: e.title, category: e.category, maxScore: e.maxScore, takenOn: e.takenOn, score: e.score, absent: !!e.absent }))
+  const round = (n: number) => Math.round(n * 100) / 100
+  const assignmentTotal = round(assignments.reduce((n, a) => n + (a.score ?? 0), 0))
+  const examTotal = round(ex.reduce((n, e) => n + (e.score ?? 0), 0))
+  // คะแนนเต็ม: งานที่ตรวจแล้ว (ของตัวเอง) + งานที่เลยกำหนดแล้วยังไม่ส่ง + สอบที่เผยแพร่
+  const now = Date.now()
+  const maxTotal = round(
+    assignments.filter((a) => a.status === 'graded' || (a.status === 'missing' && a.dueAt !== null && a.dueAt < now)).reduce((n, a) => n + a.maxScore, 0) + ex.reduce((n, e) => n + e.maxScore, 0),
+  )
+  return { total: round(assignmentTotal + examTotal), maxTotal, assignmentTotal, examTotal, assignments, exams: ex, grade: await gradeForStudent(db, studentId, classId) }
 }

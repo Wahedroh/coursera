@@ -111,3 +111,14 @@ export type ClassGrades = {
 }
 
 export type StudentGrade = { visible: false } | { visible: true; total: number; maxTotal: number; grade: string | null; fullSet: boolean; fullSetBonus: boolean; examMinPct: number | null; minExamPct: number }
+
+/** ที่มาของคะแนนรวม (ฝั่งนักเรียน): งานที่ครูตรวจแล้ว + คะแนนสอบที่ครูเผยแพร่แล้ว */
+export type StudentScoreBreakdown = {
+  total: number
+  maxTotal: number
+  assignmentTotal: number
+  examTotal: number
+  assignments: { id: string; title: string; maxScore: number; score: number | null; status: 'graded' | 'submitted' | 'late' | 'returned' | 'missing'; dueAt: number | null }[]
+  exams: { id: string; title: string; category: string; maxScore: number; score: number | null; absent: boolean; takenOn: string }[]
+  grade: StudentGrade
+}

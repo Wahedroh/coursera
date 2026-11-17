@@ -4,7 +4,7 @@ import { getDb, now } from '../db/client'
 import { avatarInputSchema } from '../../shared/avatar'
 import { parseBody } from '../http'
 import type { AppEnv, SessionInfo } from '../env'
-import { getAvatar, leaderboard, openEgg, progress, saveAvatar } from './service'
+import { expBreakdown, getAvatar, leaderboard, openEgg, progress, saveAvatar } from './service'
 import { expSummary, studentStats } from './stats'
 import { studentBadges } from './badges'
 import { getGrading } from '../grades/service'
@@ -27,6 +27,7 @@ studentPointsRoutes.put('/avatar', requireStudent, async (c) => {
   await saveAvatar(getDb(c.env), me(c).studentId, nickname, config, now())
   return c.json({ ok: true })
 })
+studentPointsRoutes.get('/exp/breakdown', requireStudent, async (c) => c.json(await expBreakdown(getDb(c.env), me(c).studentId)))
 studentPointsRoutes.get('/exp', requireStudent, async (c) => c.json(await expSummary(getDb(c.env), me(c).studentId)))
 studentPointsRoutes.get('/stats', requireStudent, async (c) => c.json(await studentStats(getDb(c.env), me(c).studentId, me(c).classId, now())))
 studentPointsRoutes.get('/badges', requireStudent, async (c) => c.json(await studentBadges(getDb(c.env), me(c).studentId)))

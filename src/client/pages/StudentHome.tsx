@@ -10,6 +10,7 @@ import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
 import AppSetupCard from '../components/AppSetupCard'
 import CardGameBanner from '../components/CardGameBanner'
+import StudentTotals from '../components/StudentTotals'
 import NotificationBell from '../components/NotificationBell'
 import ReportReadyCard from '../components/ReportReadyCard'
 import type { StudentBadge } from '../../shared/badges'
@@ -163,6 +164,7 @@ export default function StudentHome() {
         </div>
       </header>
       <CardGameBanner />
+      <StudentTotals exp={exp} />
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
         <ReportReadyCard />
