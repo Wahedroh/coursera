@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2a7c26a4-e0dc-4154-8e4a-bab5be0ef271",
+  "id": "a9c80444-79dd-4a6b-b8bf-c9e5fddbab71",
   "prevId": "0653ae58-6395-47b0-a30f-54518f38475b",
   "tables": {
     "announcement_reads": {
@@ -3159,6 +3159,35 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "quiz_attempts": {
+          "name": "quiz_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "quiz_best": {
+          "name": "quiz_best",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quiz_last": {
+          "name": "quiz_last",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "quiz_answers": {
+          "name": "quiz_answers",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "first_at": {

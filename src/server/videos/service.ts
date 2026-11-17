@@ -55,12 +55,28 @@ export async function videoViewers(db: Db, id: string): Promise<VideoViewers> {
   )
   const viewers = roster.map((s, i) => {
     const p = prog.get(s.id)
-    return { id: s.id, no: i + 1, zipgradeId: s.zipgradeId, name: `${s.firstName} ${s.lastName}`.trim(), nickname: s.nickname ?? '', percent: p?.percent ?? null, rewarded: rewarded.has(s.id), updatedAt: p?.updatedAt ?? null }
+    const nq = v.questions.length
+    // ได้ EXP จากคลิปที่มีคำถาม = เคยตอบถูกครบ (รวมคนที่ได้ก่อนเริ่มเก็บผลคำตอบ)
+    const quiz = nq && p?.quizAttempts ? { attempts: p.quizAttempts, best: p.quizBest ?? 0, last: p.quizLast ?? 0 } : nq && rewarded.has(s.id) ? { attempts: 1, best: nq, last: nq } : null
+    return { id: s.id, no: i + 1, zipgradeId: s.zipgradeId, name: `${s.firstName} ${s.lastName}`.trim(), nickname: s.nickname ?? '', percent: p?.percent ?? null, rewarded: rewarded.has(s.id), updatedAt: p?.updatedAt ?? null, quiz }
   })
   const pct = (x: (typeof viewers)[number]) => x.percent ?? (x.rewarded ? Math.round(VIDEO_WATCH_RATIO * 100) : -1)
   viewers.sort((a, b) => pct(b) - pct(a) || a.no - b.no)
   const done = viewers.filter((x) => x.rewarded || (x.percent ?? 0) >= Math.round(VIDEO_WATCH_RATIO * 100)).length
-  return { title: v.title, total: viewers.length, started: viewers.filter((x) => x.percent !== null || x.rewarded).length, done, viewers }
+  let quiz: VideoViewers['quiz'] = null
+  if (v.questions.length) {
+    const latest = viewers.map((x) => prog.get(x.id)?.quizAnswers).filter((a): a is number[] => Array.isArray(a) && a.length === v.questions.length)
+    quiz = {
+      total: v.questions.length,
+      answered: viewers.filter((x) => x.quiz).length,
+      passed: viewers.filter((x) => x.quiz && x.quiz.best === v.questions.length).length,
+      questions: v.questions.map((q, i) => {
+        const counts = q.choices.map((_, k) => latest.filter((a) => a[i] === k).length)
+        return { q: q.q, hasImage: !!(q as { image?: string }).image, choices: q.choices, answer: q.answer, counts, correct: counts[q.answer] ?? 0, answered: latest.length }
+      }),
+    }
+  }
+  return { title: v.title, total: viewers.length, started: viewers.filter((x) => x.percent !== null || x.rewarded).length, done, viewers, quiz }
 }
 
 async function getVideo(db: Db, id: string) {
@@ -151,6 +167,12 @@ export async function recordWatch(
   if (v.questions.length) {
     const answers = w.answers ?? []
     const correct = v.questions.filter((q, i) => answers[i] === q.answer).length
+    // เก็บผลการตอบให้ครูดู (จำนวนครั้ง · ถูกมากสุด · ครั้งล่าสุด · คำตอบล่าสุด)
+    if (answers.length === v.questions.length)
+      await db
+        .update(videoProgress)
+        .set({ quizAttempts: sql`${videoProgress.quizAttempts} + 1`, quizBest: sql`max(coalesce(${videoProgress.quizBest}, 0), ${correct})`, quizLast: correct, quizAnswers: answers })
+        .where(and(eq(videoProgress.videoId, id), eq(videoProgress.studentId, studentId)))
     // ตอบไม่ครบ/ผิด: ไม่บอกว่าข้อไหนผิด ให้ลองใหม่
     if (correct < v.questions.length) return { awarded: false, exp: EXP_RULES.video, correct, total: v.questions.length }
   }

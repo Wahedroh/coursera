@@ -592,6 +592,11 @@ export const videoProgress = sqliteTable(
     percent: integer('percent').notNull(),
     watchedSeconds: integer('watched_seconds').notNull(),
     durationSeconds: integer('duration_seconds').notNull(),
+    /** คำถามท้ายคลิป: จำนวนครั้งที่ส่ง · ถูกมากสุด · ครั้งล่าสุด · คำตอบล่าสุด (ลำดับตัวเลือก) */
+    quizAttempts: integer('quiz_attempts').notNull().default(0),
+    quizBest: integer('quiz_best'),
+    quizLast: integer('quiz_last'),
+    quizAnswers: text('quiz_answers', { mode: 'json' }).$type<number[]>(),
     firstAt: integer('first_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

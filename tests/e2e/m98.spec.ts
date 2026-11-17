@@ -51,6 +51,19 @@ test('ครูเพิ่มคำถามท้ายคลิป · นั�
   await s.goto('/me/videos')
   await s.getByText('คลิปมีคำถาม').click()
   await expect(s.getByTestId('watch-reward')).toContainText('ดูถึง 70% + ตอบ 2 ข้อ รับ +5 EXP')
+
+  // นักเรียนส่งคำตอบ (ถูก 1 ข้อ) → ครูเห็นผลรายคนและสรุปรายข้อ
+  const videoId = new URL(s.url()).pathname.split('/').pop()!
+  expect((await s.request.post(`/api/student/videos/${videoId}/watched`, { data: { watchedSeconds: 180, durationSeconds: 200, answers: [1, 1] } })).status()).toBe(200)
+  await t.reload()
+  // คลิปใหม่สุดอยู่บนสุด
+  await expect(t.getByRole('button', { name: /👀 ดูแล้ว/ }).first()).toContainText('ดูแล้ว 1/')
+  await t.getByRole('button', { name: /👀 ดูแล้ว/ }).first().click()
+  const sum = t.getByTestId('video-quiz-summary')
+  await expect(sum).toContainText('ตอบแล้ว 1 คน')
+  await expect(sum).toContainText('ถูก 1/1 (100%)')
+  await expect(sum).toContainText('ตอบผิดบ่อย: ข')
+  await expect(t.getByTestId('video-viewers')).toContainText('📝 1/2')
 })
 
 test('นักเรียน: ภารกิจสัปดาห์นี้บนหน้าแรก · คอลเลกชันแยกซีซัน', async ({ browser }) => {

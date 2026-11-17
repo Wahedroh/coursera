@@ -216,6 +216,37 @@ function ViewerList({ videoId }: { videoId: string }) {
       <p className="text-sm pb-2">
         ดูครบ (≥{goal}%) <b>{d.done}</b> · เริ่มดูแล้ว <b>{d.started}</b> · ยังไม่ดู <b>{d.total - d.started}</b> จาก {d.total} คน
       </p>
+      {d.quiz && (
+        <div className="mb-3 rounded-lg bg-white border border-line p-2.5 text-sm" data-testid="video-quiz-summary">
+          <b>📝 คำถามท้ายคลิป</b> · ตอบแล้ว <b>{d.quiz.answered}</b> คน · ถูกครบ {d.quiz.total} ข้อ <b>{d.quiz.passed}</b> คน
+          <ul className="flex flex-col gap-1.5 pt-1.5">
+            {d.quiz.questions.map((q, i) => {
+              const pct = q.answered ? Math.round((q.correct / q.answered) * 100) : 0
+              const wrong = q.counts.map((n, k) => ({ n, k })).filter((x) => x.k !== q.answer && x.n > 0).sort((a, b) => b.n - a.n)[0]
+              return (
+                <li key={i} className="flex flex-wrap items-center gap-2">
+                  <span className="w-48 truncate" title={q.q}>
+                    {i + 1}. {q.q || (q.hasImage ? '(โจทย์เป็นรูป)' : '')}
+                  </span>
+                  <span className="h-2 flex-1 min-w-16 rounded-full bg-stone-200 overflow-hidden">
+                    <span className={`block h-full ${pct >= 70 ? 'bg-green-500' : pct >= 40 ? 'bg-amber-400' : 'bg-red-400'}`} style={{ width: `${pct}%` }} />
+                  </span>
+                  <span className="text-xs tabular-nums">
+                    ถูก <b>{q.correct}</b>/{q.answered} ({pct}%)
+                  </span>
+                  {wrong && (
+                    <span className="text-xs text-red-700">
+                      ตอบผิดบ่อย: {['ก', 'ข', 'ค', 'ง'][wrong.k]}
+                      {q.choices[wrong.k] ? ` “${q.choices[wrong.k]}”` : ''} {wrong.n} คน
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          <p className="text-[11px] text-stone-500 pt-1">นับจากคำตอบครั้งล่าสุดของแต่ละคน · คนที่ได้ EXP ก่อนเริ่มเก็บผลนับว่าถูกครบ (ไม่รู้ว่าตอบข้อละอะไร)</p>
+        </div>
+      )}
       <ul className="grid gap-1 sm:grid-cols-2">
         {d.viewers.map((x) => {
           const pct = x.percent ?? (x.rewarded ? goal : null)
@@ -237,12 +268,23 @@ function ViewerList({ videoId }: { videoId: string }) {
                   {x.rewarded && <span title="ได้ EXP แล้ว">⭐</span>}
                 </>
               )}
+              {d.quiz && x.quiz && (
+                <span
+                  className={`rounded-full px-1.5 text-[11px] font-bold whitespace-nowrap ${x.quiz.best === d.quiz.total ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}
+                  title={`ตอบ ${x.quiz.attempts} ครั้ง · ถูกมากสุด ${x.quiz.best}/${d.quiz.total} · ครั้งล่าสุด ${x.quiz.last}/${d.quiz.total}`}
+                >
+                  📝 {x.quiz.best}/{d.quiz.total}
+                  {x.quiz.attempts > 1 ? ` · ${x.quiz.attempts} ครั้ง` : ''}
+                </span>
+              )}
               {x.updatedAt && <span className="hidden lg:inline text-[11px] text-stone-400">{seen.format(x.updatedAt)}</span>}
             </li>
           )
         })}
       </ul>
-      <p className="text-xs text-stone-500 pt-2">เปอร์เซ็นต์ = ส่วนของคลิปที่ดูจริงสูงสุดในครั้งเดียว (ไม่นับช่วงที่กดข้าม) · ⭐ = ได้ EXP แล้ว (ดูถึง {goal}%{' '}และตอบคำถามถูก ถ้ามี)</p>
+      <p className="text-xs text-stone-500 pt-2">
+        เปอร์เซ็นต์ = ส่วนของคลิปที่ดูจริงสูงสุดในครั้งเดียว (ไม่นับช่วงที่กดข้าม) · ⭐ = ได้ EXP แล้ว (ดูถึง {goal}%{' '}และตอบคำถามถูก ถ้ามี){d.quiz ? ' · 📝 = ข้อที่ตอบถูกมากสุด · จำนวนครั้งที่ตอบ' : ''}
+      </p>
     </div>
   )
 }

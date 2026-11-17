@@ -139,3 +139,35 @@ it('ความคืบหน้าการดูคลิป: เก็บ�
   expect((await del(`/api/teacher/students/${s1.id}`, cookie)).status).toBe(200)
   expect((await del(`/api/teacher/videos/${id}`, cookie)).status).toBe(200)
 })
+
+it('ผลการตอบคำถามท้ายคลิป: จำนวนครั้ง · ถูกมากสุด · ครั้งล่าสุด · สรุปรายข้อ (ตอบผิดบ่อย)', async () => {
+  const cookie = await loginTeacher()
+  const { classId } = await seedClass(db())
+  const s1 = await seedStudent(db(), classId, { firstName: 'หนึ่ง', sortOrder: 1 })
+  const s2 = await seedStudent(db(), classId, { firstName: 'สอง', sortOrder: 2 })
+  await seedStudent(db(), classId, { firstName: 'สาม', sortOrder: 3 })
+  const questions = [
+    { q: '2+2', choices: ['3', '4'], answer: 1 },
+    { q: 'สีฟ้า', choices: ['ฟ้า', 'แดง', 'เขียว'], answer: 0 },
+  ]
+  const { ids } = await json(await postJson('/api/teacher/videos', { ...VIDEO, classIds: [classId], questions }, { cookie }))
+  const id = ids[0]
+  const send = async (sid: string, answers: number[]) => json(await postJson(`/api/student/videos/${id}/watched`, { watchedSeconds: 180, durationSeconds: 200, answers }, { cookie: await studentCookie(sid) }))
+
+  expect(await send(s1.id, [0, 1])).toMatchObject({ awarded: false, correct: 0 })
+  expect(await send(s1.id, [1, 1])).toMatchObject({ awarded: false, correct: 1 })
+  expect(await send(s1.id, [1, 0])).toMatchObject({ awarded: true })
+  expect(await send(s2.id, [1, 2])).toMatchObject({ awarded: false, correct: 1 })
+
+  const v = await json(await getJson(`/api/teacher/videos/${id}/viewers`, cookie))
+  const q = (n: string) => v.viewers.find((x: { name: string }) => x.name.startsWith(n)).quiz
+  expect(q('หนึ่ง')).toEqual({ attempts: 3, best: 2, last: 2 })
+  expect(q('สอง')).toEqual({ attempts: 1, best: 1, last: 1 })
+  expect(q('สาม')).toBeNull()
+  expect(v.quiz).toMatchObject({ total: 2, answered: 2, passed: 1 })
+  // จากคำตอบล่าสุด: ข้อ 1 ถูกทั้งคู่ · ข้อ 2 หนึ่งถูก สองตอบ "เขียว"
+  expect(v.quiz.questions.map((x: { correct: number; answered: number; counts: number[] }) => [x.correct, x.answered, x.counts])).toEqual([
+    [2, 2, [0, 2]],
+    [1, 2, [1, 0, 1]],
+  ])
+})

@@ -60,8 +60,32 @@ export type TeacherVideo = {
   views: { started: number; done: number; total: number }
 }
 export const videoProgressSchema = z.object({ watchedSeconds: z.number().min(0).max(86400), durationSeconds: z.number().positive().max(86400) })
-export type VideoViewer = { id: string; no: number; zipgradeId: string; name: string; nickname: string; percent: number | null; rewarded: boolean; updatedAt: number | null }
-export type VideoViewers = { title: string; total: number; started: number; done: number; viewers: VideoViewer[] }
+export type VideoViewer = {
+  id: string
+  no: number
+  zipgradeId: string
+  name: string
+  nickname: string
+  percent: number | null
+  rewarded: boolean
+  updatedAt: number | null
+  /** คำถามท้ายคลิป: ส่งกี่ครั้ง · ถูกมากสุด · ครั้งล่าสุด (null = ยังไม่ตอบ) */
+  quiz: { attempts: number; best: number; last: number } | null
+}
+export type VideoViewers = {
+  title: string
+  total: number
+  started: number
+  done: number
+  viewers: VideoViewer[]
+  /** สรุปคำถามท้ายคลิป (จากคำตอบล่าสุดของแต่ละคน) */
+  quiz: {
+    total: number
+    answered: number
+    passed: number
+    questions: { q: string; hasImage: boolean; choices: string[]; answer: number; counts: number[]; correct: number; answered: number }[]
+  } | null
+}
 /** นักเรียนเห็นคำถามแต่ไม่เห็นเฉลย */
 export type StudentVideo = { id: string; title: string; description: string; youtubeId: string; createdAt: number; rewarded: boolean; quiz: { q: string; image?: string; choices: string[] }[] }
 /** ดูคลิปแล้ว: วินาทีที่ดูจริง (ไม่นับซ้ำ) และความยาวคลิป · answers = คำตอบคำถามท้ายคลิป (ถ้ามี) */
