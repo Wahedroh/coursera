@@ -27,6 +27,8 @@ export default function TeacherNotifications() {
   const [device, setDevice] = useState<'on' | 'off' | 'unsupported'>('off')
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // ตั้งค่าซ่อนไว้ · เปิดด้วยปุ่ม ⚙️
+  const [showSettings, setShowSettings] = useState(false)
 
   const load = useCallback(() => {
     api<TeacherNotifySettings>('/api/teacher/notify-settings').then(setS).catch((e) => setError(handle(e)))
@@ -82,9 +84,23 @@ export default function TeacherNotifications() {
 
   return (
     <TeacherLayout>
-      <h1 className="text-2xl font-extrabold">🔔 แจ้งเตือน</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-2xl font-extrabold mr-auto">🔔 แจ้งเตือน</h1>
+        <button type="button" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} className={`rounded-full px-3 py-1 text-sm font-bold ${showSettings ? 'bg-board text-white' : 'bg-board-soft text-board'}`}>
+          ⚙️ {showSettings ? 'ปิดตั้งค่า' : 'ตั้งค่า'}
+        </button>
+      </div>
       <ErrorBox message={error} />
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px] items-start">
+      {!showSettings && device === 'off' && (
+        <p className="text-xs text-amber-700">
+          ยังไม่ได้เปิดแจ้งเตือนในเครื่องนี้ ·{' '}
+          <button type="button" className="underline font-bold" onClick={() => setShowSettings(true)}>
+            ไปเปิดที่หน้าตั้งค่า
+          </button>
+        </p>
+      )}
+      <div className={`grid gap-4 items-start ${showSettings ? 'lg:grid-cols-[1fr_380px]' : ''}`}>
+        {showSettings && (
         <Card className="p-4 flex flex-col">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
             <b>แจ้งเตือนบนเครื่องนี้</b>
@@ -149,6 +165,7 @@ export default function TeacherNotifications() {
             </div>
           )}
         </Card>
+        )}
         <Card className="p-4">
           <b>ล่าสุด</b>
           {!inbox && <Loading />}
