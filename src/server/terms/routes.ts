@@ -10,6 +10,5 @@ export const teacherTermRoutes = new Hono<AppEnv>()
 teacherTermRoutes.use('*', requireTeacher)
 teacherTermRoutes.get('/terms', async (c) => c.json(await listTerms(getDb(c.env))))
 teacherTermRoutes.post('/terms', async (c) => {
-  const { name } = await parseBody(c, newTermSchema)
-  return c.json(await startNewTerm(getDb(c.env), name, now()))
+  return c.json(await startNewTerm(getDb(c.env), await parseBody(c, newTermSchema), now()))
 })

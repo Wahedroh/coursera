@@ -1,0 +1,1 @@
+ALTER TABLE `classes` ADD `archived_on` text;

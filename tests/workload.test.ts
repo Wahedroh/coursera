@@ -266,3 +266,17 @@ describe('สอนชดเชย', () => {
     expect(items[0]).toMatchObject({ title: expect.stringMatching(/^⏰ อีก/), body: expect.stringContaining('ดรุณ ชั้น 5') })
   })
 })
+
+describe('ห้องที่เก็บถาวรแล้ว', () => {
+  it('ยอดคาบ/การเดินทางก่อนวันเก็บถาวรยังนับห้องเก่า · หลังจากนั้นไม่นับ · ไม่อยู่ในเป้าคาบปัจจุบัน', async () => {
+    const { cookie, a, a2 } = await setup()
+    await env.DB.prepare(`UPDATE classes SET archived = 1, archived_on = '2030-01-08' WHERE school_id = ?`).bind(a.schoolId).run()
+    expect([a.classId, a2].length).toBe(2)
+    const w = await json(await getJson('/api/teacher/workload?from=2030-01-07&to=2030-01-14', cookie))
+    const day = (d: string) => w.days.find((x: { date: string }) => x.date === d)
+    expect(day('2030-01-07').stops.map((s: { name: string }) => s.name)).toEqual(['ดรุณ', 'บำรุงอิสลาม'])
+    expect(day('2030-01-14').stops.map((s: { name: string }) => s.name)).toEqual(['บำรุงอิสลาม'])
+    const tg = await json(await getJson('/api/teacher/workload/targets', cookie))
+    expect(tg.schools.map((s: { name: string }) => s.name)).toEqual(['บำรุงอิสลาม'])
+  })
+})
