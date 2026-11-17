@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { charactersOfSeason, RARITY_WEIGHTS, type Character } from '../../shared/characters'
-import { EXP_PER_LEVEL, levelOf } from '../../shared/points'
+import { EXP_PER_LEVEL, EXP_SOURCES, levelOf, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { classes, eggs, pointEvents, seating, settings, studentAvatars, students, terms } from '../db/schema'
 import { termWindow } from '../terms/service'
@@ -86,6 +86,26 @@ export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = n
   }
   const pool = pool0.filter((c) => c.rarity === rarity)
   return pool[Math.floor(rand() * pool.length) % pool.length].id
+}
+
+/** ที่มาของ EXP เทอมนี้ของนักเรียน 1 คน: รวมตามประเภท + รายการทั้งหมด (ใหม่ก่อน) */
+export async function expBreakdown(db: Db, studentId: string): Promise<ExpBreakdown> {
+  const [st] = await db.select({ id: students.id }).from(students).where(eq(students.id, studentId))
+  if (!st) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
+  const w = await termWindow(db)
+  const events = await db
+    .select({ delta: pointEvents.delta, reason: pointEvents.reason, source: pointEvents.source, createdAt: pointEvents.createdAt })
+    .from(pointEvents)
+    .where(and(eq(pointEvents.studentId, studentId), inTerm(w)))
+    .orderBy(desc(pointEvents.createdAt))
+  const exp = events.reduce((n, e) => n + e.delta, 0)
+  const bySource = EXP_SOURCES.map((source) => {
+    const xs = events.filter((e) => e.source === source)
+    return { source, exp: xs.reduce((n, e) => n + e.delta, 0), count: xs.length }
+  })
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.exp - a.exp)
+  return { exp, level: levelOf(exp), term: w.term.name, bySource, events: events.map((e) => ({ ...e, source: e.source as ExpSource })) }
 }
 
 export const secureRandom = () => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32

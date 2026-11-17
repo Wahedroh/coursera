@@ -67,6 +67,11 @@ test('หน้าห้อง: เห็นคะแนนนักเรีย
   await page.getByRole('button', { name: 'ดูคะแนน มานี มีนา' }).click()
   await expect(page.getByText(/^งาน \(\d+\)$/)).toBeVisible()
   await expect(page.getByText(/^คะแนนสอบ \(\d+\)$/)).toBeVisible()
+  // ที่มา EXP รายคน
+  await page.getByRole('button', { name: 'ที่มา EXP มานี มีนา' }).click()
+  const src = page.getByTestId('exp-sources')
+  await expect(src).toContainText('ที่มา EXP ของ มานี มีนา')
+  await expect(src).toContainText('ทุกรายการ')
 
   // ลบนักเรียนที่เพิ่มในเทสต์ก่อนหน้า (รหัส 88)
   page.once('dialog', (d) => d.accept())

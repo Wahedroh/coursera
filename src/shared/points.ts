@@ -9,3 +9,24 @@ export const lateExp = (onTime: number) => Math.round(onTime / 2)
 /** ดูคลิปย้อนหลังถึงสัดส่วนนี้ของความยาวคลิป จึงได้ EXP (คลิปละครั้ง) */
 export const VIDEO_WATCH_RATIO = 0.7
 export const levelOf = (exp: number) => Math.max(0, Math.floor(exp / EXP_PER_LEVEL))
+
+/** ที่มาของ EXP (ใช้แสดงให้ครูดูว่าได้จากอะไร) */
+export const EXP_SOURCES = ['assignment', 'attendance', 'video', 'live', 'manual', 'quest', 'streak', 'wheel'] as const
+export type ExpSource = (typeof EXP_SOURCES)[number]
+export const EXP_SOURCE_LABEL: Record<ExpSource, string> = {
+  assignment: '📝 ส่งงาน',
+  attendance: '✅ มาเรียน',
+  video: '🎬 ทบทวนคลิป',
+  live: '🃏 เกมการ์ด',
+  manual: '🎯 ครูให้แต้ม',
+  quest: '🏆 ภารกิจสัปดาห์',
+  streak: '🔥 สตรีคมาเรียน',
+  wheel: '🎡 วงล้อนำโชค',
+}
+export type ExpBreakdown = {
+  exp: number
+  level: number
+  term: string
+  bySource: { source: ExpSource; exp: number; count: number }[]
+  events: { delta: number; reason: string; source: ExpSource; createdAt: number }[]
+}

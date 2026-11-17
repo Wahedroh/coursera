@@ -4,7 +4,7 @@ import { requireTeacher } from '../auth/middleware'
 import { getDb } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
-import { classPoints, getSeating, givePoints, leaderboardEnabled, saveSeating, setLeaderboard } from './service'
+import { classPoints, expBreakdown, getSeating, givePoints, leaderboardEnabled, saveSeating, setLeaderboard } from './service'
 
 export const teacherPointsRoutes = new Hono<AppEnv>()
 teacherPointsRoutes.use('*', requireTeacher)
@@ -26,6 +26,7 @@ teacherPointsRoutes.post('/points', async (c) => {
   await givePoints(getDb(c.env), studentIds, delta, reason)
   return c.json({ ok: true })
 })
+teacherPointsRoutes.get('/students/:id/exp', async (c) => c.json(await expBreakdown(getDb(c.env), c.req.param('id'))))
 teacherPointsRoutes.get('/classes/:id/points', async (c) => c.json(await classPoints(getDb(c.env), c.req.param('id'))))
 teacherPointsRoutes.get('/classes/:id/seating', async (c) => c.json(await getSeating(getDb(c.env), c.req.param('id'))))
 teacherPointsRoutes.put('/classes/:id/seating', async (c) => {
