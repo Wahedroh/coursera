@@ -19,6 +19,7 @@ export async function enqueueDueReminders(env: Pick<Env, 'DB'>, t: number): Prom
     FROM assignments a JOIN students st ON st.class_id = a.class_id AND st.active = 1
     WHERE a.published = 1 AND a.created_at >= ${start} AND a.due_at > ${t} AND a.due_at <= ${t + DAY}
       AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.assignment_id = a.id AND s.student_id = st.id AND s.status != 'returned')
+      AND NOT EXISTS (SELECT 1 FROM assignment_closed x WHERE x.assignment_id = a.id AND x.student_id = st.id)
     ON CONFLICT DO NOTHING`)
   return res.meta.changes ?? 0
 }

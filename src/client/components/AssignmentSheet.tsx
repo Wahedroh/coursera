@@ -12,6 +12,8 @@ const TABS: [SheetTab, string][] = [
   ['graded', 'ตรวจแล้ว'],
   ['returned', 'แก้'],
 ]
+/** ครูบันทึกว่าไม่ส่ง = จบแล้ว (อยู่แท็บตรวจแล้ว ไม่ค้างในงานที่ต้องส่ง) */
+const tabOf = (a: StudentAssignment): SheetTab => (a.closed ? 'graded' : TAB_OF[a.status])
 const isTab = (v: string | null): v is SheetTab => v === 'pending' || v === 'submitted' || v === 'graded' || v === 'returned'
 const LAST_TAB = 'sheet-tab'
 const readLast = (): SheetTab => {
@@ -50,10 +52,10 @@ export default function AssignmentSheet({ items }: { items: StudentAssignment[] 
   const dialog = useRef<HTMLDivElement>(null)
 
   const counts = { pending: 0, submitted: 0, graded: 0, returned: 0 }
-  for (const a of items ?? []) counts[TAB_OF[a.status]]++
+  for (const a of items ?? []) counts[tabOf(a)]++
   const owed = counts.pending + counts.returned
   const now = Date.now()
-  const { open: upcoming, overdue } = sortPending((items ?? []).filter((a) => a.status === 'missing'), now)
+  const { open: upcoming, overdue } = sortPending((items ?? []).filter((a) => a.status === 'missing' && !a.closed), now)
   const next = upcoming[0] ?? overdue[0]
 
   function show(t: SheetTab = tab) {
@@ -126,7 +128,7 @@ export default function AssignmentSheet({ items }: { items: StudentAssignment[] 
     setDrag(0)
   }
 
-  const list = (items ?? []).filter((a) => TAB_OF[a.status] === tab)
+  const list = (items ?? []).filter((a) => tabOf(a) === tab)
 
   return (
     <>
@@ -217,6 +219,19 @@ export default function AssignmentSheet({ items }: { items: StudentAssignment[] 
 
 function Row({ a, now }: { a: StudentAssignment; now: number }) {
   const s = a.submission
+  if (a.closed)
+    return (
+      <Link to={`/me/assignments/${a.id}`} className="mb-1.5 flex items-center gap-3 rounded-2xl border border-stone-200 p-2.5 active:bg-stone-50">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold bg-stone-200" aria-hidden>
+          🚫
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-bold">{a.title}</span>
+          <span className="block truncate text-xs text-stone-500">ครูบันทึกว่าไม่ส่ง · ปิดรับแล้ว</span>
+        </span>
+        <Chip>0/{a.maxScore}</Chip>
+      </Link>
+    )
   const left = a.status === 'missing' ? timeLeft(a.dueAt, now) : null
   const overdue = a.status === 'missing' && a.dueAt !== null && a.dueAt < now
   const icon =

@@ -3,7 +3,7 @@ import { type AssignmentInput, type AssignmentSummary, type Gradebook, type Stud
 import { lateExp } from '../../shared/points'
 import { notifyResubmitted } from '../teacherNotify/service'
 import { newId, now, type Db } from '../db/client'
-import { assignments, classes, notifications, pointEvents, students, submissions } from '../db/schema'
+import { assignmentClosed, assignments, classes, notifications, pointEvents, students, submissions } from '../db/schema'
 import { removeFiles } from '../storage/service'
 import { apiError } from '../http'
 import { termWindow } from '../terms/service'
@@ -83,6 +83,7 @@ export async function deleteAssignment(db: Db, bucket: R2Bucket, id: string, for
     await db.delete(pointEvents).where(and(eq(pointEvents.source, 'assignment'), inArray(pointEvents.refId, ids.slice(i, i + 90))))
   await db.batch([
     db.delete(submissions).where(eq(submissions.assignmentId, id)),
+    db.delete(assignmentClosed).where(eq(assignmentClosed.assignmentId, id)),
     db.delete(notifications).where(eq(notifications.url, `/me/assignments/${id}`)),
     db.delete(assignments).where(eq(assignments.id, id)),
   ])
@@ -101,11 +102,12 @@ export async function listForStudent(db: Db, studentId: string, classId: string)
     .from(assignments)
     .leftJoin(submissions, and(eq(submissions.assignmentId, assignments.id), eq(submissions.studentId, studentId)))
     .where(and(eq(assignments.classId, classId), eq(assignments.published, true), asgInTerm(w)))
+  const closed = await closedFor(db, studentId)
   return rows
-    .map(({ a, s }) => toStudentAssignment(a, s))
+    .map(({ a, s }) => toStudentAssignment(a, s, closed.has(a.id)))
     .sort((x, y) => {
-      const px = PENDING.includes(x.status) ? 0 : 1
-      const py = PENDING.includes(y.status) ? 0 : 1
+      const px = PENDING.includes(x.status) && !x.closed ? 0 : 1
+      const py = PENDING.includes(y.status) && !y.closed ? 0 : 1
       return px - py || (x.dueAt ?? Infinity) - (y.dueAt ?? Infinity)
     })
 }
@@ -117,10 +119,34 @@ export async function getForStudent(db: Db, id: string, studentId: string, class
     .leftJoin(submissions, and(eq(submissions.assignmentId, assignments.id), eq(submissions.studentId, studentId)))
     .where(and(eq(assignments.id, id), eq(assignments.classId, classId), eq(assignments.published, true)))
   if (!row) throw assignmentNotFound()
-  return toStudentAssignment(row.a, row.s)
+  return toStudentAssignment(row.a, row.s, (await closedFor(db, studentId, id)).has(id))
 }
 
-function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submissions.$inferSelect | null): StudentAssignment {
+/** งานที่ครูบันทึกว่านักเรียนคนนี้ไม่ส่ง */
+async function closedFor(db: Db, studentId: string, assignmentId?: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ id: assignmentClosed.assignmentId })
+    .from(assignmentClosed)
+    .where(assignmentId ? and(eq(assignmentClosed.studentId, studentId), eq(assignmentClosed.assignmentId, assignmentId)) : eq(assignmentClosed.studentId, studentId))
+  return new Set(rows.map((r) => r.id))
+}
+
+/** ครูกด "ไม่ส่งงาน": ปิดรับงานชิ้นนี้ของนักเรียน (ส่งไม่ได้อีก · ไม่ได้ EXP · คะแนน 0) · ยกเลิกได้
+ *  ใช้ได้กับคนที่ยังไม่ส่ง หรือครูส่งกลับให้แก้แล้วไม่ส่งใหม่ */
+export async function setNotSubmitted(db: Db, assignmentId: string, studentId: string, closed: boolean, t: number): Promise<void> {
+  const a = await getAssignment(db, assignmentId)
+  const [st] = await db.select({ id: students.id }).from(students).where(and(eq(students.id, studentId), eq(students.classId, a.classId)))
+  if (!st) throw apiError('student_not_found', 'ไม่พบนักเรียนในห้องนี้', 404)
+  if (!closed) {
+    await db.delete(assignmentClosed).where(and(eq(assignmentClosed.assignmentId, assignmentId), eq(assignmentClosed.studentId, studentId)))
+    return
+  }
+  const [s] = await db.select({ status: submissions.status }).from(submissions).where(and(eq(submissions.assignmentId, assignmentId), eq(submissions.studentId, studentId)))
+  if (s && s.status !== 'returned') throw apiError('already_submitted', 'นักเรียนส่งงานนี้แล้ว — เปิดงานเพื่อตรวจตามปกติ', 409)
+  await db.insert(assignmentClosed).values({ assignmentId, studentId, createdAt: t }).onConflictDoNothing()
+}
+
+function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submissions.$inferSelect | null, closed = false): StudentAssignment {
   return {
     id: a.id,
     title: a.title,
@@ -130,6 +156,7 @@ function toStudentAssignment(a: typeof assignments.$inferSelect, s: typeof submi
     maxScore: a.maxScore,
     submitMode: a.submitMode,
     status: s ? s.status : 'missing',
+    closed,
     submission: s
       ? { text: s.text, imageKeys: s.imageKeys, annotatedKeys: s.annotatedKeys, score: s.score, comment: s.comment, submittedAt: s.submittedAt, imagesPurged: s.imagesPurgedAt !== null, onPaper: s.onPaper, excusedLate: s.excusedFrom !== null }
       : null,
@@ -141,6 +168,7 @@ export async function upsertSubmission(
   p: { assignmentId: string; studentId: string; classId: string; input: SubmissionInput; now: number },
 ): Promise<StudentAssignment> {
   const a = await getForStudent(db, p.assignmentId, p.studentId, p.classId)
+  if (a.closed) throw apiError('assignment_closed', 'ครูบันทึกว่าไม่ส่งงานนี้แล้ว — ส่งไม่ได้ (ติดต่อครู)', 409)
   const { text, imageKeys, clientRequestId } = p.input
   const hasText = text.trim().length > 0
   const hasImages = imageKeys.length > 0
@@ -189,6 +217,15 @@ export async function gradebook(db: Db, classId: string, win?: TermWindow): Prom
         .where(and(eq(assignments.classId, classId), asgInTerm(w)))
     : []
   const byKey = new Map(subs.map((s) => [`${s.studentId}|${s.assignmentId}`, s]))
+  // ใช้ join แทน inArray (ห้องที่มีงานเกิน 100 ชิ้นจะเกินขีดจำกัดพารามิเตอร์ของ D1)
+  const closedRows = list.length
+    ? await db
+        .select({ a: assignmentClosed.assignmentId, s: assignmentClosed.studentId })
+        .from(assignmentClosed)
+        .innerJoin(assignments, eq(assignments.id, assignmentClosed.assignmentId))
+        .where(and(eq(assignments.classId, classId), asgInTerm(w)))
+    : []
+  const isClosed = new Set(closedRows.map((r) => `${r.s}|${r.a}`))
   return {
     class: cls,
     assignments: list,
@@ -197,7 +234,9 @@ export async function gradebook(db: Db, classId: string, win?: TermWindow): Prom
       cells: Object.fromEntries(
         list.map((a) => {
           const s = byKey.get(`${st.id}|${a.id}`)
-          return [a.id, s ? { status: s.status, score: s.score, submissionId: s.id, onPaper: s.onPaper } : { status: 'missing' as const, score: null, submissionId: null }]
+          const closed = isClosed.has(`${st.id}|${a.id}`)
+          const flag = closed ? { closed: true } : {}
+          return [a.id, s ? { status: s.status, score: s.score, submissionId: s.id, onPaper: s.onPaper, ...flag } : { status: 'missing' as const, score: null, submissionId: null, ...flag }]
         }),
       ),
     })),
@@ -325,6 +364,7 @@ export async function recordPaper(db: Db, assignmentId: string, studentId: strin
     updatedAt: t,
   }
   const id = existing?.id ?? newId()
+  await db.delete(assignmentClosed).where(and(eq(assignmentClosed.assignmentId, assignmentId), eq(assignmentClosed.studentId, studentId)))
   if (existing) await db.update(submissions).set(values).where(eq(submissions.id, id))
   else await db.insert(submissions).values({ id, assignmentId, studentId, ...values })
   if (input.score !== null) {

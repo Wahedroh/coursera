@@ -11,6 +11,7 @@ const STATUS: Record<StudentScoreBreakdown['assignments'][number]['status'], str
   late: 'ส่งช้า รอครูตรวจ',
   returned: 'ครูส่งกลับให้แก้',
   missing: 'ยังไม่ส่ง',
+  closed: 'ไม่ส่ง (0)',
 }
 
 /** หน้าแรกนักเรียน: คะแนนรวม · เกรด · EXP — แตะเพื่อดูว่าได้มาจากอะไรบ้าง */
@@ -69,7 +70,7 @@ function ScoreDetail({ d }: { d: StudentScoreBreakdown }) {
                   {a.score ?? 0}/{a.maxScore}
                 </b>
               ) : (
-                <span className={`text-xs whitespace-nowrap ${a.status === 'missing' || a.status === 'returned' ? 'text-red-700' : 'text-stone-500'}`}>{STATUS[a.status]}</span>
+                <span className={`text-xs whitespace-nowrap ${a.status === 'missing' || a.status === 'returned' || a.status === 'closed' ? 'text-red-700' : 'text-stone-500'}`}>{STATUS[a.status]}</span>
               )}
             </li>
           ))}

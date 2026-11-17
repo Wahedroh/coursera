@@ -115,6 +115,17 @@ test('ครูบันทึกส่งงานกระดาษในต�
   await t.getByRole('button', { name: 'ยกเลิกการส่งกระดาษ' }).click()
   await expect(t.getByText(/ยกเลิกการส่งกระดาษของ\s*สมชาย แล้ว/)).toBeVisible()
   await expect(t.getByRole('button', { name: 'บันทึกส่งกระดาษ สมชาย รักเรียน · ใบงานเศษส่วน' })).toBeVisible()
+
+  // ไม่ส่งงาน (ปิดรับ) → ช่องขึ้น ✕ → ยกเลิกได้
+  await t.getByRole('button', { name: 'บันทึกส่งกระดาษ สมชาย รักเรียน · ใบงานเศษส่วน' }).click()
+  await t.getByRole('button', { name: '🚫 ไม่ส่งงาน' }).click()
+  await expect(t.getByText('🚫 สมชาย รักเรียน: ไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)')).toBeVisible()
+  const cell = t.getByRole('button', { name: 'บันทึกส่งกระดาษ สมชาย รักเรียน · ใบงานเศษส่วน' })
+  await expect(cell).toContainText('✕')
+  await cell.click()
+  await t.getByRole('button', { name: 'ยกเลิก “ไม่ส่งงาน”' }).click()
+  await expect(t.getByText(/ยกเลิก “ไม่ส่งงาน” ของ สมชาย รักเรียน แล้ว/)).toBeVisible()
+  await expect(cell).toContainText('–')
 })
 
 test('นักเรียน: ตัวละครเด่นบนหน้าแรกพร้อมเลเวล · หน้าสถิติของฉัน · เปลี่ยน PIN เอง', async ({ browser }) => {

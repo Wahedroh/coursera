@@ -182,8 +182,9 @@ export async function allClassGrades(db: Db): Promise<Map<string, Map<string, st
 /** ที่มาของคะแนนรวมของนักเรียน (เทอมนี้): งานที่ตรวจแล้ว + คะแนนสอบที่ครูเผยแพร่ (ไม่รวมรายการที่ครูยังไม่เผยแพร่) */
 export async function scoreBreakdown(db: Db, studentId: string, classId: string): Promise<StudentScoreBreakdown> {
   const { start, end } = await termWindow(db)
-  const asg = await db.all<{ id: string; title: string; maxScore: number; dueAt: number | null; status: string | null; score: number | null }>(sql`
-    SELECT a.id, a.title, a.max_score AS maxScore, a.due_at AS dueAt, s.status, s.score
+  const asg = await db.all<{ id: string; title: string; maxScore: number; dueAt: number | null; status: string | null; score: number | null; closed: number }>(sql`
+    SELECT a.id, a.title, a.max_score AS maxScore, a.due_at AS dueAt, s.status, s.score,
+      EXISTS (SELECT 1 FROM assignment_closed x WHERE x.assignment_id = a.id AND x.student_id = ${studentId}) AS closed
     FROM assignments a LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ${studentId}
     WHERE a.class_id = ${classId} AND a.published = 1 AND a.created_at >= ${start} AND a.created_at < ${end}
     ORDER BY a.created_at`)
@@ -197,7 +198,7 @@ export async function scoreBreakdown(db: Db, studentId: string, classId: string)
     title: a.title,
     maxScore: a.maxScore,
     dueAt: a.dueAt,
-    status: (a.status ?? 'missing') as StudentScoreBreakdown['assignments'][number]['status'],
+    status: (a.closed && (!a.status || a.status === 'returned') ? 'closed' : (a.status ?? 'missing')) as StudentScoreBreakdown['assignments'][number]['status'],
     score: a.status === 'graded' ? a.score : null,
   }))
   const ex = exams.map((e) => ({ id: e.id, title: e.title, category: e.category, maxScore: e.maxScore, takenOn: e.takenOn, score: e.score, absent: !!e.absent }))
@@ -207,7 +208,7 @@ export async function scoreBreakdown(db: Db, studentId: string, classId: string)
   // คะแนนเต็ม: งานที่ตรวจแล้ว (ของตัวเอง) + งานที่เลยกำหนดแล้วยังไม่ส่ง + สอบที่เผยแพร่
   const now = Date.now()
   const maxTotal = round(
-    assignments.filter((a) => a.status === 'graded' || (a.status === 'missing' && a.dueAt !== null && a.dueAt < now)).reduce((n, a) => n + a.maxScore, 0) + ex.reduce((n, e) => n + e.maxScore, 0),
+    assignments.filter((a) => a.status === 'graded' || a.status === 'closed' || (a.status === 'missing' && a.dueAt !== null && a.dueAt < now)).reduce((n, a) => n + a.maxScore, 0) + ex.reduce((n, e) => n + e.maxScore, 0),
   )
   return { total: round(assignmentTotal + examTotal), maxTotal, assignmentTotal, examTotal, assignments, exams: ex, grade: await gradeForStudent(db, studentId, classId) }
 }

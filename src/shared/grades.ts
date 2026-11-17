@@ -118,7 +118,7 @@ export type StudentScoreBreakdown = {
   maxTotal: number
   assignmentTotal: number
   examTotal: number
-  assignments: { id: string; title: string; maxScore: number; score: number | null; status: 'graded' | 'submitted' | 'late' | 'returned' | 'missing'; dueAt: number | null }[]
+  assignments: { id: string; title: string; maxScore: number; score: number | null; status: 'graded' | 'submitted' | 'late' | 'returned' | 'missing' | 'closed'; dueAt: number | null }[]
   exams: { id: string; title: string; category: string; maxScore: number; score: number | null; absent: boolean; takenOn: string }[]
   grade: StudentGrade
 }
