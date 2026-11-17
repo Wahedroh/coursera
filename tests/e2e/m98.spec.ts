@@ -74,5 +74,6 @@ test('นักเรียน: ภารกิจสัปดาห์นี้
   await s.getByRole('link', { name: '⭐ ตัวละครและแต้มของฉัน' }).click()
   await expect(s.getByText('เทอม 2/2569')).toBeVisible()
   await expect(s.getByTestId('collection-s1').getByRole('heading', { name: /ซีซัน 1 · สัตว์วิเศษ/ })).toContainText('เทอมนี้')
-  await expect(s.getByTestId('collection-s2').getByRole('heading', { name: /ซีซัน 2 · เพื่อนป่าหิมะ \(0\/16\)/ })).toContainText('เริ่มสะสมได้เทอมหน้า')
+  // ไม่โชว์ซีซันหน้า
+  await expect(s.getByTestId('collection-s2')).toHaveCount(0)
 })

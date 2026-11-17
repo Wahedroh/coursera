@@ -23,6 +23,8 @@ export const classes = sqliteTable('classes', {
   name: text('name').notNull().unique(),
   joinCode: text('join_code').notNull().unique(),
   archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+  /** วันที่เก็บถาวร (YYYY-MM-DD) — ยอดคาบ/การเดินทางก่อนวันนี้ยังนับห้องนี้ */
+  archivedOn: text('archived_on'),
   /** เป้าคาบสอนต่อสัปดาห์ (null = ยังไม่ตั้ง) */
   weeklyPeriods: integer('weekly_periods'),
   createdAt: integer('created_at').notNull(),

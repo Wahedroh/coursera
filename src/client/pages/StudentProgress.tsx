@@ -110,18 +110,18 @@ export default function StudentProgress() {
         ))}
         {badges && <BadgeGrid badges={badges} />}
         {[...SEASONS]
+          // แสดงเฉพาะซีซันของเทอมนี้ และซีซันที่เคยสะสมไว้ (ไม่โชว์ซีซันหน้า)
+          .filter(({ season }) => season === p.term.season || charactersOfSeason(season).some((c) => owned.has(c.id)))
           // ซีซันของเทอมนี้ขึ้นก่อน
           .sort((a, b) => (b.season === p.term.season ? 1 : 0) - (a.season === p.term.season ? 1 : 0))
           .map(({ season, name }) => {
             const set = charactersOfSeason(season)
             const have = set.filter((c) => owned.has(c.id)).length
-            const upcoming = season > p.term.season
             return (
               <section key={season} className="flex flex-col gap-2" data-testid={`collection-s${season}`}>
                 <h2 className="font-bold flex items-baseline gap-2">
                   {name} ({have}/{set.length})
                   {season === p.term.season && <span className="text-xs font-semibold text-amber-600">เทอมนี้</span>}
-                  {upcoming && <span className="text-xs font-normal text-stone-500">เริ่มสะสมได้เทอมหน้า</span>}
                   {have === set.length && <span className="text-xs">🏆 ครบชุด!</span>}
                 </h2>
                 {season === p.term.season && p.fullSetReward && (

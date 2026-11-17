@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, isNotNull, lte, or } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import {
   closureText,
@@ -39,7 +39,7 @@ export const isoWeekday = (date: string) => new Date(`${date}T00:00:00Z`).getUTC
 const thaiDate = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric', month: 'short' })
 const dateText = (from: string, to: string) => (from === to ? thaiDate.format(Date.parse(from)) : `${thaiDate.format(Date.parse(from))} – ${thaiDate.format(Date.parse(to))}`)
 
-type ClassRow = { id: string; name: string; schoolId: string; weeklyPeriods: number | null }
+type ClassRow = { id: string; name: string; schoolId: string; weeklyPeriods: number | null; archivedOn?: string | null }
 type SlotRow = { id: string; classId: string; weekday: number; start: string; end: string; periods: number | null; validFrom: string | null; validTo: string | null }
 type MakeupRow = typeof makeupClasses.$inferSelect
 type ClosureRow = typeof schoolClosures.$inferSelect
@@ -48,6 +48,24 @@ type Ctx = { classes: Map<string, ClassRow>; schools: Map<string, SchoolRow>; sl
 
 async function activeClasses(db: Db): Promise<ClassRow[]> {
   return db.select({ id: classes.id, name: classes.name, schoolId: classes.schoolId, weeklyPeriods: classes.weeklyPeriods }).from(classes).where(eq(classes.archived, false)).orderBy(classes.name)
+}
+/** ห้องทั้งหมดที่ยังนับย้อนหลังได้: ห้องปัจจุบัน + ห้องที่เก็บถาวรแล้ว (นับเฉพาะวันก่อนเก็บถาวร) */
+async function historyClasses(db: Db): Promise<ClassRow[]> {
+  return db
+    .select({ id: classes.id, name: classes.name, schoolId: classes.schoolId, weeklyPeriods: classes.weeklyPeriods, archivedOn: classes.archivedOn })
+    .from(classes)
+    .where(or(eq(classes.archived, false), isNotNull(classes.archivedOn)))
+    .orderBy(classes.name)
+}
+/** ห้องนี้ยังสอนอยู่ในวันที่ date ไหม (ห้องที่เก็บถาวรแล้วนับถึงวันก่อนเก็บ) */
+const classOn = (c: ClassRow | undefined, date: string) => !!c && (!c.archivedOn || date < c.archivedOn)
+async function historySlots(db: Db): Promise<SlotRow[]> {
+  return db
+    .select({ id: timetableSlots.id, classId: timetableSlots.classId, weekday: timetableSlots.weekday, start: timetableSlots.start, end: timetableSlots.end, periods: timetableSlots.periods, validFrom: timetableSlots.validFrom, validTo: timetableSlots.validTo })
+    .from(timetableSlots)
+    .innerJoin(classes, eq(classes.id, timetableSlots.classId))
+    .where(or(eq(classes.archived, false), isNotNull(classes.archivedOn)))
+    .orderBy(timetableSlots.weekday, timetableSlots.start)
 }
 async function allSlots(db: Db): Promise<SlotRow[]> {
   return db
@@ -63,9 +81,9 @@ async function closuresBetween(db: Db, from: string, to: string): Promise<Closur
 
 async function loadCtx(db: Db, from: string, to: string, withSlots = true): Promise<Ctx> {
   const [cls, sch, slots, closures, appts, makeups] = await Promise.all([
-    activeClasses(db),
+    historyClasses(db),
     db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, countPeriods: schools.countPeriods, countTrips: schools.countTrips }).from(schools),
-    withSlots ? allSlots(db) : Promise.resolve([]),
+    withSlots ? historySlots(db) : Promise.resolve([]),
     closuresBetween(db, from, to),
     db
       .select({ id: teacherAppointments.id, date: teacherAppointments.date, start: teacherAppointments.start, title: teacherAppointments.title, mapUrl: teacherAppointments.mapUrl, lat: teacherAppointments.lat, lng: teacherAppointments.lng })
@@ -107,9 +125,9 @@ function planDay(ctx: Ctx, date: string, paused: boolean): DayPlan {
   const weekday = isoWeekday(date)
   type Entry = { start: string; end: string | null; slot?: SlotRow; appt?: Appointment; makeup?: MakeupRow }
   const entries: Entry[] = [
-    ...(paused ? [] : ctx.slots.filter((s) => s.weekday === weekday && slotActiveOn(s, date)).map((s) => ({ start: s.start, end: s.end, slot: s }))),
+    ...(paused ? [] : ctx.slots.filter((s) => s.weekday === weekday && slotActiveOn(s, date) && classOn(ctx.classes.get(s.classId), date)).map((s) => ({ start: s.start, end: s.end, slot: s }))),
     ...ctx.appts.filter((a) => a.date === date).map((a) => ({ start: a.start, end: null, appt: a })),
-    ...ctx.makeups.filter((m) => m.date === date).map((m) => ({ start: m.start, end: m.end, makeup: m })),
+    ...ctx.makeups.filter((m) => m.date === date && classOn(ctx.classes.get(m.classId), date)).map((m) => ({ start: m.start, end: m.end, makeup: m })),
   ].sort((a, b) => a.start.localeCompare(b.start))
   const stops: Stop[] = []
   for (const e of entries) {
