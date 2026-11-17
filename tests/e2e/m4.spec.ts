@@ -47,6 +47,16 @@ test('คลิปย้อนหลัง: ครูวางลิงก์ Yo
   })
   expect(prevented).toBe(true)
 
+  // นักเรียนดูไป 40% (ส่งความคืบหน้า) → ครูเห็นรายชื่อพร้อมเปอร์เซ็นต์
+  const videoId = new URL(student.url()).pathname.split('/').pop()!
+  expect((await student.request.post(`/api/student/videos/${videoId}/progress`, { data: { watchedSeconds: 80, durationSeconds: 200 } })).status()).toBe(200)
+  await teacher.reload()
+  await teacher.getByRole('button', { name: /👀 ดูแล้ว/ }).click()
+  const list = teacher.getByTestId('video-viewers')
+  await expect(list).toContainText('เริ่มดูแล้ว 1')
+  await expect(list).toContainText('40%')
+  await expect(list).toContainText('ยังไม่ดู')
+
   // ครูซ่อนคลิป → นักเรียนไม่เห็น
   await teacher.getByRole('button', { name: 'ซ่อน', exact: true }).click()
   await expect(teacher.getByText('ซ่อนอยู่')).toBeVisible()

@@ -578,3 +578,22 @@ export const makeupClasses = sqliteTable(
   },
   (t) => [index('makeup_classes_date_idx').on(t.date), index('makeup_classes_closure_idx').on(t.closureId)],
 )
+
+/** ความคืบหน้าการดูคลิปของนักเรียน (เปอร์เซ็นต์สูงสุดที่เคยดู) — ครูเห็นรายชื่อคนที่ดูแล้ว */
+export const videoProgress = sqliteTable(
+  'video_progress',
+  {
+    videoId: text('video_id')
+      .notNull()
+      .references(() => videos.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    percent: integer('percent').notNull(),
+    watchedSeconds: integer('watched_seconds').notNull(),
+    durationSeconds: integer('duration_seconds').notNull(),
+    firstAt: integer('first_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('video_progress_unique').on(t.videoId, t.studentId), index('video_progress_student_idx').on(t.studentId)],
+)

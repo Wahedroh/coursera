@@ -91,3 +91,51 @@ it('คำถามท้ายคลิปเป็นรูปได้: เ�
   await purgeOrphans(db(), env.BUCKET, Date.now() + 3 * 86400_000)
   expect(await env.BUCKET.get(key)).not.toBeNull()
 })
+
+it('ความคืบหน้าการดูคลิป: เก็บเปอร์เซ็นต์สูงสุด · ครูเห็นรายชื่อ (ดูมากก่อน · ยังไม่ดูท้าย) · ได้ EXP แล้วนับว่าดูครบ', async () => {
+  const cookie = await loginTeacher()
+  const { classId } = await seedClass(db())
+  const s1 = await seedStudent(db(), classId, { firstName: 'หนึ่ง', sortOrder: 1 })
+  const s2 = await seedStudent(db(), classId, { firstName: 'สอง', sortOrder: 2 })
+  const s3 = await seedStudent(db(), classId, { firstName: 'สาม', sortOrder: 3 })
+  const { ids } = await json(await postJson('/api/teacher/videos', { ...VIDEO, classIds: [classId] }, { cookie }))
+  const id = ids[0]
+  const [c1, c2] = [await studentCookie(s1.id), await studentCookie(s2.id)]
+  const progress = (c: string, watchedSeconds: number) => postJson(`/api/student/videos/${id}/progress`, { watchedSeconds, durationSeconds: 200 }, { cookie: c })
+
+  expect(await json(await progress(c1, 60))).toEqual({ percent: 30 })
+  expect(await json(await progress(c1, 20))).toEqual({ percent: 30 }) // ดูรอบใหม่น้อยกว่า: เก็บค่าสูงสุด
+  expect(await json(await progress(c1, 150))).toEqual({ percent: 75 })
+  await progress(c2, 30)
+  expect((await progress(c2, -1)).status).toBe(400)
+  // นักเรียนห้องอื่นบันทึกไม่ได้
+  const other = await studentCookie((await seedStudent(db(), (await seedClass(db())).classId)).id)
+  expect((await progress(other, 50)).status).toBe(404)
+
+  let list = await json(await getJson(`/api/teacher/classes/${classId}/videos`, cookie))
+  expect(list[0].views).toEqual({ started: 2, done: 1, total: 3 })
+  let v = await json(await getJson(`/api/teacher/videos/${id}/viewers`, cookie))
+  expect(v.viewers.map((x: { name: string; percent: number | null }) => [x.name.split(' ')[0], x.percent])).toEqual([
+    ['หนึ่ง', 75],
+    ['สอง', 15],
+    ['สาม', null],
+  ])
+  expect([v.total, v.started, v.done]).toEqual([3, 2, 1])
+
+  // ส่ง "ดูครบ" (ได้ EXP) → ความคืบหน้าอัปเดตด้วย · คนที่เคยได้ EXP โดยไม่มีบันทึก % ก็นับว่าดูครบ
+  await postJson(`/api/student/videos/${id}/watched`, { watchedSeconds: 190, durationSeconds: 200 }, { cookie: c2 })
+  await env.DB.prepare(`INSERT INTO point_events (id, student_id, delta, reason, source, ref_id, created_at) VALUES ('legacy', ?, 5, 'เก่า', 'video', ?, 1)`).bind(s3.id, `${id}:${s3.id}`).run()
+  v = await json(await getJson(`/api/teacher/videos/${id}/viewers`, cookie))
+  expect(v.viewers.map((x: { name: string; percent: number | null; rewarded: boolean }) => [x.name.split(' ')[0], x.percent, x.rewarded])).toEqual([
+    ['สอง', 95, true],
+    ['หนึ่ง', 75, false],
+    ['สาม', null, true],
+  ])
+  list = await json(await getJson(`/api/teacher/classes/${classId}/videos`, cookie))
+  expect(list[0].views).toEqual({ started: 3, done: 3, total: 3 })
+  expect((await getJson(`/api/teacher/videos/${id}/viewers`, c1)).status).toBe(401)
+
+  // ลบคลิป/ลบนักเรียนได้ (ความคืบหน้าถูกลบตาม)
+  expect((await del(`/api/teacher/students/${s1.id}`, cookie)).status).toBe(200)
+  expect((await del(`/api/teacher/videos/${id}`, cookie)).status).toBe(200)
+})

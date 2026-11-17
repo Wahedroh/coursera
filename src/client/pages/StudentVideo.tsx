@@ -24,9 +24,47 @@ export default function StudentVideo() {
     return api<VideoWatchResult>(`/api/student/videos/${id}/watched`, { body })
   }
 
+  // ส่งความคืบหน้าให้ครูเห็น: ทุก ๆ +5% และตอนออกจากหน้า (เก็บเปอร์เซ็นต์สูงสุดที่เคยดู)
+  const lastSent = useRef(0)
+  const inFlight = useRef(false)
+  function sendProgress(keepalive = false) {
+    const { watched, duration } = watch.current
+    const p = Math.min(100, Math.round((watched / duration) * 100))
+    if (duration <= 1 || p <= lastSent.current) return
+    if (keepalive) {
+      lastSent.current = p
+      void fetch(`/api/student/videos/${id}/progress`, { method: 'POST', credentials: 'include', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ watchedSeconds: watched, durationSeconds: duration }) }).catch(() => {})
+      return
+    }
+    if (inFlight.current) return
+    inFlight.current = true
+    api(`/api/student/videos/${id}/progress`, { body: { watchedSeconds: watched, durationSeconds: duration } })
+      .then(() => {
+        lastSent.current = Math.max(lastSent.current, p)
+      })
+      .catch(() => {})
+      .finally(() => {
+        inFlight.current = false
+      })
+  }
+  useEffect(() => {
+    const leave = () => sendProgress(true)
+    const hidden = () => document.visibilityState === 'hidden' && leave()
+    window.addEventListener('pagehide', leave)
+    document.addEventListener('visibilitychange', hidden)
+    return () => {
+      window.removeEventListener('pagehide', leave)
+      document.removeEventListener('visibilitychange', hidden)
+      leave()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
   function onWatch(watched: number, duration: number) {
     setPct(Math.min(100, Math.round((watched / duration) * 100)))
     watch.current = { watched: Math.max(watch.current.watched, watched), duration }
+    const p = Math.min(100, Math.round((watch.current.watched / duration) * 100))
+    if (p >= lastSent.current + 5 || (p === 100 && lastSent.current < 100)) sendProgress()
     if (!v || v.rewarded || sent.current || watched + 1 < duration * VIDEO_WATCH_RATIO) return
     sent.current = true
     // มีคำถามท้ายคลิป: ดูครบแล้วให้ตอบคำถามก่อน

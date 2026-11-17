@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
 import ProtectedYouTube from '../components/ProtectedYouTube'
-import { parseYouTubeId, type TeacherVideo, type VideoQuestion } from '../../shared/videos'
+import { parseYouTubeId, type TeacherVideo, type VideoQuestion, type VideoViewers } from '../../shared/videos'
+import { VIDEO_WATCH_RATIO } from '../../shared/points'
 import VideoQuestionsEditor from '../components/VideoQuestionsEditor'
 import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, type PublishValue } from '../components/PublishPicker'
 import CopyButton from '../components/CopyDialog'
@@ -23,6 +24,7 @@ export default function TeacherVideos() {
   const [flash, setFlash] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
+  const [viewers, setViewers] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [description, setDescription] = useState('')
@@ -100,6 +102,15 @@ export default function TeacherVideos() {
                   <div className="mt-1 flex flex-wrap gap-1">
                     {v.published ? <Chip tone="green">นักเรียนเห็น</Chip> : v.publishAt ? <ScheduleChip published={false} publishAt={v.publishAt} /> : <Chip>ซ่อนอยู่</Chip>}
                     {v.questions.length > 0 && <Chip tone="purple">คำถามท้ายคลิป {v.questions.length} ข้อ</Chip>}
+                    <button
+                      type="button"
+                      onClick={() => setViewers(viewers === v.id ? null : v.id)}
+                      aria-expanded={viewers === v.id}
+                      className="rounded-full bg-blue-50 text-blue-800 px-2 py-0.5 text-xs font-bold"
+                      title="ดูรายชื่อนักเรียนที่ดูคลิปนี้"
+                    >
+                      👀 ดูแล้ว {v.views.done}/{v.views.total} คน{v.views.started > v.views.done ? ` · กำลังดู ${v.views.started - v.views.done}` : ''}
+                    </button>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
@@ -128,6 +139,7 @@ export default function TeacherVideos() {
                 />
               )}
               {preview === v.id && <ProtectedYouTube videoId={v.youtubeId} title={v.title} />}
+              {viewers === v.id && <ViewerList videoId={v.id} />}
             </div>
           ))}
         </Card>
@@ -182,6 +194,56 @@ export default function TeacherVideos() {
         </Card>
       </form>
     </TeacherLayout>
+  )
+}
+
+const seen = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+/** รายชื่อนักเรียนกับเปอร์เซ็นต์ที่ดูคลิป (สูงสุดที่เคยดู) */
+function ViewerList({ videoId }: { videoId: string }) {
+  const [d, setD] = useState<VideoViewers | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => {
+    api<VideoViewers>(`/api/teacher/videos/${videoId}/viewers`)
+      .then(setD)
+      .catch((e) => setErr(e instanceof Error ? e.message : 'โหลดไม่สำเร็จ'))
+  }, [videoId])
+  if (err) return <ErrorBox message={err} />
+  if (!d) return <Loading />
+  const goal = Math.round(VIDEO_WATCH_RATIO * 100)
+  return (
+    <div className="mt-2 rounded-xl border border-line bg-stone-50 p-3" data-testid="video-viewers">
+      <p className="text-sm pb-2">
+        ดูครบ (≥{goal}%) <b>{d.done}</b> · เริ่มดูแล้ว <b>{d.started}</b> · ยังไม่ดู <b>{d.total - d.started}</b> จาก {d.total} คน
+      </p>
+      <ul className="grid gap-1 sm:grid-cols-2">
+        {d.viewers.map((x) => {
+          const pct = x.percent ?? (x.rewarded ? goal : null)
+          return (
+            <li key={x.id} className="flex items-center gap-2 text-sm">
+              <span className="w-6 text-right text-xs text-stone-400 tabular-nums">{x.no}</span>
+              <span className="w-36 truncate" title={x.name}>
+                {x.nickname ? <b>{x.nickname}</b> : x.name}
+                {x.nickname && <span className="text-xs text-stone-500"> ({x.name.split(' ')[0]})</span>}
+              </span>
+              {pct === null ? (
+                <span className="text-xs text-stone-400">ยังไม่ดู</span>
+              ) : (
+                <>
+                  <span className="h-2 flex-1 min-w-12 rounded-full bg-stone-200 overflow-hidden">
+                    <span className={`block h-full ${pct >= goal ? 'bg-green-500' : 'bg-amber-400'}`} style={{ width: `${pct}%` }} />
+                  </span>
+                  <span className="w-12 text-right text-xs tabular-nums font-bold">{x.percent === null ? `≥${goal}%` : `${pct}%`}</span>
+                  {x.rewarded && <span title="ได้ EXP แล้ว">⭐</span>}
+                </>
+              )}
+              {x.updatedAt && <span className="hidden lg:inline text-[11px] text-stone-400">{seen.format(x.updatedAt)}</span>}
+            </li>
+          )
+        })}
+      </ul>
+      <p className="text-xs text-stone-500 pt-2">เปอร์เซ็นต์ = ส่วนของคลิปที่ดูจริงสูงสุดในครั้งเดียว (ไม่นับช่วงที่กดข้าม) · ⭐ = ได้ EXP แล้ว (ดูถึง {goal}%{' '}และตอบคำถามถูก ถ้ามี)</p>
+    </div>
   )
 }
 

@@ -238,7 +238,9 @@ export async function overview(
         }
       >(sql`
         SELECT v.class_id AS classId, v.title, v.created_at AS createdAt, v.published, json_array_length(v.questions) AS nq,
-          (SELECT count(*) FROM point_events p WHERE p.source = 'video' AND p.ref_id LIKE v.id || ':%') AS watched
+          (SELECT count(*) FROM students s WHERE s.class_id = v.class_id AND s.active = 1 AND (
+            EXISTS (SELECT 1 FROM video_progress p WHERE p.video_id = v.id AND p.student_id = s.id AND p.percent >= 70)
+            OR EXISTS (SELECT 1 FROM point_events e WHERE e.source = 'video' AND e.ref_id = v.id || ':' || s.id))) AS watched
         FROM videos v ORDER BY v.created_at DESC`);
       lists = byClass(rows, (r) => ({
         title: r.title,
