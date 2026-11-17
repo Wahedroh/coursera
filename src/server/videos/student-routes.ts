@@ -2,9 +2,9 @@ import { Hono } from 'hono'
 import { requireStudent } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv, SessionInfo } from '../env'
-import { videoWatchSchema } from '../../shared/videos'
+import { videoProgressSchema, videoWatchSchema } from '../../shared/videos'
 import { parseBody } from '../http'
-import { recordWatch, videoForStudent, videosForStudent } from './service'
+import { recordProgress, recordWatch, videoForStudent, videosForStudent } from './service'
 
 type StudentSession = Extract<SessionInfo, { kind: 'student' }>
 
@@ -17,3 +17,4 @@ studentVideoRoutes.get('/:id', async (c) => c.json(await videoForStudent(getDb(c
 studentVideoRoutes.post('/:id/watched', async (c) =>
   c.json(await recordWatch(getDb(c.env), c.req.param('id'), me(c).classId, me(c).studentId, await parseBody(c, videoWatchSchema), now())),
 )
+studentVideoRoutes.post('/:id/progress', async (c) => c.json(await recordProgress(getDb(c.env), c.req.param('id'), me(c).classId, me(c).studentId, await parseBody(c, videoProgressSchema), now())))

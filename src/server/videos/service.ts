@@ -1,8 +1,8 @@
-import { and, desc, eq, like } from 'drizzle-orm'
+import { and, desc, eq, like, sql } from 'drizzle-orm'
 import { EXP_RULES, VIDEO_WATCH_RATIO } from '../../shared/points'
-import { parseYouTubeId, type StudentVideo, type TeacherVideo, type VideoInput, type VideoWatchResult } from '../../shared/videos'
+import { parseYouTubeId, type StudentVideo, type TeacherVideo, type VideoInput, type VideoViewers, type VideoWatchResult } from '../../shared/videos'
 import { newId, type Db } from '../db/client'
-import { classes, pointEvents, videos } from '../db/schema'
+import { classes, pointEvents, studentAvatars, students, videoProgress, videos } from '../db/schema'
 import { apiError } from '../http'
 
 export const videoNotFound = () => apiError('video_not_found', 'ไม่พบคลิปนี้', 404)
@@ -23,7 +23,60 @@ export async function createVideos(db: Db, classIds: string[], input: VideoInput
 const cols = { id: videos.id, title: videos.title, description: videos.description, youtubeId: videos.youtubeId, published: videos.published, publishAt: videos.publishAt, createdAt: videos.createdAt, questions: videos.questions }
 
 export async function listVideos(db: Db, classId: string): Promise<TeacherVideo[]> {
-  return db.select(cols).from(videos).where(eq(videos.classId, classId)).orderBy(desc(videos.createdAt))
+  const rows = await db.select(cols).from(videos).where(eq(videos.classId, classId)).orderBy(desc(videos.createdAt))
+  if (!rows.length) return []
+  // นับเฉพาะนักเรียนที่ยังอยู่ในห้อง: เริ่มดู (มีความคืบหน้า/ได้ EXP) · ดูครบเกณฑ์ (ได้ EXP หรือถึง 70%)
+  const stats = await db.all<{ videoId: string; started: number; done: number }>(sql`
+    SELECT v.id AS videoId,
+      (SELECT count(*) FROM students s WHERE s.class_id = v.class_id AND s.active = 1 AND (
+        EXISTS (SELECT 1 FROM video_progress p WHERE p.video_id = v.id AND p.student_id = s.id)
+        OR EXISTS (SELECT 1 FROM point_events e WHERE e.source = 'video' AND e.ref_id = v.id || ':' || s.id))) AS started,
+      (SELECT count(*) FROM students s WHERE s.class_id = v.class_id AND s.active = 1 AND (
+        EXISTS (SELECT 1 FROM video_progress p WHERE p.video_id = v.id AND p.student_id = s.id AND p.percent >= ${Math.round(VIDEO_WATCH_RATIO * 100)})
+        OR EXISTS (SELECT 1 FROM point_events e WHERE e.source = 'video' AND e.ref_id = v.id || ':' || s.id))) AS done
+    FROM videos v WHERE v.class_id = ${classId}`)
+  const [{ total }] = await db.all<{ total: number }>(sql`SELECT count(*) AS total FROM students WHERE class_id = ${classId} AND active = 1`)
+  const by = new Map(stats.map((x) => [x.videoId, x]))
+  return rows.map((r) => ({ ...r, views: { started: by.get(r.id)?.started ?? 0, done: by.get(r.id)?.done ?? 0, total } }))
+}
+
+/** รายชื่อนักเรียนในห้องกับเปอร์เซ็นต์ที่ดูคลิปนี้ (สูงสุดที่เคยดู) — เรียงคนที่ดูมากก่อน คนที่ยังไม่ดูอยู่ท้าย */
+export async function videoViewers(db: Db, id: string): Promise<VideoViewers> {
+  const v = await getVideo(db, id)
+  const roster = await db
+    .select({ id: students.id, zipgradeId: students.zipgradeId, firstName: students.firstName, lastName: students.lastName, nickname: studentAvatars.nickname })
+    .from(students)
+    .leftJoin(studentAvatars, eq(studentAvatars.studentId, students.id))
+    .where(and(eq(students.classId, v.classId), eq(students.active, true)))
+    .orderBy(students.sortOrder, students.zipgradeId)
+  const prog = new Map((await db.select().from(videoProgress).where(eq(videoProgress.videoId, id))).map((p) => [p.studentId, p]))
+  const rewarded = new Set(
+    (await db.select({ ref: pointEvents.refId }).from(pointEvents).where(and(eq(pointEvents.source, 'video'), like(pointEvents.refId, `${id}:%`)))).map((r) => (r.ref ?? '').split(':')[1]),
+  )
+  const viewers = roster.map((s, i) => {
+    const p = prog.get(s.id)
+    const nq = v.questions.length
+    // ได้ EXP จากคลิปที่มีคำถาม = เคยตอบถูกครบ (รวมคนที่ได้ก่อนเริ่มเก็บผลคำตอบ)
+    const quiz = nq && p?.quizAttempts ? { attempts: p.quizAttempts, best: p.quizBest ?? 0, last: p.quizLast ?? 0 } : nq && rewarded.has(s.id) ? { attempts: 1, best: nq, last: nq } : null
+    return { id: s.id, no: i + 1, zipgradeId: s.zipgradeId, name: `${s.firstName} ${s.lastName}`.trim(), nickname: s.nickname ?? '', percent: p?.percent ?? null, rewarded: rewarded.has(s.id), updatedAt: p?.updatedAt ?? null, quiz }
+  })
+  const pct = (x: (typeof viewers)[number]) => x.percent ?? (x.rewarded ? Math.round(VIDEO_WATCH_RATIO * 100) : -1)
+  viewers.sort((a, b) => pct(b) - pct(a) || a.no - b.no)
+  const done = viewers.filter((x) => x.rewarded || (x.percent ?? 0) >= Math.round(VIDEO_WATCH_RATIO * 100)).length
+  let quiz: VideoViewers['quiz'] = null
+  if (v.questions.length) {
+    const latest = viewers.map((x) => prog.get(x.id)?.quizAnswers).filter((a): a is number[] => Array.isArray(a) && a.length === v.questions.length)
+    quiz = {
+      total: v.questions.length,
+      answered: viewers.filter((x) => x.quiz).length,
+      passed: viewers.filter((x) => x.quiz && x.quiz.best === v.questions.length).length,
+      questions: v.questions.map((q, i) => {
+        const counts = q.choices.map((_, k) => latest.filter((a) => a[i] === k).length)
+        return { q: q.q, hasImage: !!(q as { image?: string }).image, choices: q.choices, answer: q.answer, counts, correct: counts[q.answer] ?? 0, answered: latest.length }
+      }),
+    }
+  }
+  return { title: v.title, total: viewers.length, started: viewers.filter((x) => x.percent !== null || x.rewarded).length, done, viewers, quiz }
 }
 
 async function getVideo(db: Db, id: string) {
@@ -44,6 +97,7 @@ export async function setVideoPublished(db: Db, id: string, published: boolean):
 
 export async function deleteVideo(db: Db, id: string): Promise<void> {
   await getVideo(db, id)
+  await db.delete(videoProgress).where(eq(videoProgress.videoId, id))
   await db.delete(videos).where(eq(videos.id, id))
 }
 
@@ -82,6 +136,22 @@ export async function videoForStudent(db: Db, id: string, classId: string, stude
   return forStudent(v, (await rewardedSet(db, studentId)).has(v.id))
 }
 
+/** บันทึกความคืบหน้า (เก็บเปอร์เซ็นต์สูงสุดที่เคยดู) */
+export async function recordProgress(db: Db, id: string, classId: string, studentId: string, w: { watchedSeconds: number; durationSeconds: number }, t: number): Promise<{ percent: number }> {
+  await visibleVideo(db, id, classId)
+  const percent = Math.max(0, Math.min(100, Math.round((w.watchedSeconds / w.durationSeconds) * 100)))
+  const watchedSeconds = Math.round(Math.min(w.watchedSeconds, w.durationSeconds))
+  const [r] = await db
+    .insert(videoProgress)
+    .values({ videoId: id, studentId, percent, watchedSeconds, durationSeconds: Math.round(w.durationSeconds), firstAt: t, updatedAt: t })
+    .onConflictDoUpdate({
+      target: [videoProgress.videoId, videoProgress.studentId],
+      set: { percent: sql`max(${videoProgress.percent}, excluded.percent)`, watchedSeconds: sql`max(${videoProgress.watchedSeconds}, excluded.watched_seconds)`, durationSeconds: sql`excluded.duration_seconds`, updatedAt: t },
+    })
+    .returning({ percent: videoProgress.percent })
+  return { percent: r.percent }
+}
+
 /** ทบทวนคลิปถึง 70% ของความยาว (และตอบคำถามท้ายคลิปถูกทุกข้อ ถ้ามี) → +EXP (คลิปละครั้งต่อคน) */
 export async function recordWatch(
   db: Db,
@@ -92,10 +162,17 @@ export async function recordWatch(
   t: number,
 ): Promise<VideoWatchResult> {
   const v = await visibleVideo(db, id, classId)
+  await recordProgress(db, id, classId, studentId, w, t)
   if (w.watchedSeconds + 1 < w.durationSeconds * VIDEO_WATCH_RATIO) throw apiError('not_enough', `ต้องดูอย่างน้อย ${Math.round(VIDEO_WATCH_RATIO * 100)}% ของคลิป`, 400)
   if (v.questions.length) {
     const answers = w.answers ?? []
     const correct = v.questions.filter((q, i) => answers[i] === q.answer).length
+    // เก็บผลการตอบให้ครูดู (จำนวนครั้ง · ถูกมากสุด · ครั้งล่าสุด · คำตอบล่าสุด)
+    if (answers.length === v.questions.length)
+      await db
+        .update(videoProgress)
+        .set({ quizAttempts: sql`${videoProgress.quizAttempts} + 1`, quizBest: sql`max(coalesce(${videoProgress.quizBest}, 0), ${correct})`, quizLast: correct, quizAnswers: answers })
+        .where(and(eq(videoProgress.videoId, id), eq(videoProgress.studentId, studentId)))
     // ตอบไม่ครบ/ผิด: ไม่บอกว่าข้อไหนผิด ให้ลองใหม่
     if (correct < v.questions.length) return { awarded: false, exp: EXP_RULES.video, correct, total: v.questions.length }
   }
