@@ -5,6 +5,7 @@ import type { StudentAdminRow } from '../../server/roster/service'
 import type { Gradebook } from '../../shared/assignments'
 import type { ClassGrades } from '../../shared/grades'
 import type { ScoreBook } from '../../shared/scores'
+import { EXP_SOURCE_LABEL, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import AddStudentForm from '../components/AddStudentForm'
 import ClassMenu from '../components/ClassMenu'
@@ -27,6 +28,7 @@ export default function TeacherClass() {
   const [sort, setSort] = useState<Sort>('roster')
   const [exp, setExp] = useState<Map<string, { exp: number; level: number }>>(new Map())
   const [open, setOpen] = useState<string | null>(null)
+  const [expOpen, setExpOpen] = useState<string | null>(null)
   const [detail, setDetail] = useState<{ gb: Gradebook; book: ScoreBook } | null>(null)
 
   const load = useCallback(() => {
@@ -167,9 +169,9 @@ export default function TeacherClass() {
                       <td className="p-2">{g?.grade ?? '–'}</td>
                       <td className="p-2 text-right tabular-nums whitespace-nowrap" data-testid="student-exp">
                         {exp.get(s.id) ? (
-                          <>
-                            {exp.get(s.id)!.exp} <span className="text-xs text-stone-500">LV {exp.get(s.id)!.level}</span>
-                          </>
+                          <button type="button" className="text-board underline decoration-dotted" onClick={() => setExpOpen(expOpen === s.id ? null : s.id)} aria-expanded={expOpen === s.id} aria-label={`ที่มา EXP ${fullName(s)}`}>
+                            <b>{exp.get(s.id)!.exp}</b> <span className="text-xs text-stone-500">LV {exp.get(s.id)!.level}</span>
+                          </button>
                         ) : (
                           '–'
                         )}
@@ -212,6 +214,13 @@ export default function TeacherClass() {
                         </div>
                       </td>
                     </tr>
+                    {expOpen === s.id && (
+                      <tr className="bg-amber-50/60">
+                        <td colSpan={11} className="p-3">
+                          <ExpSources studentId={s.id} name={fullName(s)} />
+                        </td>
+                      </tr>
+                    )}
                     {open === s.id && (
                       <tr className="bg-stone-50">
                         <td colSpan={11} className="p-3">
@@ -227,6 +236,74 @@ export default function TeacherClass() {
         </>
       )}
     </TeacherLayout>
+  )
+}
+
+const expDay = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+/** ที่มาของ EXP เทอมนี้: รวมตามประเภท (ส่งงาน มาเรียน คลิป เกม ...) + รายการทั้งหมด กรองตามประเภทได้ */
+function ExpSources({ studentId, name }: { studentId: string; name: string }) {
+  const [d, setD] = useState<ExpBreakdown | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [only, setOnly] = useState<ExpSource | null>(null)
+  useEffect(() => {
+    api<ExpBreakdown>(`/api/teacher/students/${studentId}/exp`)
+      .then(setD)
+      .catch((e) => setErr(e instanceof Error ? e.message : 'โหลดไม่สำเร็จ'))
+  }, [studentId])
+  if (err) return <ErrorBox message={err} />
+  if (!d) return <Loading />
+  const max = Math.max(1, ...d.bySource.map((x) => x.exp))
+  const list = d.events.filter((e) => !only || e.source === only)
+  return (
+    <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] text-xs" data-testid="exp-sources">
+      <div>
+        <p className="font-bold mb-1">
+          ที่มา EXP ของ {name} · เทอม {d.term} · รวม {d.exp} EXP (LV {d.level})
+        </p>
+        {!d.bySource.length && <p className="text-stone-500">ยังไม่มี EXP เทอมนี้</p>}
+        <ul className="flex flex-col gap-1">
+          {d.bySource.map((x) => (
+            <li key={x.source}>
+              <button type="button" onClick={() => setOnly(only === x.source ? null : x.source)} className={`w-full flex items-center gap-2 rounded-lg px-1.5 py-1 text-left ${only === x.source ? 'bg-amber-100' : 'hover:bg-white'}`}>
+                <span className="w-32 shrink-0">{EXP_SOURCE_LABEL[x.source]}</span>
+                <span className="h-2.5 flex-1 rounded-full bg-stone-200 overflow-hidden">
+                  <span className="block h-full bg-amber-400" style={{ width: `${(Math.max(0, x.exp) / max) * 100}%` }} />
+                </span>
+                <b className="w-14 text-right tabular-nums">{x.exp}</b>
+                <span className="w-16 text-right text-stone-500 tabular-nums">
+                  {x.count} ครั้ง · {d.exp ? Math.round((x.exp / d.exp) * 100) : 0}%
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] text-stone-500 pt-1">แตะประเภทเพื่อดูเฉพาะรายการนั้น</p>
+      </div>
+      <div>
+        <p className="font-bold mb-1">
+          {only ? `${EXP_SOURCE_LABEL[only]} (${list.length})` : `ทุกรายการ (${list.length})`}
+          {only && (
+            <button type="button" className="ml-2 underline font-normal" onClick={() => setOnly(null)}>
+              ดูทั้งหมด
+            </button>
+          )}
+        </p>
+        <ul className="max-h-72 overflow-y-auto pr-1">
+          {list.map((e, i) => (
+            <li key={i} className="flex justify-between gap-2 border-b border-stone-200 py-0.5">
+              <span className="min-w-0 truncate" title={e.reason}>
+                <span className="text-stone-400">{expDay.format(e.createdAt)}</span> {e.reason}
+              </span>
+              <b className={`tabular-nums ${e.delta < 0 ? 'text-red-700' : 'text-green-700'}`}>
+                {e.delta > 0 ? '+' : ''}
+                {e.delta}
+              </b>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   )
 }
 
