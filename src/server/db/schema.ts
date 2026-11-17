@@ -575,6 +575,9 @@ export const makeupClasses = sqliteTable(
     periods: integer('periods'),
     mode: text('mode').$type<'onsite' | 'online'>().notNull(),
     meetUrl: text('meet_url'),
+    /** แทนคาบของวันที่ (ไม่ผูกกับวันปิดโรงเรียนก็ได้) และหมายเหตุ */
+    forDate: text('for_date'),
+    note: text('note').notNull().default(''),
     announcementId: text('announcement_id'),
     createdAt: integer('created_at').notNull(),
   },

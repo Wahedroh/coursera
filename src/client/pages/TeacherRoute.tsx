@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { WEEKDAY_LABEL } from '../../shared/timetable'
-import { CLOSURE_LABEL, CLOSURE_REASONS, type Appointment, type Closure, type ClosureReason, type DayPlan, type SchoolPlace } from '../../shared/workload'
+import { CLOSURE_LABEL, CLOSURE_REASONS, slotPeriods, type Appointment, type Closure, type ClosureReason, type DayPlan, type MakeupItem, type SchoolPlace } from '../../shared/workload'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -48,9 +48,11 @@ export default function TeacherRoute() {
     loadLists()
     api<SchoolPlace[]>('/api/teacher/places').then(setPlaces).catch(fail)
   }, [loadLists, fail])
+  const [tick, setTick] = useState(0)
   const reload = () => {
     void loadDay()
     loadLists()
+    setTick((n) => n + 1)
   }
 
   async function removeClosure(id: string) {
@@ -238,6 +240,8 @@ export default function TeacherRoute() {
             <AppointmentForm date={date} onDone={reload} onError={fail} />
           </Card>
 
+          <MakeupCard closures={closures} refresh={tick} onChanged={() => void loadDay()} onError={fail} />
+
           <Card className="p-4">
             <b>วันที่ปิด (30 วันที่ผ่านมา – ล่วงหน้า)</b>
             {!closures.length && <p className="text-sm text-stone-500 py-2">ยังไม่มี</p>}
@@ -289,6 +293,227 @@ export default function TeacherRoute() {
         </div>
       </div>
     </TeacherLayout>
+  )
+}
+
+type SchoolClasses = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
+const shortDay = (d: string) => new Intl.DateTimeFormat('th-TH', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }).format(Date.parse(d))
+
+/** คาบสอนชดเชยทั้งหมด (60 วันย้อนหลัง – ล่วงหน้า) + เพิ่มเองได้ทั้งย้อนหลังและล่วงหน้า ไม่ต้องมีวันปิดก่อน */
+function MakeupCard({ closures, refresh, onChanged, onError }: { closures: Closure[]; refresh: number; onChanged: () => void; onError: (e: unknown) => void }) {
+  const [items, setItems] = useState<MakeupItem[] | null>(null)
+  const [adding, setAdding] = useState(false)
+  const load = useCallback(() => {
+    api<MakeupItem[]>(`/api/teacher/makeups?from=${addDays(todayStr(), -60)}`).then(setItems).catch(onError)
+  }, [onError])
+  useEffect(load, [load, refresh])
+  async function remove(m: MakeupItem) {
+    if (!window.confirm(`ลบคาบชดเชย ${m.className} ${shortDay(m.date)} ${m.start}–${m.end}?`)) return
+    try {
+      await api(`/api/teacher/makeups/${m.id}`, { method: 'DELETE' })
+      load()
+      onChanged()
+    } catch (e) {
+      onError(e)
+    }
+  }
+  const today = todayStr()
+  return (
+    <div data-testid="makeup-card">
+    <Card className="p-4 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <b className="mr-auto">↺ คาบสอนชดเชย (60 วันที่ผ่านมา – ล่วงหน้า)</b>
+        {!adding && (
+          <Button type="button" onClick={() => setAdding(true)}>
+            + เพิ่มคาบสอนชดเชย
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-stone-500">บันทึกคาบที่สอนชดเชยไปแล้ว หรือนัดล่วงหน้า · นับเป็นคาบสอน (ที่โรงเรียนนับการเดินทางด้วย · ออนไลน์ไม่นับ)</p>
+      {adding && (
+        <GeneralMakeupForm
+          closures={closures}
+          onCancel={() => setAdding(false)}
+          onDone={() => {
+            setAdding(false)
+            load()
+            onChanged()
+          }}
+          onError={onError}
+        />
+      )}
+      {items && !items.length && <p className="text-sm text-stone-500 py-1">ยังไม่มี</p>}
+      <ul className="flex flex-col" data-testid="makeup-list">
+        {items?.map((m) => (
+          <li key={m.id} className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 border-t border-stone-100 py-2 text-sm ${m.date < today ? 'text-stone-600' : ''}`}>
+            <b className="tabular-nums">
+              {shortDay(m.date)} {m.start}–{m.end}
+            </b>
+            <span>
+              {m.mode === 'online' ? '💻' : '🏫'} {m.className} ({m.periods} คาบ)
+            </span>
+            <span className="text-xs text-stone-500">
+              {m.forDate ? `แทนคาบ ${shortDay(m.forDate)}` : ''}
+              {m.closure ? ` · ${m.closure.note || CLOSURE_LABEL[m.closure.reason]}` : ''}
+              {m.note ? ` · ${m.note}` : ''}
+              {m.date < today ? ' · สอนแล้ว' : ' · นัดไว้'}
+            </span>
+            <button type="button" className="ml-auto text-xs underline" onClick={() => void remove(m)}>
+              ลบ
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+    </div>
+  )
+}
+
+function GeneralMakeupForm({ closures, onCancel, onDone, onError }: { closures: Closure[]; onCancel: () => void; onDone: () => void; onError: (e: unknown) => void }) {
+  const [schools, setSchools] = useState<SchoolClasses[]>([])
+  const [schoolId, setSchoolId] = useState('')
+  const [picked, setPicked] = useState<string[]>([])
+  const [day, setDay] = useState(todayStr())
+  const [start, setStart] = useState('09:00')
+  const [end, setEnd] = useState('10:40')
+  const [periods, setPeriods] = useState('')
+  const [mode, setMode] = useState<'onsite' | 'online'>('onsite')
+  const [meetUrl, setMeetUrl] = useState('')
+  const [forDate, setForDate] = useState('')
+  const [closureId, setClosureId] = useState('')
+  const [note, setNote] = useState('')
+  const [notify, setNotify] = useState(false)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    api<SchoolClasses[]>('/api/teacher/classes')
+      .then((s) => {
+        setSchools(s)
+        setSchoolId((x) => x || s[0]?.schoolId || '')
+      })
+      .catch(onError)
+  }, [onError])
+  const school = schools.find((s) => s.schoolId === schoolId)
+  const linkable = closures.filter((c) => c.schoolId === null || c.schoolId === schoolId)
+  const past = day < todayStr()
+  const auto = start < end ? slotPeriods({ start, end }) : 0
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const cl = closures.find((c) => c.id === closureId)
+      await api('/api/teacher/makeups', {
+        body: {
+          closureId: closureId || null,
+          classIds: picked,
+          date: day,
+          start,
+          end,
+          mode,
+          meetUrl,
+          notifyStudents: notify && !past,
+          forDate: forDate || cl?.from || null,
+          note,
+          periods: periods ? Number(periods) : null,
+        },
+      })
+      onDone()
+    } catch (err) {
+      onError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={save} className="rounded-2xl border-2 border-blue-300 bg-white p-3 flex flex-col gap-2 text-sm" data-testid="general-makeup-form">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1">
+          โรงเรียน
+          <select
+            aria-label="โรงเรียนของคาบชดเชย"
+            className={input}
+            value={schoolId}
+            onChange={(e) => {
+              setSchoolId(e.target.value)
+              setPicked([])
+              setClosureId('')
+            }}
+          >
+            {schools.map((s) => (
+              <option key={s.schoolId} value={s.schoolId}>
+                {s.schoolName}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        ห้อง:
+        {school?.classes.map((c) => (
+          <label key={c.id} className="inline-flex items-center gap-1 rounded-lg border-2 border-line px-2 py-0.5">
+            <input type="checkbox" aria-label={`ห้องชดเชย ${c.name}`} checked={picked.includes(c.id)} onChange={(e) => setPicked((xs) => (e.target.checked ? [...xs, c.id] : xs.filter((x) => x !== c.id)))} />
+            {c.grade !== null ? `ชั้น ${c.grade}` : c.name}
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="รูปแบบคาบชดเชย">
+        {(['onsite', 'online'] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`rounded-full border-2 px-3 py-1 ${mode === m ? 'border-board bg-board-soft font-extrabold' : 'border-line'}`}>
+            {m === 'onsite' ? '🏫 ที่โรงเรียน' : '💻 ออนไลน์ (Google Meet)'}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        วันที่สอนชดเชย <input type="date" aria-label="วันที่สอนชดเชย (ย้อนหลังหรือล่วงหน้า)" className={input} value={day} onChange={(e) => setDay(e.target.value)} required />
+        <input type="time" aria-label="เวลาเริ่มคาบชดเชย" className={input} value={start} onChange={(e) => setStart(e.target.value)} required />–
+        <input type="time" aria-label="เวลาจบคาบชดเชย" className={input} value={end} onChange={(e) => setEnd(e.target.value)} required />
+        <select aria-label="จำนวนคาบชดเชย" className={input} value={periods} onChange={(e) => setPeriods(e.target.value)}>
+          <option value="">{auto} คาบ (อัตโนมัติ)</option>
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <option key={n} value={n}>
+              {n} คาบ
+            </option>
+          ))}
+        </select>
+        <span className={`text-xs font-bold ${past ? 'text-stone-600' : 'text-blue-800'}`}>{past ? 'ย้อนหลัง (สอนแล้ว)' : 'นัดล่วงหน้า'}</span>
+      </div>
+      {mode === 'online' && <input aria-label="ลิงก์ Google Meet ของคาบชดเชย" className={input} placeholder="https://meet.google.com/…" value={meetUrl} onChange={(e) => setMeetUrl(e.target.value)} />}
+      <div className="flex flex-wrap items-center gap-2">
+        {linkable.length > 0 && (
+          <label className="flex items-center gap-1">
+            แทนการปิด
+            <select aria-label="แทนการปิดโรงเรียน" className={input} value={closureId} onChange={(e) => setClosureId(e.target.value)}>
+              <option value="">— ไม่ผูก —</option>
+              {linkable.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {shortDay(c.from)} · {c.schoolName ?? 'ทุกโรงเรียน'} · {c.note || CLOSURE_LABEL[c.reason]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {!closureId && (
+          <label className="flex items-center gap-1">
+            แทนคาบวันที่ (ไม่บังคับ)
+            <input type="date" aria-label="แทนคาบของวันที่" className={input} value={forDate} onChange={(e) => setForDate(e.target.value)} />
+          </label>
+        )}
+      </div>
+      <input aria-label="หมายเหตุคาบชดเชย" className={input} placeholder="หมายเหตุ เช่น “ครูไปอบรม” “สอนเสริมก่อนสอบ”" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
+      {!past && (
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
+          ประกาศให้นักเรียนห้องที่เลือก{mode === 'online' ? ' (พร้อมลิงก์ Meet)' : ''}
+        </label>
+      )}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={busy || !picked.length || start >= end}>
+          บันทึกคาบชดเชย
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          ยกเลิก
+        </Button>
+      </div>
+    </form>
   )
 }
 
