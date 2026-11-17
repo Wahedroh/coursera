@@ -9,6 +9,7 @@ import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 
+const CLOSED = { cls: 'bg-stone-300 text-stone-700', text: () => '✕', label: 'ไม่ส่ง (ปิดรับ)' }
 const CELL: Record<GradebookCell['status'], { cls: string; text: (c: GradebookCell) => string; label: string }> = {
   missing: { cls: 'bg-red-50 text-red-700', text: () => '–', label: 'ยังไม่ส่ง' },
   submitted: { cls: 'bg-board-soft text-board', text: () => '✓', label: 'ส่งแล้ว รอตรวจ' },
@@ -34,7 +35,7 @@ export default function TeacherGradebook() {
   /** คนถัดไปในงานเดียวกันที่ยังไม่ส่ง/ส่งกลับแก้ (ไว้บันทึกกระดาษต่อเนื่องทั้งห้อง) */
   function nextPending(g: Gradebook, assignmentId: string, afterStudentId: string) {
     const i = g.students.findIndex((s) => s.id === afterStudentId)
-    return g.students.slice(i + 1).find((s) => ['missing', 'returned'].includes(s.cells[assignmentId].status))
+    return g.students.slice(i + 1).find((s) => ['missing', 'returned'].includes(s.cells[assignmentId].status) && !s.cells[assignmentId].closed)
   }
 
   async function savePaper(body: { score: number | null; late: boolean; comment: string }, goNext: boolean) {
@@ -43,6 +44,22 @@ export default function TeacherGradebook() {
     try {
       await api(`/api/teacher/assignments/${paper.assignmentId}/paper/${paper.studentId}`, { method: 'PUT', body })
       setFlash(`📄 บันทึกส่งกระดาษ: ${st?.firstName} ${st?.lastName}${body.score !== null ? ` · ${body.score} คะแนน` : ' · รอให้คะแนน'}`)
+      setError(null)
+      const next = goNext ? nextPending(gb, paper.assignmentId, paper.studentId) : undefined
+      setPaper(next ? { studentId: next.id, assignmentId: paper.assignmentId } : null)
+      load()
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
+
+  /** ไม่ส่งงาน: ปิดรับ (ส่งไม่ได้อีก · ไม่ได้ EXP · คะแนน 0) / ยกเลิก */
+  async function setNotSubmitted(closed: boolean, goNext: boolean) {
+    if (!paper || !gb) return
+    const st = gb.students.find((s) => s.id === paper.studentId)
+    try {
+      await api(`/api/teacher/assignments/${paper.assignmentId}/not-submitted/${paper.studentId}`, { method: 'PUT', body: { closed } })
+      setFlash(closed ? `🚫 ${st?.firstName} ${st?.lastName}: ไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)` : `ยกเลิก “ไม่ส่งงาน” ของ ${st?.firstName} ${st?.lastName} แล้ว — ส่งได้อีกครั้ง`)
       setError(null)
       const next = goNext ? nextPending(gb, paper.assignmentId, paper.studentId) : undefined
       setPaper(next ? { studentId: next.id, assignmentId: paper.assignmentId } : null)
@@ -100,12 +117,13 @@ export default function TeacherGradebook() {
               studentId={paper.studentId}
               assignmentId={paper.assignmentId}
               onSave={savePaper}
+              onNotSubmitted={setNotSubmitted}
               onClose={() => setPaper(null)}
             />
           )}
           <p className="text-xs text-stone-500">นักเรียนส่งเป็นกระดาษ? แตะช่อง <b>–</b> (ยังไม่ส่ง) เพื่อบันทึกว่าส่งแล้วและให้คะแนนได้เลย · 📄 = ส่งกระดาษ</p>
           <div className="flex flex-wrap gap-3 text-xs">
-            {Object.entries(CELL).map(([k, v]) => (
+            {Object.entries({ ...CELL, closed: CLOSED }).map(([k, v]) => (
               <span key={k} className="flex items-center gap-1">
                 <span className={`inline-flex w-6 h-6 rounded-md items-center justify-center font-bold ${v.cls}`}>{k === 'graded' ? '8' : v.text({} as GradebookCell)}</span>
                 {v.label}
@@ -147,7 +165,7 @@ export default function TeacherGradebook() {
                       </td>
                       {gb.assignments.map((a) => {
                         const c = s.cells[a.id]
-                        const v = CELL[c.status]
+                        const v = c.closed ? CLOSED : CELL[c.status]
                         const box = (
                           <span className={`relative inline-flex w-8 h-8 rounded-lg items-center justify-center font-bold ${v.cls}`}>
                             {v.text(c)}
@@ -194,12 +212,14 @@ function PaperForm({
   studentId,
   assignmentId,
   onSave,
+  onNotSubmitted,
   onClose,
 }: {
   gb: Gradebook
   studentId: string
   assignmentId: string
   onSave: (body: { score: number | null; late: boolean; comment: string }, goNext: boolean) => Promise<void>
+  onNotSubmitted: (closed: boolean, goNext: boolean) => Promise<void>
   onClose: () => void
 }) {
   const a = gb.assignments.find((x) => x.id === assignmentId)!
@@ -264,6 +284,23 @@ function PaperForm({
         </div>
       </form>
       {bad && <p className="text-xs text-red-600">คะแนนต้องอยู่ระหว่าง 0–{a.maxScore}</p>}
+      <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2">
+        {st.cells[assignmentId].closed ? (
+          <>
+            <span className="text-sm font-semibold text-stone-700">🚫 บันทึกแล้วว่าไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)</span>
+            <Button type="button" variant="ghost" disabled={busy} onClick={() => void onNotSubmitted(false, false)}>
+              ยกเลิก “ไม่ส่งงาน”
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" variant="danger" disabled={busy} onClick={() => void onNotSubmitted(true, true)}>
+              🚫 ไม่ส่งงาน
+            </Button>
+            <span className="text-xs text-stone-500">ปิดรับงานนี้ของคนนี้: ส่งไม่ได้อีก · ไม่ได้ EXP · คะแนน 0 (แทนการขึ้นว่า “ส่งสาย”) · ยกเลิกได้</span>
+          </>
+        )}
+      </div>
       <p className="text-xs text-stone-500">ไม่ใส่คะแนน = บันทึกว่าส่งแล้ว รอตรวจ (แตะช่องเพื่อให้คะแนนทีหลัง) · ส่งตรงเวลาได้ EXP เต็ม ส่งช้าได้ครึ่ง (เมื่อให้คะแนน) · Enter = บันทึกแล้วไปคนถัดไปที่ยังไม่ส่ง</p>
     </Card>
   )

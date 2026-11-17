@@ -107,9 +107,28 @@ export const makeupInputSchema = z
       .refine((u) => u === '' || /^https:\/\/[^\s]+$/.test(u), 'ลิงก์ต้องขึ้นต้นด้วย https://')
       .default(''),
     notifyStudents: z.boolean().default(false),
+    /** แทนคาบของวันที่ (ไม่บังคับ) · หมายเหตุ · จำนวนคาบ (ไม่ใส่ = คิดจากเวลา 50 นาที/คาบ) */
+    forDate: dateSchema.nullable().default(null),
+    note: z.string().trim().max(200).default(''),
+    periods: z.number().int().min(1).max(12).nullable().default(null),
   })
   .refine((x) => x.start < x.end, { message: 'เวลาจบต้องหลังเวลาเริ่ม' })
 export type MakeupInput = z.infer<typeof makeupInputSchema>
+export type MakeupItem = {
+  id: string
+  classId: string
+  className: string
+  schoolName: string
+  date: string
+  start: string
+  end: string
+  periods: number
+  mode: MakeupMode
+  meetUrl: string | null
+  forDate: string | null
+  note: string
+  closure: { reason: ClosureReason; note: string } | null
+}
 export type MakeupSummary = {
   closures: {
     id: string

@@ -39,6 +39,8 @@ export type StudentAssignment = {
   maxScore: number
   submitMode: SubmitMode
   status: StudentStatus
+  /** ครูบันทึกว่าไม่ส่งงาน (ปิดรับ ส่งไม่ได้อีก · ไม่ได้ EXP) */
+  closed: boolean
   submission: { text: string; imageKeys: string[]; annotatedKeys: string[]; score: number | null; comment: string; submittedAt: number; imagesPurged: boolean; onPaper: boolean; excusedLate: boolean } | null
 }
 
@@ -49,7 +51,7 @@ export const submissionInputSchema = z.object({
 })
 export type SubmissionInput = z.infer<typeof submissionInputSchema>
 
-export type GradebookCell = { status: StudentStatus; score: number | null; submissionId: string | null; onPaper?: boolean }
+export type GradebookCell = { status: StudentStatus; score: number | null; submissionId: string | null; onPaper?: boolean; closed?: boolean }
 export type Gradebook = {
   class: { id: string; name: string }
   assignments: { id: string; title: string; dueAt: number | null; maxScore: number; published?: boolean; publishAt?: number | null }[]
@@ -59,7 +61,7 @@ export type Gradebook = {
 /** ข้อความรายชื่อคนยังไม่ส่ง (รวมคนที่ครูส่งกลับให้แก้) สำหรับวางในกลุ่มแชตของห้อง */
 export function missingText(gb: Gradebook, assignmentId: string): string {
   const a = gb.assignments.find((x) => x.id === assignmentId)
-  const pending = gb.students.filter((s) => ['missing', 'returned'].includes(s.cells[assignmentId]?.status ?? 'missing'))
+  const pending = gb.students.filter((s) => ['missing', 'returned'].includes(s.cells[assignmentId]?.status ?? 'missing') && !s.cells[assignmentId]?.closed)
   const lines = pending.map(
     (s, i) =>
       `${i + 1}. ${s.title ?? ''}${s.firstName} ${s.lastName} (${s.zipgradeId})${s.cells[assignmentId]?.status === 'returned' ? ' — ครูส่งกลับให้แก้' : ''}`,

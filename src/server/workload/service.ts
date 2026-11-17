@@ -9,6 +9,7 @@ import {
   type Appointment,
   type AppointmentInput,
   type MakeupInput,
+  type MakeupItem,
   type MakeupMode,
   type MakeupSummary,
   type Closure,
@@ -152,7 +153,7 @@ function planDay(ctx: Ctx, date: string, paused: boolean): DayPlan {
         nav: online ? (m.meetUrl ?? '') : navUrl({ lat: sch?.lat ?? null, lng: sch?.lng ?? null, name: sch?.name ?? '' }),
         countPeriods: sch?.countPeriods ?? true,
         countTrips: online ? false : (sch?.countTrips ?? true),
-        makeup: { id: m.id, mode: m.mode as MakeupMode, meetUrl: m.meetUrl, forDate: cl ? cl.fromDate : null, reason: cl ? (cl.reason as ClosureReason) : null, note: cl?.note ?? '' },
+        makeup: { id: m.id, mode: m.mode as MakeupMode, meetUrl: m.meetUrl, forDate: m.forDate ?? (cl ? cl.fromDate : null), reason: cl ? (cl.reason as ClosureReason) : null, note: m.note || (cl?.note ?? '') },
       })
       continue
     }
@@ -417,12 +418,42 @@ export async function createMakeups(db: Db, input: MakeupInput, t: number): Prom
       end: input.end,
       mode: input.mode,
       meetUrl: input.mode === 'online' ? input.meetUrl || null : null,
+      forDate: input.forDate,
+      note: input.note,
+      periods: input.periods,
       announcementId: annIds[i] ?? null,
       createdAt: t,
     })
     out.push(id)
   }
   return out
+}
+
+/** คาบสอนชดเชยตั้งแต่วันที่ from (ย้อนหลังและล่วงหน้า) */
+export async function listMakeups(db: Db, from: string): Promise<MakeupItem[]> {
+  const rows = await db
+    .select({ m: makeupClasses, className: classes.name, schoolName: schools.name, cReason: schoolClosures.reason, cNote: schoolClosures.note })
+    .from(makeupClasses)
+    .innerJoin(classes, eq(classes.id, makeupClasses.classId))
+    .innerJoin(schools, eq(schools.id, classes.schoolId))
+    .leftJoin(schoolClosures, eq(schoolClosures.id, makeupClasses.closureId))
+    .where(and(gte(makeupClasses.date, from), eq(classes.archived, false)))
+    .orderBy(makeupClasses.date, makeupClasses.start)
+  return rows.map(({ m, className, schoolName, cReason, cNote }) => ({
+    id: m.id,
+    classId: m.classId,
+    className,
+    schoolName,
+    date: m.date,
+    start: m.start,
+    end: m.end,
+    periods: slotPeriods(m),
+    mode: m.mode as MakeupMode,
+    meetUrl: m.meetUrl,
+    forDate: m.forDate,
+    note: m.note,
+    closure: cReason ? { reason: cReason as ClosureReason, note: cNote ?? '' } : null,
+  }))
 }
 
 export async function deleteMakeup(db: Db, id: string): Promise<void> {

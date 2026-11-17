@@ -10,6 +10,7 @@ import {
   createAppointment,
   createMakeups,
   deleteMakeup,
+  listMakeups,
   makeupSummary,
   setMakeupNeeded,
   createClosure,
@@ -87,6 +88,7 @@ teacherWorkloadRoutes.put('/closures/:id/makeup', async (c) => {
   await setMakeupNeeded(getDb(c.env), c.req.param('id'), needed)
   return c.json({ ok: true })
 })
+teacherWorkloadRoutes.get('/makeups', async (c) => c.json(await listMakeups(getDb(c.env), date(c.req.query('from'), todayBangkok(now() - 60 * 86400_000)))))
 teacherWorkloadRoutes.post('/makeups', async (c) => c.json({ ids: await createMakeups(getDb(c.env), await parseBody(c, makeupInputSchema), now()) }))
 teacherWorkloadRoutes.delete('/makeups/:id', async (c) => {
   await deleteMakeup(getDb(c.env), c.req.param('id'))

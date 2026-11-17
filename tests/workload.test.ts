@@ -280,3 +280,28 @@ describe('ห้องที่เก็บถาวรแล้ว', () => {
     expect(tg.schools.map((s: { name: string }) => s.name)).toEqual(['บำรุงอิสลาม'])
   })
 })
+
+describe('เพิ่มคาบสอนชดเชยเอง (ไม่ต้องมีวันปิด)', () => {
+  it('ย้อนหลัง/ล่วงหน้า · แทนคาบวันที่ + หมายเหตุ · กำหนดจำนวนคาบเอง · นับในยอด · ผูกกับวันปิดที่มีอยู่ได้', async () => {
+    const { cookie, a, a2 } = await setup()
+    const add = (body: Record<string, unknown>) => postJson('/api/teacher/makeups', { closureId: null, mode: 'onsite', ...body }, { cookie })
+    expect((await add({ classIds: [a.classId], date: '2030-01-05', start: '09:00', end: '10:40', forDate: '2030-01-03', note: 'ครูไปอบรม', periods: 3 })).status).toBe(200)
+    expect((await add({ classIds: [a2], date: '2030-01-19', start: '19:00', end: '19:50', mode: 'online', meetUrl: 'https://meet.google.com/x' })).status).toBe(200)
+    expect((await add({ classIds: [a.classId], date: '2030-01-05', start: '09:00', end: '10:40', periods: 20 })).status).toBe(400)
+
+    const list = await json(await getJson('/api/teacher/makeups?from=2030-01-01', cookie))
+    expect(list.map((m: { className: string; date: string; periods: number; forDate: string | null; note: string; mode: string }) => [m.className, m.date, m.periods, m.forDate, m.note, m.mode])).toEqual([
+      ['ดรุณ ชั้น 5', '2030-01-05', 3, '2030-01-03', 'ครูไปอบรม', 'onsite'],
+      ['ดรุณ ชั้น 1', '2030-01-19', 1, null, '', 'online'],
+    ])
+    const w = await json(await getJson('/api/teacher/workload?from=2030-01-05&to=2030-01-05', cookie))
+    expect(w.days[0]).toMatchObject({ periods: 3, trips: 1 })
+    expect(w.days[0].stops[0].makeup).toMatchObject({ forDate: '2030-01-03', note: 'ครูไปอบรม' })
+
+    // ผูกกับวันปิดที่มีอยู่ → นับในตารางคาบชดเชย
+    const { id: cid } = await json(await postJson('/api/teacher/closures', { schoolId: a.schoolId, from: '2030-01-07', to: '2030-01-07', reason: 'exam', note: '' }, { cookie }))
+    await add({ closureId: cid, classIds: [a.classId], date: '2030-01-12', start: '09:00', end: '10:40' })
+    const sum = await json(await getJson('/api/teacher/workload/makeup?from=2030-01-01&to=2030-01-31', cookie))
+    expect(sum.closures[0].classes.find((c: { name: string }) => c.name === 'ดรุณ ชั้น 5')).toMatchObject({ closed: 2, madeUp: 2 })
+  })
+})

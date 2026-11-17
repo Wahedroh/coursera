@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { Hono } from 'hono'
 import { assignmentInputSchema, createAssignmentsSchema, gradeInputSchema, onTimeSchema, paperInputSchema, returnInputSchema } from '../../shared/assignments'
 import { requireTeacher } from '../auth/middleware'
@@ -9,7 +10,7 @@ import { resolvePublish } from '../timetable/service'
 import { invalidateRelease } from '../timetable/release'
 import { enqueue, enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
-import {
+import { setNotSubmitted,
   createAssignments,
   deleteAssignment,
   getAssignment,
@@ -70,6 +71,11 @@ teacherAssignmentRoutes.post('/submissions/:id/return', async (c) => {
   return c.json({ ok: true })
 })
 
+teacherAssignmentRoutes.put('/assignments/:id/not-submitted/:studentId', async (c) => {
+  const { closed } = await parseBody(c, z.object({ closed: z.boolean() }))
+  await setNotSubmitted(getDb(c.env), c.req.param('id'), c.req.param('studentId'), closed, now())
+  return c.json({ ok: true })
+})
 teacherAssignmentRoutes.put('/assignments/:id/paper/:studentId', async (c) =>
   c.json(await recordPaper(getDb(c.env), c.req.param('id'), c.req.param('studentId'), await parseBody(c, paperInputSchema), now())),
 )

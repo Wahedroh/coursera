@@ -81,7 +81,8 @@ export default function StudentSubmit() {
   }
 
   if (!a) return error ? <ErrorBox message={error} /> : <Loading />
-  const graded = a.status === 'graded'
+  // ครูบันทึกว่าไม่ส่งงาน = ปิดรับ ส่งไม่ได้ (ล็อกเหมือนตรวจแล้ว)
+  const graded = a.status === 'graded' || a.closed
   const uploading = images.some((x) => !x.key && !x.error)
   const failed = images.some((x) => x.error)
 
@@ -118,7 +119,13 @@ export default function StudentSubmit() {
           ))}
         </Card>
       )}
-      {a.status === 'returned' && (
+      {a.closed && (
+        <Card className="p-4 bg-stone-100 border-stone-300" data-testid="closed-notice">
+          <p className="text-sm font-semibold text-stone-800">🚫 ครูบันทึกว่าไม่ส่งงานนี้ — ปิดรับแล้ว ส่งไม่ได้</p>
+          <p className="text-xs text-stone-600">ได้ 0 คะแนน และไม่ได้ EXP · ถ้ามีเหตุจำเป็น ติดต่อครู</p>
+        </Card>
+      )}
+      {a.status === 'returned' && !a.closed && (
         <Card className="p-4 bg-violet-50 border-violet-200">
           <p className="text-sm font-semibold text-violet-700">ครูส่งกลับให้แก้</p>
           {a.submission?.comment && <p className="text-sm text-violet-700">“{a.submission.comment}”</p>}

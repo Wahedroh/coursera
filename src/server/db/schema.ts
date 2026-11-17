@@ -575,6 +575,9 @@ export const makeupClasses = sqliteTable(
     periods: integer('periods'),
     mode: text('mode').$type<'onsite' | 'online'>().notNull(),
     meetUrl: text('meet_url'),
+    /** แทนคาบของวันที่ (ไม่ผูกกับวันปิดโรงเรียนก็ได้) และหมายเหตุ */
+    forDate: text('for_date'),
+    note: text('note').notNull().default(''),
     announcementId: text('announcement_id'),
     createdAt: integer('created_at').notNull(),
   },
@@ -603,4 +606,19 @@ export const videoProgress = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [uniqueIndex('video_progress_unique').on(t.videoId, t.studentId), index('video_progress_student_idx').on(t.studentId)],
+)
+
+/** ครูบันทึกว่านักเรียน "ไม่ส่งงาน" ชิ้นนี้: ปิดรับ (ส่งไม่ได้อีก) · ไม่ได้ EXP · คะแนน 0 */
+export const assignmentClosed = sqliteTable(
+  'assignment_closed',
+  {
+    assignmentId: text('assignment_id')
+      .notNull()
+      .references(() => assignments.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('assignment_closed_unique').on(t.assignmentId, t.studentId), index('assignment_closed_student_idx').on(t.studentId)],
 )
