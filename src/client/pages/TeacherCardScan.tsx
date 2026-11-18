@@ -5,6 +5,7 @@ import { Countdown, GameControls, useCardGame, useCountdown } from '../component
 import { loadReader, scanImage, type CardScan } from '../lib/cardScanner'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 /** มือถือครู: เปิดกล้องหลัง ส่องไปทั่วห้อง อ่านการ์ดทุกใบในภาพ แล้วส่งคำตอบขึ้นระบบเป็นชุด ๆ */
 export default function TeacherCardScan() {
@@ -173,7 +174,7 @@ export default function TeacherCardScan() {
             </span>
             <b className="text-lg" data-testid="scan-status">
               ข้อ {state.current + 1}/{state.questions.length} · ตอบแล้ว {done.size}/{state.roster.length}
-              {state.devices.length > 0 && <span className="font-normal text-sm"> (📱 ในเครื่อง {state.devices.length})</span>}
+              {state.devices.length > 0 && <span className="font-normal text-sm"> (<Icon n="phone" /> ในเครื่อง {state.devices.length})</span>}
             </b>
             <p className="text-xs opacity-85">{state.revealed ? 'เฉลยแล้ว — กด "ข้อถัดไป" เพื่อสแกนข้อต่อไป' : left === 0 ? 'หมดเวลา — ไม่รับคำตอบเพิ่ม' : 'ส่องกล้องไปทั่วห้องช้า ๆ · ใครสแกนแล้วขึ้นกรอบเขียว'}</p>
           </>
@@ -193,7 +194,7 @@ export default function TeacherCardScan() {
           </p>
         )}
         {unknown.length > 0 && <p className="text-xs text-red-700">พบการ์ดที่ไม่ใช่ของห้องนี้: {unknown.join(', ')}</p>}
-        <p className="text-xs text-stone-500">ระยะสแกนประมาณ 3–5 เมตร (การ์ดใหญ่ไกลขึ้น) · แสงสว่างช่วยให้อ่านเร็ว · นักเรียนเปลี่ยนคำตอบได้จนกว่าครูกดเฉลย · คนที่ตอบในเครื่องตัวเองแล้ว (📱) สแกนการ์ดซ้ำไม่ทับคำตอบ</p>
+        <p className="text-xs text-stone-500">ระยะสแกนประมาณ 3–5 เมตร (การ์ดใหญ่ไกลขึ้น) · แสงสว่างช่วยให้อ่านเร็ว · นักเรียนเปลี่ยนคำตอบได้จนกว่าครูกดเฉลย · คนที่ตอบในเครื่องตัวเองแล้ว (<Icon n="phone" />) สแกนการ์ดซ้ำไม่ทับคำตอบ</p>
       </section>
     </main>
   )

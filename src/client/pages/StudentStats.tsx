@@ -4,6 +4,7 @@ import { api, ApiClientError } from '../api'
 import { formatDate } from '../lib/format'
 import type { StudentStats as Stats } from '../../shared/stats'
 import { Button, Card, ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 const pinInput = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white text-center text-xl tracking-[0.5em]'
 
@@ -30,7 +31,7 @@ export default function StudentStats() {
         <Link to="/me" className="text-sm opacity-85">
           ← งานของฉัน
         </Link>
-        <h1 className="text-xl font-extrabold mt-2">📈 สถิติของฉัน</h1>
+        <h1 className="text-xl font-extrabold mt-2"><Icon n="trend" /> สถิติของฉัน</h1>
       </header>
       <section className="p-5 flex flex-col gap-3">
         <ErrorBox message={error} />
@@ -129,7 +130,7 @@ function ChangePin() {
   return (
     <Card className="p-3 flex flex-col gap-2">
       <button type="button" className="flex justify-between items-center font-bold text-sm" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span>🔒 เปลี่ยน PIN</span>
+        <span><Icon n="lock" /> เปลี่ยน PIN</span>
         <span className="text-stone-400">{open ? '▲' : '▼'}</span>
       </button>
       {open && (

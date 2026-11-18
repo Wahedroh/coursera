@@ -7,6 +7,7 @@ import { todayBangkok } from '../../shared/attendance'
 import type { CalendarItem } from '../../shared/calendar'
 import { downloadIcs } from '../lib/ics'
 import { Card, ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 export default function StudentCalendar() {
   const navigate = useNavigate()
@@ -30,7 +31,7 @@ export default function StudentCalendar() {
         <Link to="/me" className="text-sm opacity-85">
           ← งานของฉัน
         </Link>
-        <h1 className="text-xl font-extrabold mt-2">📅 ปฏิทิน</h1>
+        <h1 className="text-xl font-extrabold mt-2"><Icon n="calendar" /> ปฏิทิน</h1>
         <p className="text-sm opacity-85">กำหนดส่งงาน วันสอบ และกิจกรรมของห้อง</p>
       </header>
       <section className="p-5 flex flex-col gap-4">
@@ -66,7 +67,7 @@ export default function StudentCalendar() {
                 className="self-center text-sm rounded-xl border-2 border-line bg-white px-3 py-1.5 font-semibold"
                 onClick={() => downloadIcs(items.filter((x) => x.date >= today), 'ห้องเรียน Change', `ปฏิทิน-${month}.ics`)}
               >
-                ➕ เพิ่มลงปฏิทินในมือถือ (.ics)
+                <Icon n="plus" /> เพิ่มลงปฏิทินในมือถือ (.ics)
               </button>
             )}
           </>

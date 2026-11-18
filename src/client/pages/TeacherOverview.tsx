@@ -6,6 +6,7 @@ import type { Overview, OverviewItem } from '../../shared/overview'
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null; studentCount: number }[] }
 
@@ -60,7 +61,7 @@ export default function TeacherOverview() {
         </div>
         {menu.all && (
           <Link to={menu.all.to} className="rounded-2xl bg-board text-white px-4 py-2 font-bold">
-            {menu.all.label}
+            {menu.all.icon && <Icon n={menu.all.icon} />} {menu.all.label}
           </Link>
         )}
       </div>

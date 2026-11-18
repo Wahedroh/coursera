@@ -7,6 +7,7 @@ import { LETTERS, type CardGameResult } from '../../shared/cardgame'
 import { fileUrl } from '../lib/upload'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 /** จอหน้าห้อง: คำถาม · ใครตอบแล้ว (ไม่บอกคำตอบจนกว่าเฉลย) · กราฟคำตอบ · ผลเกม */
 export default function TeacherCardGameScreen() {
@@ -52,7 +53,7 @@ export default function TeacherCardGameScreen() {
             ← เกมการ์ด
           </Link>
           <h1 className="text-2xl font-extrabold">
-            🃏 {state.quizTitle} · {state.class.name}
+            <Icon n="cards" /> {state.quizTitle} · {state.class.name}
           </h1>
         </div>
         {!state.ended && (
@@ -66,7 +67,7 @@ export default function TeacherCardGameScreen() {
               {onDevice.size > 0 && (
                 <span className="opacity-80 text-base" data-testid="device-count">
                   {' '}
-                  (📱 {onDevice.size} · 🃏 {answered.length - onDevice.size})
+                  (<Icon n="phone" /> {onDevice.size} · <Icon n="cards" /> {answered.length - onDevice.size})
                 </span>
               )}
             </span>
@@ -75,7 +76,7 @@ export default function TeacherCardGameScreen() {
                 <rect width={qr.n} height={qr.n} fill="#fff" />
                 <path d={qr.d} fill="#000" />
               </svg>
-              📷 มือถือครู
+              <Icon n="camera" /> มือถือครู
               <br />
               สแกนเพื่อเปิดกล้อง
             </Link>
@@ -140,13 +141,13 @@ export default function TeacherCardGameScreen() {
               <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }} data-testid="answered-grid">
                 {state.roster.map((r) => (
                   <div key={r.id} title={r.name} className={`h-11 rounded-lg px-2 flex items-center justify-center gap-1 font-bold text-sm truncate ${onDevice.has(r.id) ? 'bg-sky-300 text-sky-950' : state.answers[r.id] !== undefined ? 'bg-green-400 text-green-950' : 'bg-white/10 text-white/60'}`}>
-                    {onDevice.has(r.id) ? '📱 ' : state.answers[r.id] !== undefined && '✓ '}
+                    {onDevice.has(r.id) ? <><Icon n="phone" />{' '}</> : state.answers[r.id] !== undefined && '✓ '}
                     {r.name.split(' ')[0]} <span className="font-normal opacity-80">({r.zipgradeId})</span>
                   </div>
                 ))}
               </div>
-              <p className="text-sm opacity-75 mt-2">เขียว ✓ = ครูสแกนการ์ดแล้ว · ฟ้า 📱 = ตอบในเครื่องตัวเอง · ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย</p>
-              <p className="mt-2 inline-block rounded-xl bg-white text-stone-900 px-3 py-1.5 text-sm font-bold">📱 มีมือถือ/iPad? เปิดแอป → แตะแบนเนอร์ 🃏 · ไม่มี → ชูการ์ด QR</p>
+              <p className="text-sm opacity-75 mt-2">เขียว ✓ = ครูสแกนการ์ดแล้ว · ฟ้า <Icon n="phone" /> = ตอบในเครื่องตัวเอง · ยังไม่แสดงว่าตอบอะไรจนกว่าจะเฉลย</p>
+              <p className="mt-2 inline-block rounded-xl bg-white text-stone-900 px-3 py-1.5 text-sm font-bold"><Icon n="phone" /> มีมือถือ/iPad? เปิดแอป → แตะแบนเนอร์ <Icon n="cards" /> · ไม่มี → ชูการ์ด QR</p>
             </div>
           )}
           <GameControls state={state} reload={reload} onError={onError} onEnded={setResult} />

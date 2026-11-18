@@ -22,3 +22,7 @@ npm run deploy            # build + deploy
 ```
 
 > ไฟล์ CSV รายชื่อนักเรียนเป็นข้อมูลส่วนบุคคล ห้าม commit ลง git (`.gitignore` กันไว้แล้ว)
+
+## เครดิต
+
+ไอคอนโดย [IconSaga](https://iconsaga.com) · iconsaga.com (ไลเซนส์ฟรี ต้องใส่เครดิต) — `src/client/icons.ts` มีเฉพาะไอคอนที่แอปนี้ใช้ ไม่ใช่ชุดไอคอนสำหรับนำไปใช้ต่อ

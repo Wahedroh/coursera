@@ -10,6 +10,7 @@ import CopyButton from '../components/CopyDialog'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
@@ -218,7 +219,7 @@ function ViewerList({ videoId }: { videoId: string }) {
       </p>
       {d.quiz && (
         <div className="mb-3 rounded-lg bg-white border border-line p-2.5 text-sm" data-testid="video-quiz-summary">
-          <b>📝 คำถามท้ายคลิป</b> · ตอบแล้ว <b>{d.quiz.answered}</b> คน · ถูกครบ {d.quiz.total} ข้อ <b>{d.quiz.passed}</b> คน
+          <b><Icon n="task" /> คำถามท้ายคลิป</b> · ตอบแล้ว <b>{d.quiz.answered}</b> คน · ถูกครบ {d.quiz.total} ข้อ <b>{d.quiz.passed}</b> คน
           <ul className="flex flex-col gap-1.5 pt-1.5">
             {d.quiz.questions.map((q, i) => {
               const pct = q.answered ? Math.round((q.correct / q.answered) * 100) : 0
@@ -273,7 +274,7 @@ function ViewerList({ videoId }: { videoId: string }) {
                   className={`rounded-full px-1.5 text-[11px] font-bold whitespace-nowrap ${x.quiz.best === d.quiz.total ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}
                   title={`ตอบ ${x.quiz.attempts} ครั้ง · ถูกมากสุด ${x.quiz.best}/${d.quiz.total} · ครั้งล่าสุด ${x.quiz.last}/${d.quiz.total}`}
                 >
-                  📝 {x.quiz.best}/{d.quiz.total}
+                  <Icon n="task" /> {x.quiz.best}/{d.quiz.total}
                   {x.quiz.attempts > 1 ? ` · ${x.quiz.attempts} ครั้ง` : ''}
                 </span>
               )}
@@ -283,7 +284,7 @@ function ViewerList({ videoId }: { videoId: string }) {
         })}
       </ul>
       <p className="text-xs text-stone-500 pt-2">
-        เปอร์เซ็นต์ = ส่วนของคลิปที่ดูจริงสูงสุดในครั้งเดียว (ไม่นับช่วงที่กดข้าม) · ⭐ = ได้ EXP แล้ว (ดูถึง {goal}%{' '}และตอบคำถามถูก ถ้ามี){d.quiz ? ' · 📝 = ข้อที่ตอบถูกมากสุด · จำนวนครั้งที่ตอบ' : ''}
+        เปอร์เซ็นต์ = ส่วนของคลิปที่ดูจริงสูงสุดในครั้งเดียว (ไม่นับช่วงที่กดข้าม) · ⭐ = ได้ EXP แล้ว (ดูถึง {goal}%{' '}และตอบคำถามถูก ถ้ามี){d.quiz && <> · <Icon n="task" /> = ข้อที่ตอบถูกมากสุด · จำนวนครั้งที่ตอบ</>}
       </p>
     </div>
   )

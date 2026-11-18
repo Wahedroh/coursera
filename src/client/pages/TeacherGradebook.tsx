@@ -8,6 +8,7 @@ import { formatDue } from '../lib/format'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const CLOSED = { cls: 'bg-stone-300 text-stone-700', text: () => '✕', label: 'ไม่ส่ง (ปิดรับ)' }
 const CELL: Record<GradebookCell['status'], { cls: string; text: (c: GradebookCell) => string; label: string }> = {
@@ -43,7 +44,7 @@ export default function TeacherGradebook() {
     const st = gb.students.find((s) => s.id === paper.studentId)
     try {
       await api(`/api/teacher/assignments/${paper.assignmentId}/paper/${paper.studentId}`, { method: 'PUT', body })
-      setFlash(`📄 บันทึกส่งกระดาษ: ${st?.firstName} ${st?.lastName}${body.score !== null ? ` · ${body.score} คะแนน` : ' · รอให้คะแนน'}`)
+      setFlash(`บันทึกส่งกระดาษ: ${st?.firstName} ${st?.lastName}${body.score !== null ? ` · ${body.score} คะแนน` : ' · รอให้คะแนน'}`)
       setError(null)
       const next = goNext ? nextPending(gb, paper.assignmentId, paper.studentId) : undefined
       setPaper(next ? { studentId: next.id, assignmentId: paper.assignmentId } : null)
@@ -59,7 +60,7 @@ export default function TeacherGradebook() {
     const st = gb.students.find((s) => s.id === paper.studentId)
     try {
       await api(`/api/teacher/assignments/${paper.assignmentId}/not-submitted/${paper.studentId}`, { method: 'PUT', body: { closed } })
-      setFlash(closed ? `🚫 ${st?.firstName} ${st?.lastName}: ไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)` : `ยกเลิก “ไม่ส่งงาน” ของ ${st?.firstName} ${st?.lastName} แล้ว — ส่งได้อีกครั้ง`)
+      setFlash(closed ? `${st?.firstName} ${st?.lastName}: ไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)` : `ยกเลิก “ไม่ส่งงาน” ของ ${st?.firstName} ${st?.lastName} แล้ว — ส่งได้อีกครั้ง`)
       setError(null)
       const next = goNext ? nextPending(gb, paper.assignmentId, paper.studentId) : undefined
       setPaper(next ? { studentId: next.id, assignmentId: paper.assignmentId } : null)
@@ -103,7 +104,7 @@ export default function TeacherGradebook() {
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={exportAll} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-                ⬇ Excel
+                <Icon n="download" /> Excel
               </button>
               <Link to={`/teacher/assignments/new?classId=${id}`} className="rounded-2xl bg-board text-white px-4 py-2 font-bold">
                 + สร้างงาน
@@ -121,7 +122,7 @@ export default function TeacherGradebook() {
               onClose={() => setPaper(null)}
             />
           )}
-          <p className="text-xs text-stone-500">นักเรียนส่งเป็นกระดาษ? แตะช่อง <b>–</b> (ยังไม่ส่ง) เพื่อบันทึกว่าส่งแล้วและให้คะแนนได้เลย · 📄 = ส่งกระดาษ</p>
+          <p className="text-xs text-stone-500">นักเรียนส่งเป็นกระดาษ? แตะช่อง <b>–</b> (ยังไม่ส่ง) เพื่อบันทึกว่าส่งแล้วและให้คะแนนได้เลย · <Icon n="doc" /> = ส่งกระดาษ</p>
           <div className="flex flex-wrap gap-3 text-xs">
             {Object.entries({ ...CELL, closed: CLOSED }).map(([k, v]) => (
               <span key={k} className="flex items-center gap-1">
@@ -146,10 +147,10 @@ export default function TeacherGradebook() {
                         </Link>
                         <span className="block font-normal">{formatDue(a.dueAt).replace('กำหนดส่ง ', '')}</span>
                         {a.published === false && (
-                          <span className="block font-normal text-violet-700">{a.publishAt ? `⏰ เผยแพร่ ${formatDue(a.publishAt).replace('กำหนดส่ง ', '')}` : 'ร่าง (นักเรียนยังไม่เห็น)'}</span>
+                          <span className="block font-normal text-violet-700">{a.publishAt ? <><Icon n="alarm" /> เผยแพร่ {formatDue(a.publishAt).replace('กำหนดส่ง ', '')}</> : 'ร่าง (นักเรียนยังไม่เห็น)'}</span>
                         )}
                         <button type="button" onClick={() => copyMissing(a.id)} className="mt-1 rounded-md border border-line px-1.5 py-0.5 font-normal" aria-label={`คัดลอกรายชื่อคนยังไม่ส่ง ${a.title}`}>
-                          📋 ยังไม่ส่ง
+                          <Icon n="clipboard" /> ยังไม่ส่ง
                         </button>
                       </th>
                     ))}
@@ -169,7 +170,7 @@ export default function TeacherGradebook() {
                         const box = (
                           <span className={`relative inline-flex w-8 h-8 rounded-lg items-center justify-center font-bold ${v.cls}`}>
                             {v.text(c)}
-                            {c.onPaper && <span className="absolute -top-1.5 -right-1.5 text-[10px]" aria-hidden>📄</span>}
+                            {c.onPaper && <span className="absolute -top-1.5 -right-1.5 text-[10px]" aria-hidden><Icon n="doc" /></span>}
                           </span>
                         )
                         const pending = c.status === 'missing' || c.status === 'returned'
@@ -239,7 +240,7 @@ function PaperForm({
     <Card className="p-4 flex flex-col gap-3 border-board">
       <div className="flex justify-between gap-2">
         <div>
-          <p className="font-bold">📄 บันทึกส่งงานแบบกระดาษ</p>
+          <p className="font-bold"><Icon n="doc" /> บันทึกส่งงานแบบกระดาษ</p>
           <p className="text-sm text-stone-600">
             {st.firstName} {st.lastName} ({st.zipgradeId}) · {a.title}
           </p>
@@ -287,7 +288,7 @@ function PaperForm({
       <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-2">
         {st.cells[assignmentId].closed ? (
           <>
-            <span className="text-sm font-semibold text-stone-700">🚫 บันทึกแล้วว่าไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)</span>
+            <span className="text-sm font-semibold text-stone-700"><Icon n="blocked" /> บันทึกแล้วว่าไม่ส่งงาน (ปิดรับ · ไม่ได้ EXP)</span>
             <Button type="button" variant="ghost" disabled={busy} onClick={() => void onNotSubmitted(false, false)}>
               ยกเลิก “ไม่ส่งงาน”
             </Button>
@@ -295,7 +296,7 @@ function PaperForm({
         ) : (
           <>
             <Button type="button" variant="danger" disabled={busy} onClick={() => void onNotSubmitted(true, true)}>
-              🚫 ไม่ส่งงาน
+              <Icon n="blocked" /> ไม่ส่งงาน
             </Button>
             <span className="text-xs text-stone-500">ปิดรับงานนี้ของคนนี้: ส่งไม่ได้อีก · ไม่ได้ EXP · คะแนน 0 (แทนการขึ้นว่า “ส่งสาย”) · ยกเลิกได้</span>
           </>

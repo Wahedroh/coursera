@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { canPromptInstall, disablePush, enablePush, isIos, isStandalone, onInstallChange, promptInstall, pushSupported, resyncPush } from '../lib/pwa'
 import { Card } from '../ui'
+import Icon from './Icon'
 
 const HIDE_KEY = 'appSetup:hidden'
 
@@ -35,7 +36,7 @@ export default function AppSetupCard() {
   if (push === 'on' && (standalone || !installable)) {
     return (
       <p className="text-xs text-stone-500 text-center" data-testid="app-setup">
-        🔔 เปิดการแจ้งเตือนแล้ว ·{' '}
+        <Icon n="bell" /> เปิดการแจ้งเตือนแล้ว ·{' '}
         <button
           type="button"
           className="underline"
@@ -70,7 +71,7 @@ export default function AppSetupCard() {
     <div data-testid="app-setup">
       <Card className="p-4 flex flex-col gap-2 bg-board-soft border-green-200">
         <div className="flex justify-between items-start gap-2">
-          <b>📲 ใช้เป็นแอปในมือถือ</b>
+          <b><Icon n="phone" /> ใช้เป็นแอปในมือถือ</b>
           <button
             type="button"
             className="text-xs text-stone-500"
@@ -88,12 +89,12 @@ export default function AppSetupCard() {
         <div className="flex flex-wrap gap-2">
           {!standalone && installable && (
             <button type="button" className={`${btn} bg-board text-white`} onClick={() => void promptInstall()}>
-              📲 ติดตั้งแอป
+              <Icon n="phone" /> ติดตั้งแอป
             </button>
           )}
           {push === 'off' && !needInstallFirst && (
             <button type="button" disabled={busy} className={`${btn} bg-amber-400 text-amber-950`} onClick={() => void turnOn()}>
-              🔔 เปิดการแจ้งเตือน
+              <Icon n="bell" /> เปิดการแจ้งเตือน
             </button>
           )}
         </div>

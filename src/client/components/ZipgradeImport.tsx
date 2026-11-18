@@ -4,6 +4,7 @@ import { canonicalZipgradeId } from '../../shared/zipgrade'
 import { validScore, type ScoreSheet } from '../../shared/scores'
 import { parseZipgradeResults, toItemScore, type ScoreImportResult, type ZipgradeResultsParse } from '../../shared/zipgrade-results'
 import { Button, Card } from '../ui'
+import Icon from './Icon'
 
 /** นำเข้าคะแนนจากไฟล์ผลสอบของ ZipGrade ลงรายการนี้ — ดูตัวอย่างก่อนยืนยัน แล้วแก้รายคนในตารางต่อได้ */
 export default function ZipgradeImport({ sheet, onDone, onError }: { sheet: ScoreSheet; onDone: (msg: string) => void; onError: (e: unknown) => void }) {
@@ -58,7 +59,7 @@ export default function ZipgradeImport({ sheet, onDone, onError }: { sheet: Scor
   if (!open)
     return (
       <button type="button" onClick={() => setOpen(true)} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-        📥 นำเข้าจาก ZipGrade
+        <Icon n="import" /> นำเข้าจาก ZipGrade
       </button>
     )
 
@@ -66,7 +67,7 @@ export default function ZipgradeImport({ sheet, onDone, onError }: { sheet: Scor
     <Card className="p-4 flex flex-col gap-3 basis-full">
       <div className="flex justify-between items-start gap-2">
         <div>
-          <h2 className="font-bold">📥 นำเข้าคะแนนจาก ZipGrade</h2>
+          <h2 className="font-bold"><Icon n="import" /> นำเข้าคะแนนจาก ZipGrade</h2>
           <p className="text-xs text-stone-500">ZipGrade → เลือกแบบทดสอบ → Export → ไฟล์ CSV ผลสอบ · จับคู่นักเรียนด้วย ZipGrade ID</p>
         </div>
         <button type="button" className="text-sm text-stone-500" onClick={() => (setOpen(false), setFile(null))}>

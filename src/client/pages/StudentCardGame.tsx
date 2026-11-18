@@ -4,6 +4,7 @@ import { api, ApiClientError } from '../api'
 import { LETTERS, type StudentCardGame as Game } from '../../shared/cardgame'
 import { fileUrl } from '../lib/upload'
 import { ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 const COLORS = ['bg-red-500', 'bg-blue-500', 'bg-amber-500', 'bg-green-600']
 
@@ -74,18 +75,18 @@ export default function StudentCardGame() {
           <Link to="/me" className="text-xs opacity-80">
             ← หน้าแรก
           </Link>
-          <p className="text-xs opacity-85 truncate">🃏 {g.quizTitle}</p>
+          <p className="text-xs opacity-85 truncate"><Icon n="cards" /> {g.quizTitle}</p>
           <b className="text-lg" data-testid="device-q-no">
             {g.ended ? 'จบเกมแล้ว' : `ข้อ ${g.current + 1} / ${g.total}`}
           </b>
         </div>
-        {!g.ended && (g.revealed ? <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-bold">เฉลยแล้ว</span> : left !== null && <span className={`rounded-full w-12 h-12 flex items-center justify-center text-xl font-extrabold tabular-nums ${left <= 5 ? 'bg-red-500 animate-pulse' : 'bg-amber-400 text-amber-950'}`}>{left || '⏰'}</span>)}
+        {!g.ended && (g.revealed ? <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-bold">เฉลยแล้ว</span> : left !== null && <span className={`rounded-full w-12 h-12 flex items-center justify-center text-xl font-extrabold tabular-nums ${left <= 5 ? 'bg-red-500 animate-pulse' : 'bg-amber-400 text-amber-950'}`}>{left || <Icon n="alarm" />}</span>)}
       </header>
       <section className="p-4 flex flex-col gap-3 flex-1">
         <ErrorBox message={error} />
         {g.ended && g.summary ? (
           <div className="rounded-3xl bg-white border-2 border-line p-6 text-center flex flex-col gap-2" data-testid="device-summary">
-            <span className="text-5xl">{g.summary.answered ? '🎉' : '🃏'}</span>
+            <span className="text-5xl">{g.summary.answered ? '🎉' : <Icon n="cards" />}</span>
             <b className="text-2xl">
               ถูก {g.summary.correct} / {g.total} ข้อ
             </b>

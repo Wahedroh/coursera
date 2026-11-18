@@ -6,6 +6,7 @@ import type { TeacherInbox, TeacherNotifySettings } from '../../shared/teacherNo
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon, { type IconName } from '../components/Icon'
 
 const BASE = '/api/teacher/push'
 const when = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -27,7 +28,7 @@ export default function TeacherNotifications() {
   const [device, setDevice] = useState<'on' | 'off' | 'unsupported'>('off')
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  // ตั้งค่าซ่อนไว้ · เปิดด้วยปุ่ม ⚙️
+  // ตั้งค่าซ่อนไว้ · เปิดด้วยปุ่มตั้งค่า
   const [showSettings, setShowSettings] = useState(false)
 
   const load = useCallback(() => {
@@ -71,11 +72,13 @@ export default function TeacherNotifications() {
     }
   }
 
-  const row = (label: string, desc: string, on: boolean, set: (v: boolean) => void, extra?: React.ReactNode) => (
+  const row = (icon: IconName, label: string, desc: string, on: boolean, set: (v: boolean) => void, extra?: React.ReactNode) => (
     <div className="flex items-center gap-3 border-t border-stone-100 py-2.5">
       <Toggle on={on} onChange={set} label={label} />
       <div className="flex-1 min-w-0">
-        <b className="text-sm">{label}</b>
+        <b className="text-sm">
+          <Icon n={icon} /> {label}
+        </b>
         <div className="text-xs text-stone-500">{desc}</div>
       </div>
       {extra}
@@ -85,9 +88,9 @@ export default function TeacherNotifications() {
   return (
     <TeacherLayout>
       <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-extrabold mr-auto">🔔 แจ้งเตือน</h1>
+        <h1 className="text-2xl font-extrabold mr-auto"><Icon n="bell" /> แจ้งเตือน</h1>
         <button type="button" onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings} className={`rounded-full px-3 py-1 text-sm font-bold ${showSettings ? 'bg-board text-white' : 'bg-board-soft text-board'}`}>
-          ⚙️ {showSettings ? 'ปิดตั้งค่า' : 'ตั้งค่า'}
+          <Icon n="settings" /> {showSettings ? 'ปิดตั้งค่า' : 'ตั้งค่า'}
         </button>
       </div>
       <ErrorBox message={error} />
@@ -116,7 +119,7 @@ export default function TeacherNotifications() {
           {!s && <Loading />}
           {s && (
             <div data-testid="notify-settings">
-              {row('⏰ ก่อนเข้าคาบ', 'จากตารางสอน', s.beforeClass.on, (on) => void save({ ...s, beforeClass: { ...s.beforeClass, on } }),
+              {row('alarm', 'ก่อนเข้าคาบ', 'จากตารางสอน', s.beforeClass.on, (on) => void save({ ...s, beforeClass: { ...s.beforeClass, on } }),
                 <select aria-label="เตือนก่อนเข้าคาบกี่นาที" className={input} value={s.beforeClass.minutes} onChange={(e) => void save({ ...s, beforeClass: { ...s.beforeClass, minutes: Number(e.target.value) } })}>
                   {[5, 10, 15, 30].map((m) => (
                     <option key={m} value={m}>
@@ -125,7 +128,7 @@ export default function TeacherNotifications() {
                   ))}
                 </select>,
               )}
-              {row('📸 ยืนยันการสอน (เซลฟี + พิกัด)', 'เตือนตอนเริ่มคาบ แตะแล้วเปิดลิงก์ยืนยัน · กด “ยืนยันแล้ว” บนการ์ดกำลังสอนเพื่อหยุดเตือน', s.selfie.on, (on) => void save({ ...s, selfie: { ...s.selfie, on } }))}
+              {row('camera', 'ยืนยันการสอน (เซลฟี + พิกัด)', 'เตือนตอนเริ่มคาบ แตะแล้วเปิดลิงก์ยืนยัน · กด “ยืนยันแล้ว” บนการ์ดกำลังสอนเพื่อหยุดเตือน', s.selfie.on, (on) => void save({ ...s, selfie: { ...s.selfie, on } }))}
               {s.selfie.on && (
                 <label className="flex items-center gap-2 pb-2 pl-14 text-xs">
                   ลิงก์
@@ -137,7 +140,7 @@ export default function TeacherNotifications() {
                   />
                 </label>
               )}
-              {row('📋 ลืมเช็กชื่อ', 'หลังจบคาบแล้วยังไม่เปิดเช็กชื่อ', s.missedAttendance.on, (on) => void save({ ...s, missedAttendance: { ...s.missedAttendance, on } }),
+              {row('clipboard', 'ลืมเช็กชื่อ', 'หลังจบคาบแล้วยังไม่เปิดเช็กชื่อ', s.missedAttendance.on, (on) => void save({ ...s, missedAttendance: { ...s.missedAttendance, on } }),
                 <select aria-label="เตือนลืมเช็กชื่อหลังจบคาบกี่นาที" className={input} value={s.missedAttendance.afterMinutes} onChange={(e) => void save({ ...s, missedAttendance: { ...s.missedAttendance, afterMinutes: Number(e.target.value) } })}>
                   {[15, 30, 60].map((m) => (
                     <option key={m} value={m}>
@@ -146,13 +149,13 @@ export default function TeacherNotifications() {
                   ))}
                 </select>,
               )}
-              {row('✅ สรุปงานรอตรวจ', 'วันละครั้ง (ข้ามถ้าไม่มีงานรอ)', s.toGrade.on, (on) => void save({ ...s, toGrade: { ...s.toGrade, on } }),
+              {row('check', 'สรุปงานรอตรวจ', 'วันละครั้ง (ข้ามถ้าไม่มีงานรอ)', s.toGrade.on, (on) => void save({ ...s, toGrade: { ...s.toGrade, on } }),
                 <input type="time" aria-label="เวลาสรุปงานรอตรวจ" className={input} value={s.toGrade.at} onChange={(e) => e.target.value && void save({ ...s, toGrade: { ...s.toGrade, at: e.target.value } })} />,
               )}
-              {row('↩️ นักเรียนส่งแก้แล้ว', 'งานที่ครูส่งกลับให้แก้ ถูกส่งใหม่', s.resubmitted.on, (on) => void save({ ...s, resubmitted: { on } }))}
-              {row('📮 ครบกำหนดแล้วยังค้าง', 'สรุปจำนวนคนค้างเมื่อถึงกำหนดส่ง', s.overdue.on, (on) => void save({ ...s, overdue: { on } }))}
-              {row('📣 เผยแพร่ตามเวลาแล้ว', 'งาน/คลิป/เอกสาร/ประกาศที่ตั้งเวลาไว้ ขึ้นให้นักเรียนแล้ว', s.released.on, (on) => void save({ ...s, released: { on } }))}
-              {row('🌙 ช่วงห้ามรบกวน', 'ไม่ส่งช่วงนี้ เก็บไว้ส่งเมื่อพ้นช่วง', s.quiet.on, (on) => void save({ ...s, quiet: { ...s.quiet, on } }),
+              {row('undo', 'นักเรียนส่งแก้แล้ว', 'งานที่ครูส่งกลับให้แก้ ถูกส่งใหม่', s.resubmitted.on, (on) => void save({ ...s, resubmitted: { on } }))}
+              {row('inbox', 'ครบกำหนดแล้วยังค้าง', 'สรุปจำนวนคนค้างเมื่อถึงกำหนดส่ง', s.overdue.on, (on) => void save({ ...s, overdue: { on } }))}
+              {row('megaphone', 'เผยแพร่ตามเวลาแล้ว', 'งาน/คลิป/เอกสาร/ประกาศที่ตั้งเวลาไว้ ขึ้นให้นักเรียนแล้ว', s.released.on, (on) => void save({ ...s, released: { on } }))}
+              {row('moon', 'ช่วงห้ามรบกวน', 'ไม่ส่งช่วงนี้ เก็บไว้ส่งเมื่อพ้นช่วง', s.quiet.on, (on) => void save({ ...s, quiet: { ...s.quiet, on } }),
                 <span className="flex items-center gap-1 text-xs">
                   <input type="time" aria-label="ห้ามรบกวนตั้งแต่" className={input} value={s.quiet.from} onChange={(e) => e.target.value && void save({ ...s, quiet: { ...s.quiet, from: e.target.value } })} />–
                   <input type="time" aria-label="ห้ามรบกวนถึง" className={input} value={s.quiet.to} onChange={(e) => e.target.value && void save({ ...s, quiet: { ...s.quiet, to: e.target.value } })} />

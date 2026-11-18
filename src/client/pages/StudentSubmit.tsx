@@ -7,6 +7,7 @@ import { resizeImage } from '../lib/image'
 import { fileUrl, uploadImage } from '../lib/upload'
 import { randomId } from '../lib/session'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 const MAX_IMAGES = 10
 type Pending = { id: string; preview: string; key?: string; error?: string }
@@ -108,7 +109,7 @@ export default function StudentSubmit() {
 
       {graded && a.submission && (
         <Card className="p-4 bg-board-soft border-green-200 flex flex-col gap-2">
-          <p className="text-sm text-board font-semibold">ครูตรวจแล้ว{a.submission.onPaper && ' · 📄 ส่งเป็นกระดาษ'}</p>
+          <p className="text-sm text-board font-semibold">ครูตรวจแล้ว{a.submission.onPaper && <> · <Icon n="doc" /> ส่งเป็นกระดาษ</>}</p>
           <p className="text-3xl font-extrabold text-board">
             {a.submission.score}/{a.maxScore}
           </p>
@@ -121,7 +122,7 @@ export default function StudentSubmit() {
       )}
       {a.closed && (
         <Card className="p-4 bg-stone-100 border-stone-300" data-testid="closed-notice">
-          <p className="text-sm font-semibold text-stone-800">🚫 ครูบันทึกว่าไม่ส่งงานนี้ — ปิดรับแล้ว ส่งไม่ได้</p>
+          <p className="text-sm font-semibold text-stone-800"><Icon n="blocked" /> ครูบันทึกว่าไม่ส่งงานนี้ — ปิดรับแล้ว ส่งไม่ได้</p>
           <p className="text-xs text-stone-600">ได้ 0 คะแนน และไม่ได้ EXP · ถ้ามีเหตุจำเป็น ติดต่อครู</p>
         </Card>
       )}
@@ -135,7 +136,7 @@ export default function StudentSubmit() {
         <Card className="p-3 bg-board-soft border-green-200">
           <p className="text-sm font-semibold text-board">
             {a.status === 'late' ? 'ส่งแล้ว (สาย) รอครูตรวจ' : 'ส่งแล้ว รอครูตรวจ'}
-            {a.submission?.onPaper && ' · 📄 ครูบันทึกว่าส่งเป็นกระดาษ'}
+            {a.submission?.onPaper && <> · <Icon n="doc" /> ครูบันทึกว่าส่งเป็นกระดาษ</>}
             {a.submission?.excusedLate && ' · ✓ ครูนับว่าส่งตรงเวลา'}
           </p>
           <p className="text-xs text-stone-500">
@@ -165,7 +166,7 @@ export default function StudentSubmit() {
             {!graded && images.length < MAX_IMAGES && (
               <label className="w-24 h-28 rounded-xl border-2 border-dashed border-line bg-white flex flex-col items-center justify-center text-xs font-semibold text-stone-500 cursor-pointer">
                 <span className="text-2xl" aria-hidden>
-                  📷
+                  <Icon n="camera" />
                 </span>
                 ถ่าย/เลือกรูป
                 <input type="file" accept="image/*" multiple aria-label="เพิ่มรูปงาน" className="sr-only" onChange={(e) => addFiles(e.target.files)} />

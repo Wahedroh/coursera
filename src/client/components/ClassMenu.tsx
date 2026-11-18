@@ -1,3 +1,4 @@
+import type { IconName } from './Icon'
 import { Link } from 'react-router'
 import type { OverviewKind } from '../../shared/overview'
 
@@ -8,7 +9,7 @@ export type MenuEntry = {
   path: (id: string) => string
   primary?: boolean
   /** หน้าที่ดูรวมทุกห้องได้อยู่แล้ว */
-  all?: { label: string; to: string }
+  all?: { label: string; to: string; icon?: IconName }
   /** ข้อความเมื่อห้องยังไม่มีรายการ */
   empty?: string
 }
@@ -19,9 +20,9 @@ export const CLASS_MENU: MenuEntry[] = [
   { label: 'ผังห้อง & แต้ม', kind: 'seating', path: (id) => `/teacher/classes/${id}/seating` },
   { label: 'คะแนนสอบ', kind: 'scores', empty: 'ยังไม่มีรายการสอบเทอมนี้', path: (id) => `/teacher/classes/${id}/scores` },
   { label: 'เกรด', kind: 'grades', path: (id) => `/teacher/classes/${id}/grades` },
-  { label: 'กราฟ', kind: 'insights', all: { label: '📊 เทียบทุกห้อง', to: '/teacher/insights' }, path: (id) => `/teacher/insights?class=${id}` },
-  { label: 'ปฏิทิน', kind: 'calendar', all: { label: '📅 ปฏิทินรวมทุกห้อง', to: '/teacher/calendar' }, empty: 'ไม่มีวันสำคัญที่กำลังจะถึง', path: (id) => `/teacher/calendar?class=${id}` },
-  { label: 'เกมการ์ด', kind: 'card-game', all: { label: '🃏 ชุดคำถาม & เริ่มเกม', to: '/teacher/card-game' }, empty: 'ยังไม่เคยเล่น', path: (id) => `/teacher/card-game?class=${id}` },
+  { label: 'กราฟ', kind: 'insights', all: { icon: 'chart', label: 'เทียบทุกห้อง', to: '/teacher/insights' }, path: (id) => `/teacher/insights?class=${id}` },
+  { label: 'ปฏิทิน', kind: 'calendar', all: { icon: 'calendar', label: 'ปฏิทินรวมทุกห้อง', to: '/teacher/calendar' }, empty: 'ไม่มีวันสำคัญที่กำลังจะถึง', path: (id) => `/teacher/calendar?class=${id}` },
+  { label: 'เกมการ์ด', kind: 'card-game', all: { icon: 'cards', label: 'ชุดคำถาม & เริ่มเกม', to: '/teacher/card-game' }, empty: 'ยังไม่เคยเล่น', path: (id) => `/teacher/card-game?class=${id}` },
   { label: 'วิเคราะห์รายคน', kind: 'analysis', path: (id) => `/teacher/classes/${id}/analysis` },
   { label: 'ใบสรุปผล', kind: 'report-cards', path: (id) => `/teacher/classes/${id}/report-cards` },
   { label: 'คลิปย้อนหลัง', kind: 'videos', empty: 'ยังไม่มีคลิป', path: (id) => `/teacher/classes/${id}/videos` },

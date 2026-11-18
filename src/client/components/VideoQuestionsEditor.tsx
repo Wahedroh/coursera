@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { fileUrl, uploadImage } from '../lib/upload'
 import { resizeImage } from '../lib/image'
 import { MAX_VIDEO_QUESTIONS, type VideoQuestion } from '../../shared/videos'
+import Icon from './Icon'
 
 const input = 'w-full border-2 border-line rounded-xl px-3 py-1.5 bg-white text-sm'
 const LETTERS_TH = ['ก', 'ข', 'ค', 'ง']
@@ -61,7 +62,7 @@ export default function VideoQuestionsEditor({
           </div>
           {allowTimer && (
             <label className="pl-5 flex items-center gap-2 text-xs font-semibold">
-              ⏱️ เวลาตอบ
+              <Icon n="stopwatch" /> เวลาตอบ
               <select aria-label={`เวลาตอบข้อ ${i + 1}`} className="border border-line rounded-lg px-2 py-1 bg-white" value={q.seconds ?? 0} onChange={(e) => set(i, { seconds: Number(e.target.value) || undefined })}>
                 {TIMES.map((t) => (
                   <option key={t} value={t}>
@@ -75,7 +76,7 @@ export default function VideoQuestionsEditor({
             <div className="pl-5 flex flex-wrap items-center gap-2">
               {q.image && <img src={fileUrl(q.image)} alt={`รูปโจทย์ข้อ ${i + 1}`} className="max-h-32 rounded-lg border border-line bg-white" />}
               <label className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold cursor-pointer">
-                {uploading === i ? 'กำลังอัปโหลด…' : q.image ? '🖼️ เปลี่ยนรูป' : '🖼️ ใส่รูปโจทย์'}
+                {uploading === i ? 'กำลังอัปโหลด…' : <><Icon n="image" /> {q.image ? 'เปลี่ยนรูป' : 'ใส่รูปโจทย์'}</>}
                 <input type="file" accept="image/*" className="sr-only" aria-label={`รูปโจทย์ข้อ ${i + 1}`} disabled={uploading !== null} onChange={(e) => void pickImage(i, e.target.files?.[0])} />
               </label>
               {q.image && (

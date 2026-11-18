@@ -5,10 +5,11 @@ import { localToEpoch, epochToLocal } from '../lib/format'
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon, { type IconName } from '../components/Icon'
 
 type Item = { type: 'assignment' | 'video' | 'material' | 'announcement'; id: string; classId: string; title: string; publishAt: number | null; createdAt: number }
 type School = { schoolName: string; classes: { id: string; name: string }[] }
-const TYPE: Record<Item['type'], string> = { assignment: '📝 งาน', video: '🎬 คลิป', material: '📄 เอกสาร', announcement: '📢 ประกาศ' }
+const TYPE: Record<Item['type'], [IconName, string]> = { assignment: ['task', 'งาน'], video: ['clip', 'คลิป'], material: ['doc', 'เอกสาร'], announcement: ['megaphone', 'ประกาศ'] }
 const fmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 /** รายการที่ตั้งเวลาเผยแพร่ไว้/ร่าง ทุกห้อง · เผยแพร่ตอนนี้หรือเลื่อนเวลาได้ */
@@ -62,12 +63,12 @@ export default function TeacherScheduled() {
           <Card key={`${it.type}${it.id}`} className="p-3 flex flex-wrap items-center gap-3">
             <div className="flex-1 min-w-48">
               <div className="text-xs text-stone-500">
-                {TYPE[it.type]} · {names.get(it.classId) ?? ''}
+                <Icon n={TYPE[it.type][0]} /> {TYPE[it.type][1]} · {names.get(it.classId) ?? ''}
               </div>
               <b>{it.title}</b>
             </div>
             {it.publishAt ? (
-              <span className="rounded-full bg-violet-100 text-violet-700 px-2.5 py-0.5 text-xs font-bold">⏰ {fmt.format(it.publishAt)}</span>
+              <span className="rounded-full bg-violet-100 text-violet-700 px-2.5 py-0.5 text-xs font-bold"><Icon n="alarm" /> {fmt.format(it.publishAt)}</span>
             ) : (
               <span className="rounded-full bg-stone-100 text-stone-600 px-2.5 py-0.5 text-xs font-bold">ร่าง</span>
             )}

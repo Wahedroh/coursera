@@ -5,12 +5,13 @@ import type { StudentAdminRow } from '../../server/roster/service'
 import type { Gradebook } from '../../shared/assignments'
 import type { ClassGrades } from '../../shared/grades'
 import type { ScoreBook } from '../../shared/scores'
-import { EXP_SOURCE_LABEL, type ExpBreakdown, type ExpSource } from '../../shared/points'
+import { EXP_SOURCE_ICON, EXP_SOURCE_LABEL, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import AddStudentForm from '../components/AddStudentForm'
 import ClassMenu from '../components/ClassMenu'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Data = { class: { id: string; name: string; joinCode: string }; students: StudentAdminRow[] }
 
@@ -266,7 +267,9 @@ function ExpSources({ studentId, name }: { studentId: string; name: string }) {
           {d.bySource.map((x) => (
             <li key={x.source}>
               <button type="button" onClick={() => setOnly(only === x.source ? null : x.source)} className={`w-full flex items-center gap-2 rounded-lg px-1.5 py-1 text-left ${only === x.source ? 'bg-amber-100' : 'hover:bg-white'}`}>
-                <span className="w-32 shrink-0">{EXP_SOURCE_LABEL[x.source]}</span>
+                <span className="w-32 shrink-0">
+                <Icon n={EXP_SOURCE_ICON[x.source]} /> {EXP_SOURCE_LABEL[x.source]}
+              </span>
                 <span className="h-2.5 flex-1 rounded-full bg-stone-200 overflow-hidden">
                   <span className="block h-full bg-amber-400" style={{ width: `${(Math.max(0, x.exp) / max) * 100}%` }} />
                 </span>

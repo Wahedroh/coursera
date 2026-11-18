@@ -12,6 +12,7 @@ import PasteZone, { type PastedPage } from '../components/PasteZone'
 import { combineToPdf } from '../lib/pdf'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
@@ -133,7 +134,7 @@ export default function TeacherMaterials() {
             }}
             className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${tab === k ? 'bg-white shadow-sm text-board' : 'text-stone-500'}`}
           >
-            {k === 'blank' ? '📄 ' : '📒 '}
+            <Icon n={k === 'blank' ? 'doc' : 'notebook'} />{' '}
             {MATERIAL_KIND_LABEL[k]}
             {split && <span className="ml-1 text-xs opacity-70">({split[k].length})</span>}
           </button>

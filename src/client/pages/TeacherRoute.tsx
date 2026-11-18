@@ -6,6 +6,7 @@ import { CLOSURE_LABEL, CLOSURE_REASONS, slotPeriods, type Appointment, type Clo
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const input = 'border-2 border-line rounded-lg px-2 py-1.5 bg-white text-sm'
 const todayStr = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
@@ -94,9 +95,9 @@ export default function TeacherRoute() {
   return (
     <TeacherLayout>
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-extrabold mr-auto">🧭 เส้นทาง & ปิดโรงเรียน</h1>
+        <h1 className="text-2xl font-extrabold mr-auto"><Icon n="compass" /> เส้นทาง & ปิดโรงเรียน</h1>
         <Link to="/teacher/workload" className="rounded-xl bg-board-soft text-board px-3 py-1.5 text-sm font-bold">
-          📊 ภาระสอน & การเดินทาง
+          <Icon n="chart" /> ภาระสอน & การเดินทาง
         </Link>
       </div>
       <ErrorBox message={error} />
@@ -118,7 +119,7 @@ export default function TeacherRoute() {
                 </button>
               )}
               <b className="ml-auto" data-testid="day-summary">
-                {thai(date)} · {plan ? `${plan.periods} คาบ · 🚗 ${plan.trips} ที่` : ''}
+                {thai(date)} · {plan && <>{plan.periods} คาบ · <Icon n="car" /> {plan.trips} ที่</>}
               </b>
             </div>
             {!plan && <Loading />}
@@ -132,8 +133,8 @@ export default function TeacherRoute() {
                       {s.end ? `–${s.end}` : ''}
                     </b>
                     <b className={s.closed ? 'line-through text-rose-800' : ''}>
-                      {s.kind === 'appointment' ? '📍 ' : ''}
-                      {s.makeup ? (s.makeup.mode === 'online' ? '💻 สอนชดเชยออนไลน์ ' : '↺ สอนชดเชย ') : ''}
+                      {s.kind === 'appointment' && <><Icon n="location" />{' '}</>}
+                      {s.makeup && (s.makeup.mode === 'online' ? <><Icon n="laptop" /> สอนชดเชยออนไลน์{' '}</> : '↺ สอนชดเชย ')}
                       {s.makeup ? s.classes.map((c) => c.name).join(', ') : s.name}
                       {s.kind !== 'appointment' ? ` (${s.periods} คาบ)` : ''}
                     </b>
@@ -148,7 +149,7 @@ export default function TeacherRoute() {
                   {s.closed ? (
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <span className="text-rose-800">
-                        ⛔ ปิด: {CLOSURE_LABEL[s.closed.reason]}
+                        <Icon n="closed" /> ปิด: {CLOSURE_LABEL[s.closed.reason]}
                         {s.closed.note ? ` · ${s.closed.note}` : ''} {s.closed.allSchools ? '(ทุกโรงเรียน)' : ''} — ไม่นับคาบ/การเดินทาง ไม่เตือน ไม่นำทาง
                       </span>
                       {s.closed.makeupNeeded ? <b className="text-amber-700">ต้องสอนชดเชย</b> : <span className="text-stone-500">ไม่ต้องชดเชย</span>}
@@ -173,14 +174,14 @@ export default function TeacherRoute() {
                       {s.makeup.mode === 'online' ? (
                         s.nav ? (
                           <a href={s.nav} target="_blank" rel="noreferrer" className="rounded-lg bg-violet-600 text-white px-2.5 py-1 text-xs font-bold">
-                            🎥 เปิด Meet
+                            <Icon n="video" /> เปิด Meet
                           </a>
                         ) : (
                           <span className="text-xs text-violet-800">ยังไม่ได้ใส่ลิงก์ Meet</span>
                         )
                       ) : (
                         <a href={s.nav} target="_blank" rel="noreferrer" className="rounded-lg bg-board text-white px-2.5 py-1 text-xs font-bold">
-                          🧭 นำทาง
+                          <Icon n="compass" /> นำทาง
                         </a>
                       )}
                       <button type="button" className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-bold" onClick={() => void removeMakeup(s.makeup!.id)}>
@@ -191,7 +192,7 @@ export default function TeacherRoute() {
                     <div className="flex flex-wrap items-center gap-2 pt-1.5">
                       {s.lat === null && s.kind === 'school' && <span className="text-xs text-amber-700">ยังไม่มีพิกัด (นำทางด้วยชื่อ)</span>}
                       <a href={s.nav} target="_blank" rel="noreferrer" className="rounded-lg bg-board text-white px-2.5 py-1 text-xs font-bold">
-                        🧭 นำทาง
+                        <Icon n="compass" /> นำทาง
                       </a>
                       {s.kind === 'school' ? (
                         <button type="button" className="rounded-lg bg-rose-100 text-rose-800 px-2.5 py-1 text-xs font-bold" onClick={() => setClosing({ schoolId: s.key, name: s.name })}>
@@ -209,7 +210,7 @@ export default function TeacherRoute() {
             </ul>
             <div className="flex flex-wrap gap-2">
               <button type="button" className="rounded-lg bg-rose-100 text-rose-800 px-3 py-1.5 text-sm font-bold" onClick={() => setClosing({ schoolId: null, name: 'ทุกโรงเรียน' })}>
-                ⛔ ปิดทุกโรงเรียน…
+                <Icon n="closed" /> ปิดทุกโรงเรียน…
               </button>
             </div>
             {makingUp && (
@@ -269,7 +270,7 @@ export default function TeacherRoute() {
                       <b>
                         {short(a.date)} {a.start}
                       </b>
-                      <span>📍 {a.title}</span>
+                      <span><Icon n="location" /> {a.title}</span>
                       <button type="button" className="ml-auto text-xs underline" onClick={() => void removeAppt(a.id)}>
                         ลบ
                       </button>
@@ -283,7 +284,7 @@ export default function TeacherRoute() {
 
         <div className="flex flex-col gap-4">
           <Card className="p-4 flex flex-col gap-2">
-            <b>📍 ตำแหน่งโรงเรียน</b>
+            <b><Icon n="location" /> ตำแหน่งโรงเรียน</b>
             <p className="text-xs text-stone-600">เปิด Google Maps หรือ Apple Maps → ค้นหาโรงเรียน → แชร์ → คัดลอกลิงก์ → วางที่ช่อง (หรือพิมพ์ “ละติจูด, ลองจิจูด”)</p>
             {!places && <Loading />}
             {places?.map((p) => (
@@ -350,7 +351,7 @@ function MakeupCard({ closures, refresh, onChanged, onError }: { closures: Closu
               {shortDay(m.date)} {m.start}–{m.end}
             </b>
             <span>
-              {m.mode === 'online' ? '💻' : '🏫'} {m.className} ({m.periods} คาบ)
+              <Icon n={m.mode === 'online' ? 'laptop' : 'school'} /> {m.className} ({m.periods} คาบ)
             </span>
             <span className="text-xs text-stone-500">
               {m.forDate ? `แทนคาบ ${shortDay(m.forDate)}` : ''}
@@ -458,7 +459,7 @@ function GeneralMakeupForm({ closures, onCancel, onDone, onError }: { closures: 
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="รูปแบบคาบชดเชย">
         {(['onsite', 'online'] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`rounded-full border-2 px-3 py-1 ${mode === m ? 'border-board bg-board-soft font-extrabold' : 'border-line'}`}>
-            {m === 'onsite' ? '🏫 ที่โรงเรียน' : '💻 ออนไลน์ (Google Meet)'}
+            <Icon n={m === 'onsite' ? 'school' : 'laptop'} /> {m === 'onsite' ? 'ที่โรงเรียน' : 'ออนไลน์ (Google Meet)'}
           </button>
         ))}
       </div>
@@ -567,7 +568,7 @@ function MakeupForm({
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="รูปแบบการสอนชดเชย">
         {(['onsite', 'online'] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`rounded-full border-2 px-3 py-1 ${mode === m ? 'border-board bg-board-soft font-extrabold' : 'border-line'}`}>
-            {m === 'onsite' ? '🏫 ที่โรงเรียน' : '💻 ออนไลน์ (Google Meet)'}
+            <Icon n={m === 'onsite' ? 'school' : 'laptop'} /> {m === 'onsite' ? 'ที่โรงเรียน' : 'ออนไลน์ (Google Meet)'}
           </button>
         ))}
       </div>
@@ -709,7 +710,7 @@ function PlaceRow({ p, onSaved, onError }: { p: SchoolPlace; onSaved: (p: School
     <div className="border-t border-stone-100 pt-2 text-sm">
       <div className="flex items-center gap-2">
         <b className="flex-1">{p.name}</b>
-        {busy ? <span className="text-xs">กำลังบันทึก…</span> : p.lat !== null ? <span className="text-xs text-green-700" data-testid={`place-ok-${p.name}`}>📍 พิกัดพร้อม</span> : p.mapUrl ? <span className="text-xs text-amber-700">อ่านพิกัดไม่ได้ (นำทางด้วยชื่อ)</span> : <span className="text-xs text-stone-400">ยังไม่ใส่</span>}
+        {busy ? <span className="text-xs">กำลังบันทึก…</span> : p.lat !== null ? <span className="text-xs text-green-700" data-testid={`place-ok-${p.name}`}><Icon n="location" /> พิกัดพร้อม</span> : p.mapUrl ? <span className="text-xs text-amber-700">อ่านพิกัดไม่ได้ (นำทางด้วยชื่อ)</span> : <span className="text-xs text-stone-400">ยังไม่ใส่</span>}
       </div>
       <input aria-label={`ลิงก์แผนที่ ${p.name}`} className={`${input} w-full mt-1`} placeholder="วางลิงก์ Google/Apple Maps" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => void save()} onKeyDown={(e) => e.key === 'Enter' && void save()} />
     </div>

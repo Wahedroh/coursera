@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import type { NotificationInbox } from '../../shared/push'
+import Icon from './Icon'
 
 function ago(t: number): string {
   const m = Math.max(0, Math.round((Date.now() - t) / 60_000))
@@ -50,7 +51,7 @@ export default function NotificationBell() {
         className="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-xl"
         data-testid="notice-bell"
       >
-        🔔
+        <Icon n="bell" />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">
             {unread > 9 ? '9+' : unread}
@@ -67,7 +68,7 @@ export default function NotificationBell() {
             data-testid="notice-panel"
           >
             <header className="flex justify-between items-center px-5 pt-4 pb-2">
-              <h2 className="font-extrabold text-lg">🔔 การแจ้งเตือน</h2>
+              <h2 className="font-extrabold text-lg"><Icon n="bell" /> การแจ้งเตือน</h2>
               <button type="button" onClick={toggle} className="text-sm text-stone-500 px-2 py-1">
                 ปิด
               </button>

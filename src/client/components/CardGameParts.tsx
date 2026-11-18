@@ -4,6 +4,7 @@ import { AvatarArt } from './PixelArt'
 import { avatarConfigSchema, DEFAULT_AVATAR } from '../../shared/avatar'
 import { LETTERS, type CardGameResult, type CardGameState } from '../../shared/cardgame'
 import { Button } from '../ui'
+import Icon from './Icon'
 
 /** สถานะเกม (ดึงใหม่ทุก ~1.5 วินาที ให้จอหน้าห้องกับมือถือครูตรงกัน) */
 export function useCardGame(id: string, onError: (e: unknown) => void, intervalMs = 1500) {
@@ -40,7 +41,7 @@ export function Countdown({ left, big }: { left: number | null; big?: boolean })
       className={`inline-flex items-center justify-center rounded-full font-extrabold tabular-nums ${big ? 'w-20 h-20 text-4xl' : 'w-11 h-11 text-xl'} ${left <= 5 ? 'bg-red-500 text-white animate-pulse' : 'bg-amber-300 text-amber-950'}`}
       aria-label={left ? `เหลือ ${left} วินาที` : 'หมดเวลา'}
     >
-      {left || '⏰'}
+      {left || <Icon n="alarm" />}
     </span>
   )
 }

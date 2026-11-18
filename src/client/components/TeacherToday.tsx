@@ -4,6 +4,7 @@ import { api } from "../api";
 import { DUE_SOON_DAYS, type TeacherToday as Today } from "../../shared/today";
 import { formatDue } from "../lib/format";
 import { Card } from "../ui";
+import Icon from './Icon'
 
 /** สรุปวันนี้: งานรอตรวจ · ขาดเรียนวันนี้ · งานใกล้ครบกำหนด (ทุกห้อง) */
 export default function TeacherToday() {
@@ -22,13 +23,13 @@ export default function TeacherToday() {
     <div data-testid="teacher-today">
       <Card className="p-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-bold">📋 สรุปวันนี้</h2>
+          <h2 className="font-bold"><Icon n="clipboard" /> สรุปวันนี้</h2>
           <span className="text-xs text-stone-500">เทอม {t.term}</span>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
           <section className={box} aria-label="งานรอตรวจ">
             <h3 className="text-sm font-bold">
-              ✅ รอตรวจ{" "}
+              <Icon n="check" /> รอตรวจ{" "}
               <span className={waiting ? "text-amber-600" : "text-stone-400"}>
                 {waiting} ชิ้น
               </span>
@@ -59,7 +60,7 @@ export default function TeacherToday() {
           </section>
           <section className={box} aria-label="ขาดเรียนวันนี้">
             <h3 className="text-sm font-bold">
-              🚫 ขาดวันนี้{" "}
+              <Icon n="blocked" /> ขาดวันนี้{" "}
               <span className={absent ? "text-red-600" : "text-stone-400"}>
                 {absent} คน
               </span>
@@ -82,7 +83,7 @@ export default function TeacherToday() {
           </section>
           <section className={box} aria-label="ใกล้ครบกำหนด">
             <h3 className="text-sm font-bold">
-              ⏰ ครบกำหนดใน {DUE_SOON_DAYS} วัน
+              <Icon n="alarm" /> ครบกำหนดใน {DUE_SOON_DAYS} วัน
             </h3>
             {t.dueSoon.length === 0 && (
               <p className="text-xs text-stone-500">ไม่มีงานใกล้ครบกำหนด</p>

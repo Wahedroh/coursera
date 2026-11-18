@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Icon from './Icon'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -282,7 +283,7 @@ export default function ProtectedYouTube({ videoId, title, onWatch }: { videoId:
       </div>
       <div className="flex items-center gap-1 px-2 py-1.5 text-sm bg-black">
         <button type="button" className={btn} onClick={toggle} disabled={!ready} aria-label={playing ? 'หยุด' : 'เล่น'}>
-          {playing ? '⏸' : '▶'}
+          <Icon n={playing ? 'pause' : 'play'} />
         </button>
         <button type="button" className={btn} onClick={() => skip(-10)} disabled={!ready} aria-label="ย้อน 10 วินาที">
           ⟲10
@@ -305,7 +306,7 @@ export default function ProtectedYouTube({ videoId, title, onWatch }: { videoId:
           className="flex-1 min-w-12 accent-amber-400"
         />
         <button type="button" className={btn} onClick={toggleMute} disabled={!ready} aria-label={muted ? 'เปิดเสียง' : 'ปิดเสียง'}>
-          {muted ? '🔇' : '🔊'}
+          <Icon n={muted ? 'mute' : 'sound'} />
         </button>
         <select aria-label="ความเร็ว" disabled={!ready} value={rate} onChange={(e) => changeRate(Number(e.target.value))} className="bg-black text-white text-xs rounded border border-white/30 px-1 py-0.5">
           {RATES.map((r) => (
@@ -315,7 +316,7 @@ export default function ProtectedYouTube({ videoId, title, onWatch }: { videoId:
           ))}
         </select>
         <button type="button" className={btn} onClick={toggleFull} aria-label={full || pseudoFull ? 'ออกจากเต็มจอ' : 'เต็มจอ'}>
-          {full || pseudoFull ? '⤡' : '⛶'}
+          <Icon n={full || pseudoFull ? 'fullscreenExit' : 'fullscreen'} />
         </button>
       </div>
     </div>

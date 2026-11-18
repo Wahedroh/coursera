@@ -7,6 +7,7 @@ import { exportAttendance } from '../lib/excel'
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const TONE: Record<AttendanceStatus, string> = {
   present: 'bg-board text-white',
@@ -151,7 +152,7 @@ export default function TeacherAttendance() {
           <input type="date" className={`${input} block`} value={to} onChange={(e) => setTo(e.target.value)} />
         </label>
         <button type="button" onClick={exportRange} className="rounded-xl border-2 border-line bg-white px-3 py-1.5 font-bold">
-          ⬇ Excel เช็กชื่อ
+          <Icon n="download" /> Excel เช็กชื่อ
         </button>
       </Card>
       <p className="text-xs text-stone-500">ทุกคนเริ่มต้นเป็น "มา" แตะเพื่อเปลี่ยน · บันทึกอัตโนมัติ · มาหรือสายได้ +{EXP_RULES.attendance} EXP</p>

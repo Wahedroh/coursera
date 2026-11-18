@@ -4,6 +4,7 @@ import { EMPTY_PAYMENT, hasPayment, type PaymentInfo } from '../../shared/fees'
 import { resizeImage } from '../lib/image'
 import { fileUrl, uploadImage } from '../lib/upload'
 import { Button, Card } from '../ui'
+import Icon from './Icon'
 
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
 
@@ -20,7 +21,7 @@ export function StudentPayment({ owed }: { owed: string }) {
   return (
     <div data-testid="payment-info">
       <Card className="p-4 flex flex-col gap-3 bg-amber-50 border-amber-200">
-        <b>💸 ช่องทางโอนจ่าย · ยอดค้าง {owed}</b>
+        <b><Icon n="transfer" /> ช่องทางโอนจ่าย · ยอดค้าง {owed}</b>
         {p.accountNumber && (
           <div className="rounded-xl bg-white border border-line p-3 text-sm">
             {p.bank && <div className="text-stone-500">{p.bank}</div>}
@@ -98,7 +99,7 @@ export function TeacherPaymentSettings({ onError }: { onError: (e: unknown) => v
       <Card className="p-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-bold">💸 ช่องทางโอนจ่าย (เลขบัญชี / QR)</h2>
+            <h2 className="font-bold"><Icon n="transfer" /> ช่องทางโอนจ่าย (เลขบัญชี / QR)</h2>
             <p className="text-xs text-stone-500">{hasPayment(p) ? `ตั้งไว้แล้ว${p.accountNumber ? ` · ${p.bank} ${p.accountNumber}` : ''}${p.qrKey ? ' · มี QR' : ''}` : 'ยังไม่ได้ตั้ง — นักเรียนที่ค้างจะยังไม่เห็นช่องทางจ่าย'}</p>
           </div>
           <button type="button" className="rounded-xl border-2 border-line bg-white px-3 py-1.5 text-sm font-bold" onClick={() => setOpen(!open)}>
@@ -128,7 +129,7 @@ export function TeacherPaymentSettings({ onError }: { onError: (e: unknown) => v
             <div className="flex flex-wrap items-center gap-3">
               {p.qrKey && <img src={fileUrl(p.qrKey)} alt="QR รับเงินที่ตั้งไว้" className="max-h-40 rounded-xl border border-line bg-white" />}
               <label className="rounded-xl border-2 border-line bg-white px-3 py-2 text-sm font-bold cursor-pointer">
-                {busy ? 'กำลังอัปโหลด…' : p.qrKey ? '🖼️ เปลี่ยนรูป QR' : '🖼️ แนบรูป QR รับเงิน'}
+                {busy ? 'กำลังอัปโหลด…' : <><Icon n="image" /> {p.qrKey ? 'เปลี่ยนรูป QR' : 'แนบรูป QR รับเงิน'}</>}
                 <input type="file" accept="image/*" className="sr-only" aria-label="รูป QR รับเงิน" disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
               </label>
               {p.qrKey && (

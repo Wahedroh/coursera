@@ -16,6 +16,7 @@ import { Button, Card, Chip, ErrorBox, Loading } from "../ui";
 import CopyButton from "../components/CopyDialog";
 import TeacherLayout from "./TeacherLayout";
 import { useTeacherErrorHandler } from "./useTeacherGuard";
+import Icon from '../components/Icon'
 
 type School = {
   schoolId: string;
@@ -110,7 +111,7 @@ export default function TeacherScores() {
           onClick={exportAll}
           className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold"
         >
-          ⬇ Excel สมุดคะแนน
+          <Icon n="download" /> Excel สมุดคะแนน
         </button>
       </div>
       <ErrorBox message={error} />

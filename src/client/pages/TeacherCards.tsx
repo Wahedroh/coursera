@@ -4,6 +4,7 @@ import { api } from '../api'
 import QrCard from '../components/QrCard'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Cards = { class: { id: string; name: string }; students: { id: string; no: number; zipgradeId: string; name: string }[] }
 /** ต่อหน้า A4 → ขนาดการ์ด (มม.) และจำนวนคอลัมน์ */
@@ -56,7 +57,7 @@ export default function TeacherCards() {
           </select>
         </label>
         <button type="button" onClick={() => window.print()} className="rounded-xl bg-board text-white px-4 py-2 font-bold">
-          🖨️ พิมพ์
+          <Icon n="printer" /> พิมพ์
         </button>
         <span className="text-xs text-stone-500 w-full">ตัดตามเส้นประ · เคลือบพลาสติกใช้ได้ทั้งเทอม · นักเรียนหมุนการ์ดให้ตัวอักษรที่ตอบอยู่ด้านบน</span>
       </div>

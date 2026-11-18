@@ -6,6 +6,7 @@ import { exportGrades } from '../lib/excel'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const TONE = ['bg-board text-white', 'bg-green-600 text-white', 'bg-green-100 text-green-800', 'bg-lime-100 text-lime-800', 'bg-amber-100 text-amber-800', 'bg-orange-100 text-orange-800', 'bg-red-100 text-red-700', 'bg-red-500 text-white']
 const toneOf = (bands: GradeBand[], grade: string | null) => {
@@ -78,7 +79,7 @@ export default function TeacherGrades() {
           </p>
         </div>
         <button type="button" disabled={data.maxTotal === 0} onClick={() => exportGrades(data, className)} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold disabled:opacity-40">
-          ⬇ Excel เกรด
+          <Icon n="download" /> Excel เกรด
         </button>
       </div>
       <ErrorBox message={error} />

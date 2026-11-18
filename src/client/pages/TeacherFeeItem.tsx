@@ -6,6 +6,7 @@ import { exportFees } from '../lib/excel'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 /** charge = ค่าที่บันทึกแล้ว; amountText/paidText/noteText = ค่าที่กำลังพิมพ์ */
 type Row = FeeRow & { amountText: string; paidText: string; noteText: string; invalid: string | false; saving: boolean }
@@ -151,7 +152,7 @@ export default function TeacherFeeItem() {
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold" onClick={() => exportFees({ ...sheet, students: rows })}>
-            ⬇ Excel
+            <Icon n="download" /> Excel
           </button>
           <button type="button" className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold" onClick={() => setEditing((v) => !v)}>
             แก้รายละเอียด

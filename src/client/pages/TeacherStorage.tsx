@@ -4,6 +4,7 @@ import { CF_FREE_LIMITS, type CloudflareUsage } from '../../shared/cloudflareUsa
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Usage = { bytes: number; files: number; limitBytes: number; freeBytes: number; syncedAt: number | null }
 type Candidate = { assignmentId: string; title: string; className: string; submissions: number; files: number; bytes: number; lastGradedAt: number }
@@ -80,7 +81,7 @@ export default function TeacherStorage() {
         </div>
         <p className="text-xs text-stone-500">
           {pct >= 90
-            ? '⚠️ ใกล้เต็มแล้ว — ถ้าเกิน 9.5 GB จะอัปโหลดไฟล์/รูปใหม่ไม่ได้ (นักเรียนยังส่งข้อความได้) กรุณาลบรูปงานที่ตรวจแล้วหรือเอกสารที่ไม่ใช้'
+            ? 'ใกล้เต็มแล้ว — ถ้าเกิน 9.5 GB จะอัปโหลดไฟล์/รูปใหม่ไม่ได้ (นักเรียนยังส่งข้อความได้) กรุณาลบรูปงานที่ตรวจแล้วหรือเอกสารที่ไม่ใช้'
             : `ใช้ไป ${pct.toFixed(1)}% ของแพ็กเกจฟรี Cloudflare (10 GB) · รวมไฟล์ทุกชนิดด้านล่าง · ระบบหยุดรับไฟล์ใหม่ที่ 9.5 GB เพื่อไม่ให้เต็มกลางคาบ`}
         </p>
         <ul className="grid gap-1 sm:grid-cols-2 text-sm" data-testid="storage-breakdown">
@@ -119,7 +120,7 @@ export default function TeacherStorage() {
             onClick={() => run('/api/teacher/storage/purge', { olderThanDays: days }, `ลบรูปของงานทุกชิ้นที่ตรวจไว้นานกว่า ${days} วัน? ลบแล้วกู้คืนไม่ได้ (คะแนนยังอยู่)`, purged)}
             className="py-2"
           >
-            🗑 ลบรูปเก่า
+            <Icon n="trash" /> ลบรูปเก่า
           </Button>
         </div>
         {candidates.length === 0 ? (
@@ -145,7 +146,7 @@ export default function TeacherStorage() {
                     onClick={() => run('/api/teacher/storage/purge', { assignmentId: c.assignmentId }, `ลบรูปของงาน "${c.title}" (${c.className}) ที่ตรวจแล้ว ${c.submissions} คน? กู้คืนไม่ได้ (คะแนนยังอยู่)`, purged)}
                     aria-label={`ลบรูปงาน ${c.title} ${c.className}`}
                   >
-                    🗑 ลบรูปงานนี้
+                    <Icon n="trash" /> ลบรูปงานนี้
                   </button>
                 </div>
               ))}
@@ -209,7 +210,7 @@ function CloudflareQuota() {
   if (!u) return null
   return (
     <Card className="p-4 flex flex-col gap-2" data-testid="cf-usage">
-      <h2 className="font-bold">☁️ โควตาวันนี้ของบัญชี Cloudflare (แพ็กเกจฟรี)</h2>
+      <h2 className="font-bold"><Icon n="cloud" /> โควตาวันนี้ของบัญชี Cloudflare (แพ็กเกจฟรี)</h2>
       {!u.configured ? (
         <p className="text-sm text-stone-600">
           ยังไม่ได้เชื่อม — ตั้ง GitHub secret <code className="bg-stone-100 px-1 rounded">CF_ANALYTICS_TOKEN</code> (Cloudflare API token สิทธิ์ “Account Analytics: Read” อย่างเดียว) แล้ว deploy ใหม่ จะเห็นการใช้ KV · Workers · D1 ของวันนี้ที่นี่
@@ -217,7 +218,7 @@ function CloudflareQuota() {
       ) : (
         <>
           <p className="text-xs text-stone-500">
-            นับรวมทุกแอปในบัญชี · รีเซ็ตทุกวัน 07:00 น. · อัปเดต {hhmm.format(u.fetchedAt)} น. (ทุก ~5 นาที){u.error ? ` · ⚠️ ดึงข้อมูลไม่ได้: ${u.error}` : ''}
+            นับรวมทุกแอปในบัญชี · รีเซ็ตทุกวัน 07:00 น. · อัปเดต {hhmm.format(u.fetchedAt)} น. (ทุก ~5 นาที){u.error && <> · <Icon n="warning" /> ดึงข้อมูลไม่ได้: {u.error}</>}
           </p>
           <b className="text-sm pt-1">KV</b>
           <ul className="flex flex-col gap-1.5">
@@ -254,7 +255,7 @@ function Backups() {
   const stale = latest !== undefined && Date.now() - latest.uploadedAt > 9 * 86400_000
   return (
     <Card className="p-4 flex flex-col gap-2" data-testid="backups">
-      <h2 className="font-bold">🛟 สำรองข้อมูลอัตโนมัติ</h2>
+      <h2 className="font-bold"><Icon n="backup" /> สำรองข้อมูลอัตโนมัติ</h2>
       <p className="text-sm text-stone-500">
         ระบบสำรองฐานข้อมูลทั้งหมด (รายชื่อ งาน คะแนน เช็กชื่อ แต้ม ค่าเอกสาร ประกาศ) ทุกวันอาทิตย์ 02:00 น. เก็บย้อนหลัง 180 วัน · ไม่รวมไฟล์รูปงาน/เอกสารเรียน
       </p>
@@ -273,7 +274,7 @@ function Backups() {
                 {when.format(b.uploadedAt)} <span className="text-xs text-stone-500">· {fmtBytes(b.size)}</span>
               </span>
               <a className="rounded-lg border border-line bg-white px-2 py-1 text-xs font-semibold" href={`/api/teacher/backups/${encodeURIComponent(b.name)}`} download>
-                ⬇ ดาวน์โหลด
+                <Icon n="download" /> ดาวน์โหลด
               </a>
             </div>
           ))}

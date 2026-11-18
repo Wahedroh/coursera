@@ -8,6 +8,7 @@ import PublishPicker, { PUBLISH_NOW, publishBody, publishValid, ScheduleChip, ty
 import CopyButton from '../components/CopyDialog'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
@@ -88,7 +89,7 @@ export default function TeacherAnnouncements() {
               <div className="flex flex-wrap items-start gap-3">
                 <div className="flex-1 min-w-48">
                   <div className="font-bold">
-                    {a.pinned && '📌 '}
+                    {a.pinned && <><Icon n="pin" />{' '}</>}
                     {a.title}
                   </div>
                   {a.body && <p className="text-sm text-stone-600 whitespace-pre-line">{a.body}</p>}
@@ -187,7 +188,7 @@ function Fields({ value, onChange }: { value: AnnouncementInput; onChange: (v: A
           <input type="date" className={input} value={value.expiresOn ?? ''} onChange={(e) => onChange({ ...value, expiresOn: e.target.value || null })} />
         </label>
         <label className="flex items-center gap-2 text-sm pb-2">
-          <input type="checkbox" checked={value.pinned} onChange={(e) => onChange({ ...value, pinned: e.target.checked })} /> 📌 ปักหมุดไว้บนสุด
+          <input type="checkbox" checked={value.pinned} onChange={(e) => onChange({ ...value, pinned: e.target.checked })} /> <Icon n="pin" /> ปักหมุดไว้บนสุด
         </label>
       </div>
     </>

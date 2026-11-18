@@ -7,6 +7,7 @@ import type { Term } from '../../shared/terms'
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Data = { release: ReportRelease; term: { id: string; name: string }; cards: ReportCard[] }
 
@@ -58,7 +59,7 @@ export default function TeacherReportCards() {
         <Link to={`/teacher/classes/${id}`} className="text-sm text-stone-500">
           ← หน้าห้อง
         </Link>
-        <h1 className="text-2xl font-extrabold">📄 ใบสรุปผลปลายเทอม</h1>
+        <h1 className="text-2xl font-extrabold"><Icon n="doc" /> ใบสรุปผลปลายเทอม</h1>
         <ErrorBox message={error} />
         {!data && !error && <Loading />}
         {data && (
@@ -102,10 +103,10 @@ export default function TeacherReportCards() {
                 ))}
               </select>
               <button type="button" className="rounded-xl bg-board text-white px-4 py-2 font-bold" onClick={() => window.print()}>
-                🖨️ พิมพ์ {only ? '1 คน' : 'ทั้งห้อง'} (1 คน/หน้า)
+                <Icon n="printer" /> พิมพ์ {only ? '1 คน' : 'ทั้งห้อง'} (1 คน/หน้า)
               </button>
               <Link to={`/teacher/classes/${id}/analysis`} className="text-sm underline">
-                ✏️ เขียนความเห็นครูรายคน
+                <Icon n="edit" /> เขียนความเห็นครูรายคน
               </Link>
             </div>
             <p className="text-xs text-stone-500">คะแนนสอบที่ยังไม่เผยแพร่จะไม่แสดง · แก้คะแนนหลังเปิดแล้ว ใบสรุปผลอัปเดตตาม · นักเรียนดาวน์โหลดเป็น PDF จากหน้า "คะแนนสอบ"</p>
