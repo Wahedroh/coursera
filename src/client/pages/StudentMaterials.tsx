@@ -5,6 +5,7 @@ import { fileUrl } from '../lib/upload'
 import { fileIcon, fmtSize, groupByDate, groupByTopic } from '../lib/materials'
 import { MATERIAL_KIND_LABEL, splitMaterials, type MaterialKind, type StudentMaterial } from '../../shared/materials'
 import { Card, ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 export default function StudentMaterials() {
   const navigate = useNavigate()
@@ -42,7 +43,7 @@ export default function StudentMaterials() {
               onClick={() => setParams(k === 'notes' ? { tab: 'notes' } : {}, { replace: true })}
               className={`rounded-lg px-2 py-2 text-sm font-semibold ${tab === k ? 'bg-white shadow-sm text-board' : 'text-stone-500'}`}
             >
-              {k === 'blank' ? '📄 ' : '📒 '}
+              <Icon n={k === 'blank' ? 'doc' : 'notebook'} />{' '}
               {MATERIAL_KIND_LABEL[k]}
               {split && <span className="ml-1 text-xs opacity-70">({split[k].length})</span>}
             </button>

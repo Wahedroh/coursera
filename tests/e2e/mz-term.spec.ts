@@ -21,7 +21,7 @@ test('เทอม 2/2569 → ขึ้นปีใหม่ใช้ขั้�
     void d.accept()
   })
   await card.getByRole('button', { name: 'เปิดเทอม 2/2570' }).click()
-  await expect(card.getByRole('heading', { name: '🗓️ เทอม 2/2570' })).toBeVisible()
+  await expect(card.getByRole('heading', { name: 'เทอม 2/2570' })).toBeVisible()
   await expect(card.getByText(/ไข่ของเทอมนี้ได้ตัวละครซีซัน 2/)).toBeVisible()
 
   const s = await (await browser.newContext()).newPage()

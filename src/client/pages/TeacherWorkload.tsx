@@ -6,6 +6,7 @@ import { CLOSURE_LABEL, type MakeupSummary, type WorkloadRange, type WorkloadTar
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const input = 'border-2 border-line rounded-lg px-2 py-1 bg-white text-sm'
 const todayStr = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
@@ -110,9 +111,9 @@ export default function TeacherWorkload() {
   return (
     <TeacherLayout>
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-extrabold mr-auto">📊 ภาระสอน & การเดินทาง</h1>
+        <h1 className="text-2xl font-extrabold mr-auto"><Icon n="chart" /> ภาระสอน & การเดินทาง</h1>
         <Link to="/teacher/route" className="rounded-xl bg-board-soft text-board px-3 py-1.5 text-sm font-bold">
-          🧭 เส้นทาง · ปิดโรงเรียน
+          <Icon n="compass" /> เส้นทาง · ปิดโรงเรียน
         </Link>
       </div>
       <ErrorBox message={error} />
@@ -160,7 +161,7 @@ export default function TeacherWorkload() {
               ›
             </button>
             <button type="button" className="ml-auto rounded-lg border-2 border-line px-2.5 py-1 text-sm font-bold" onClick={downloadCsv} disabled={!range}>
-              ⬇ Excel (CSV)
+              <Icon n="download" /> Excel (CSV)
             </button>
           </div>
           {!range && <Loading />}
@@ -203,20 +204,20 @@ export default function TeacherWorkload() {
                             className={`rounded-lg px-2 py-0.5 text-xs font-bold ${s.closed ? 'bg-rose-100 text-rose-800 line-through' : s.makeup ? (s.makeup.mode === 'online' ? 'bg-violet-100 text-violet-800' : 'bg-blue-100 text-blue-900') : s.kind === 'school' ? (s.countPeriods || s.countTrips ? 'bg-board-soft text-board' : 'bg-stone-100 text-stone-500') : 'bg-blue-50 text-blue-800'}`}
                             title={s.kind === 'school' && (!s.countPeriods || !s.countTrips) ? [!s.countPeriods && 'ไม่นับคาบ', !s.countTrips && 'ไม่นับการเดินทาง'].filter(Boolean).join(' · ') : undefined}
                           >
-                            {s.kind === 'appointment' ? '📍 ' : ''}
-                            {s.makeup ? (s.makeup.mode === 'online' ? '💻 ' : '↺ ') : ''}
+                            {s.kind === 'appointment' && <><Icon n="location" />{' '}</>}
+                            {s.makeup && (s.makeup.mode === 'online' ? <><Icon n="laptop" />{' '}</> : '↺ ')}
                             {s.makeup ? s.classes.map((c) => c.name).join(', ') : s.name}
                             {s.kind !== 'appointment' ? (s.countPeriods ? ` ${s.periods}` : ' (ไม่นับคาบ)') : ''}
-                            {s.kind === 'school' && !s.countTrips ? ' 🚫🚗' : ''}
+                            {s.kind === 'school' && !s.countTrips && <NoTrip />}
                           </span>
                           {s.closed && <span className="text-[11px] text-rose-700">ปิด: {CLOSURE_LABEL[s.closed.reason]}{s.closed.note ? ` · ${s.closed.note}` : ''}</span>}
                         </span>
                       ))}
-                      <span className="ml-auto font-extrabold tabular-nums">🚗 {d.trips}</span>
+                      <span className="ml-auto font-extrabold tabular-nums"><Icon n="car" /> {d.trips}</span>
                     </li>
                   ))}
               </ul>
-              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · 🚫🚗 = โรงเรียนที่ตั้งไม่นับการเดินทาง · แต่ละวันคิดจากตารางสอนที่ใช้ในวันนั้น</p>
+              <p className="text-xs text-stone-500">นับการเดินทาง = ย้ายไปอีกที่ 1 ครั้ง (เช้า ดรุณ + บ่าย บำรุง = 2 · ไป-กลับที่เดิมในวันเดียวนับทุกเที่ยว) · ที่ปิดไม่นับ · <NoTrip /> = โรงเรียนที่ตั้งไม่นับการเดินทาง · แต่ละวันคิดจากตารางสอนที่ใช้ในวันนั้น</p>
             </>
           )}
         </Card>
@@ -258,7 +259,7 @@ export default function TeacherWorkload() {
                     <td className="py-1 text-right tabular-nums">{r.closed}</td>
                     <td className="py-1 text-right tabular-nums">
                       {r.madeUp}
-                      {r.online ? ` (💻 ${r.online})` : ''}
+                      {r.online > 0 && <> (<Icon n="laptop" /> {r.online})</>}
                     </td>
                     <td className="py-1 pl-3 whitespace-nowrap">
                       {!c.makeupNeeded ? <span className="text-stone-500">ไม่ต้องชดเชย</span> : r.madeUp >= r.closed ? <b className="text-green-700">✓ ครบ</b> : <b className="text-red-700">ค้าง {r.closed - r.madeUp}</b>}
@@ -347,5 +348,15 @@ function SchoolRows({
         </tr>
       ))}
     </>
+  )
+}
+
+/** โรงเรียนที่ตั้งไม่นับการเดินทาง: รถขีดฆ่า */
+function NoTrip() {
+  return (
+    <span className="relative inline-block ml-1 opacity-70" title="ไม่นับการเดินทาง" aria-label="ไม่นับการเดินทาง">
+      <Icon n="car" />
+      <span className="absolute left-0 right-0 top-1/2 h-0.5 -rotate-45 bg-red-600" aria-hidden="true" />
+    </span>
   )
 }

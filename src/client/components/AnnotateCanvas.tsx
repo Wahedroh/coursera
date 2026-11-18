@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import Icon from './Icon'
 
 type Tool = 'pen' | 'highlight' | 'text' | 'erase'
 type Stroke =
@@ -9,8 +10,8 @@ export type AnnotateHandle = { hasChanges(): boolean; toBlob(): Promise<Blob> }
 
 const COLORS = ['#E53935', '#222222', '#1E63D6', '#2E9D6A', '#F59E0B']
 const TOOLS: { id: Tool; label: string; icon: string }[] = [
-  { id: 'pen', label: 'ปากกา', icon: '✏️' },
-  { id: 'highlight', label: 'ไฮไลต์', icon: '🖍️' },
+  { id: 'pen', label: 'ปากกา', icon: 'edit' },
+  { id: 'highlight', label: 'ไฮไลต์', icon: 'highlighter' },
   { id: 'text', label: 'ข้อความ', icon: 'T' },
   { id: 'erase', label: 'ยางลบ', icon: '⌫' },
 ]
@@ -101,7 +102,7 @@ export const AnnotateCanvas = forwardRef<AnnotateHandle, { src: string; label: s
             onClick={() => setTool(t.id)}
             className={`w-9 h-9 rounded-lg font-bold ${tool === t.id ? 'bg-board-soft ring-2 ring-board' : 'bg-stone-100'}`}
           >
-            {t.icon}
+            <Icon n={t.icon} />
           </button>
         ))}
         <span className="w-px h-6 bg-line mx-1" />

@@ -5,6 +5,7 @@ import { COPY_TYPE_LABEL, COPY_TYPES, type CopyType, type LibraryItem } from '..
 import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const date = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit' })
 
@@ -32,7 +33,7 @@ export default function TeacherLibrary() {
 
   return (
     <TeacherLayout>
-      <h1 className="text-2xl font-extrabold">📚 คลังของครู</h1>
+      <h1 className="text-2xl font-extrabold"><Icon n="books" /> คลังของครู</h1>
       <p className="text-sm text-stone-500 -mt-2">ของที่เคยสร้างทุกเทอม · เลือกแล้วคัดลอกไปห้องอื่นหรือเทอมใหม่ (ได้แต่ตัวงาน ไม่รวมงานที่ส่ง/คะแนน)</p>
       <ErrorBox message={error} />
       {flash && <Card className="p-3 bg-board-soft border-green-200 text-board font-semibold">{flash}</Card>}

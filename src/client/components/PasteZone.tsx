@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { pdfPageCount } from '../lib/pdf'
+import Icon from './Icon'
 
 /** ชิ้นที่วาง/ลากเข้ามา (รูป หรือ PDF) — ตอนอัปโหลดรวมเป็น PDF ไฟล์เดียวตามลำดับ */
 export type PastedPage = { id: number; blob: Blob; url: string; kind: 'image' | 'pdf'; name: string; pageCount: number | null }
@@ -195,7 +196,7 @@ export default function PasteZone({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void pasteButton()} className="rounded-xl bg-amber-400 text-amber-950 px-3 py-1.5 text-sm font-bold">
-          📋 วางจากคลิปบอร์ด
+          <Icon n="clipboard" /> วางจากคลิปบอร์ด
         </button>
         {msg && <span className="text-xs text-stone-600">{msg}</span>}
       </div>
@@ -225,7 +226,7 @@ export default function PasteZone({
                 <img src={p.url} alt={`หน้าที่ ${i + 1}`} className="h-32 w-full object-contain bg-stone-50 rounded-lg" />
               ) : (
                 <div role="img" aria-label={`PDF ชิ้นที่ ${i + 1}`} className="h-32 w-full rounded-lg bg-red-50 flex flex-col items-center justify-center text-center px-1">
-                  <span className="text-2xl">📄</span>
+                  <span className="text-2xl"><Icon n="doc" /></span>
                   <span className="text-[10px] text-stone-600 break-all line-clamp-2">{p.name}</span>
                   <b className="text-xs text-red-700">{(counts[p.id] ?? p.pageCount) == null ? 'PDF' : `${counts[p.id] ?? p.pageCount} หน้า`}</b>
                 </div>

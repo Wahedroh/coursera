@@ -7,6 +7,7 @@ import { fileUrl, uploadImage } from '../lib/upload'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Detail = {
   submission: { id: string; text: string; imageKeys: string[]; annotatedKeys: string[]; status: string; score: number | null; comment: string; submittedAt: number; imagesPurgedAt: number | null; onPaper: boolean; excusedFrom: number | null }
@@ -146,7 +147,7 @@ export default function TeacherGrade() {
             d.assignment.dueAt !== null &&
             d.submission.submittedAt > d.assignment.dueAt && (
               <p className="mt-1 flex flex-wrap items-center gap-2 text-sm" data-testid="late-fix">
-                <span className="text-amber-700 font-semibold">⏰ ส่งช้า</span>
+                <span className="text-amber-700 font-semibold"><Icon n="alarm" /> ส่งช้า</span>
                 <button type="button" className="rounded-lg border-2 border-board bg-white px-2 py-0.5 text-xs font-bold text-board" onClick={() => void setOnTime(true)}>
                   ✓ นับว่าตรงเวลา
                 </button>
@@ -173,7 +174,7 @@ export default function TeacherGrade() {
           {d.submission.onPaper && (
             <Card className="p-4 text-sm bg-amber-50 border-amber-200 flex flex-wrap items-center justify-between gap-2">
               <span>
-                📄 <b>นักเรียนส่งเป็นกระดาษ</b> (ครูบันทึกเอง) — ให้/แก้คะแนนด้านขวาได้ตามปกติ
+                <Icon n="doc" /> <b>นักเรียนส่งเป็นกระดาษ</b> (ครูบันทึกเอง) — ให้/แก้คะแนนด้านขวาได้ตามปกติ
               </span>
               <button type="button" onClick={() => void undoPaper()} className="rounded-lg border border-red-200 text-red-700 bg-white px-2 py-1 text-xs font-semibold">
                 ยกเลิกการส่งกระดาษ

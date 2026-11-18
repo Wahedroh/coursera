@@ -6,6 +6,7 @@ import { LETTERS, MAX_CARD_QUESTIONS, TIME_OPTIONS, type CardQuestion, type Card
 import { Button, Card, ErrorBox } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string }[] }
 type Game = { id: string; className: string; quizTitle: string; createdAt: number; endedAt: number | null; n: number }
@@ -124,7 +125,7 @@ export default function TeacherCardGame() {
 
   return (
     <TeacherLayout>
-      <h1 className="text-2xl font-extrabold">🃏 เกมการ์ด QR</h1>
+      <h1 className="text-2xl font-extrabold"><Icon n="cards" /> เกมการ์ด QR</h1>
       <p className="text-sm text-stone-500 -mt-2">นักเรียนชูการ์ด หมุนตัวอักษรที่ตอบไว้ด้านบน · ครูสแกนทั้งห้องด้วยกล้องมือถือเครื่องเดียว</p>
       <ErrorBox message={error} />
       <div className="grid gap-4 lg:grid-cols-2 items-start">
@@ -147,7 +148,7 @@ export default function TeacherCardGame() {
           <p className="text-xs text-stone-500">เปิดหน้าจอเกมบนคอม/โปรเจกเตอร์ แล้วสแกน QR บนจอด้วยมือถือครู (ต้องล็อกอินครูในมือถือ) เพื่อเปิดกล้อง · หรือเล่นจากมือถือเครื่องเดียวก็ได้</p>
         </Card>
         <Card className="p-4 flex flex-col gap-3">
-          <h2 className="font-bold">🖨️ พิมพ์การ์ดประจำตัว</h2>
+          <h2 className="font-bold"><Icon n="printer" /> พิมพ์การ์ดประจำตัว</h2>
           <div className="flex flex-wrap gap-2 items-center">
             {classSelect('ห้องที่พิมพ์การ์ด')}
             <Link to={`/teacher/classes/${classId}/cards`} className="rounded-xl border-2 border-line bg-white px-4 py-2 font-bold">
@@ -159,7 +160,7 @@ export default function TeacherCardGame() {
       </div>
       <Card className="p-4 flex flex-col gap-2">
         <div className="flex justify-between items-center">
-          <h2 className="font-bold">📚 ชุดคำถาม</h2>
+          <h2 className="font-bold"><Icon n="books" /> ชุดคำถาม</h2>
           <button type="button" className="rounded-xl border-2 border-line bg-white px-3 py-1.5 text-sm font-bold" onClick={() => setEditing({ id: null, title: '', questions: [{ q: '', choices: ['', '', '', ''], answer: 0 }] })}>
             + สร้างชุดคำถาม
           </button>
@@ -188,7 +189,7 @@ export default function TeacherCardGame() {
               <input className={input} required maxLength={120} placeholder="เช่น ทบทวนกฎของนิวตัน" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} />
             </label>
             <label className="text-sm font-semibold flex items-center gap-2">
-              ⏱️ ตั้งเวลาทุกข้อ
+              <Icon n="stopwatch" /> ตั้งเวลาทุกข้อ
               <select
                 aria-label="ตั้งเวลาทุกข้อ"
                 className="border-2 border-line rounded-lg px-2 py-1 bg-white font-normal"
@@ -227,7 +228,7 @@ export default function TeacherCardGame() {
       )}
       {games.length > 0 && (
         <Card className="p-4 flex flex-col gap-1">
-          <h2 className="font-bold">🕘 เกมล่าสุด</h2>
+          <h2 className="font-bold"><Icon n="clock" /> เกมล่าสุด</h2>
           {games.map((g) => (
             <div key={g.id} className="flex items-center gap-2 border-t border-stone-100 pt-1.5 text-sm">
               <Link to={`/teacher/card-games/${g.id}`} className="flex-1 flex flex-wrap justify-between gap-2 hover:underline">

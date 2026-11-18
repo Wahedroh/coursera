@@ -4,6 +4,7 @@ import { api } from '../api'
 import { todayBangkok } from '../../shared/attendance'
 import { WEEKDAY_LABEL, WEEKDAY_SHORT, type Slot } from '../../shared/timetable'
 import { Card } from '../ui'
+import Icon from './Icon'
 
 type Occ = Slot & { startAt: number; endAt: number }
 type Now = {
@@ -42,7 +43,7 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
     return (
       <Link to="/teacher/timetable" className="block">
         <Card className="p-3 text-sm bg-board-soft border-green-200">
-          🗓️ <b>ตั้งตารางสอน</b> แล้วหน้านี้จะขึ้นห้องที่กำลังสอนพร้อมปุ่มลัด (เช็กชื่อ · สุ่มชื่อ · สั่งงาน) · แตะเพื่อเริ่ม
+          <Icon n="calendar" /> <b>ตั้งตารางสอน</b> แล้วหน้านี้จะขึ้นห้องที่กำลังสอนพร้อมปุ่มลัด (เช็กชื่อ · สุ่มชื่อ · สั่งงาน) · แตะเพื่อเริ่ม
         </Card>
       </Link>
     )
@@ -68,11 +69,11 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
   const info = c ? cls(c.classId) : null
   const next = now.upcoming[0]
   const quick = (id: string) => [
-    { icon: '🎲', label: 'สุ่มชื่อ', to: `/teacher/classes/${id}/seating` },
-    { icon: '📝', label: 'สั่งงาน', to: `/teacher/assignments/new?classId=${id}` },
-    { icon: '📒', label: 'อัปที่จด', to: `/teacher/classes/${id}/materials?kind=notes` },
-    { icon: '🃏', label: 'เกมการ์ด', to: `/teacher/card-game?class=${id}` },
-    { icon: '📚', label: 'เปิดห้อง', to: `/teacher/classes/${id}` },
+    { icon: 'dice', label: 'สุ่มชื่อ', to: `/teacher/classes/${id}/seating` },
+    { icon: 'task', label: 'สั่งงาน', to: `/teacher/assignments/new?classId=${id}` },
+    { icon: 'notebook', label: 'อัปที่จด', to: `/teacher/classes/${id}/materials?kind=notes` },
+    { icon: 'cards', label: 'เกมการ์ด', to: `/teacher/card-game?class=${id}` },
+    { icon: 'books', label: 'เปิดห้อง', to: `/teacher/classes/${id}` },
   ]
   return (
     <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
@@ -86,10 +87,10 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
           {now.selfie && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-white/15 px-3 py-2" data-testid="selfie-row">
               {now.selfie.done ? (
-                <span className="font-bold">✅ ยืนยันการสอนคาบนี้แล้ว</span>
+                <span className="font-bold"><Icon n="check" /> ยืนยันการสอนคาบนี้แล้ว</span>
               ) : (
                 <a href={now.selfie.url} target="_blank" rel="noreferrer" className="rounded-lg bg-amber-400 text-amber-950 px-3 py-1.5 text-sm font-extrabold">
-                  📸 ยืนยันการสอน (เซลฟี + พิกัด)
+                  <Icon n="camera" /> ยืนยันการสอน (เซลฟี + พิกัด)
                 </a>
               )}
               <button type="button" onClick={() => void markSelfie(!now.selfie!.done)} className="text-xs underline opacity-90">
@@ -99,12 +100,12 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
           )}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-3">
             <button type="button" disabled={busy} onClick={() => void checkIn(c.classId)} className="rounded-xl bg-white text-ink py-2 font-bold text-sm">
-              <span className="block text-xl">📋</span>
+              <span className="block text-xl"><Icon n="clipboard" /></span>
               {now.currentDayId ? 'เช็กชื่อ ✓' : 'เช็กชื่อ'}
             </button>
             {quick(c.classId).map((q) => (
               <Link key={q.label} to={q.to} className="rounded-xl bg-white text-ink py-2 font-bold text-sm text-center">
-                <span className="block text-xl">{q.icon}</span>
+                <span className="block text-xl"><Icon n={q.icon} /></span>
                 {q.label}
               </Link>
             ))}
@@ -140,10 +141,10 @@ export default function NowCard({ classes }: { classes: ClassInfo[] }) {
           </Link>
         </div>
         {now.missingAttendance.length === 0 ? (
-          <p className="text-stone-500">✅ เช็กชื่อครบทุกคาบที่ผ่านมา</p>
+          <p className="text-stone-500"><Icon n="check" /> เช็กชื่อครบทุกคาบที่ผ่านมา</p>
         ) : (
           <>
-            <p className="text-amber-700 font-semibold">⚠️ ยังไม่เช็กชื่อ {now.missingAttendance.length} คาบ</p>
+            <p className="text-amber-700 font-semibold"><Icon n="warning" /> ยังไม่เช็กชื่อ {now.missingAttendance.length} คาบ</p>
             {now.missingAttendance.slice(0, 5).map((m) => (
               <Link key={`${m.classId}${m.date}`} to={`/teacher/classes/${m.classId}/attendance?date=${m.date}`} className="text-xs underline text-stone-600" data-testid="missing-attendance">
                 {cls(m.classId)?.name ?? '—'} ({WEEKDAY_SHORT[m.weekday]})

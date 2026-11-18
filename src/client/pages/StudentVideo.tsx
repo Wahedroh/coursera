@@ -6,6 +6,7 @@ import ProtectedYouTube from '../components/ProtectedYouTube'
 import type { StudentVideo as Video, VideoWatchResult } from '../../shared/videos'
 import { ErrorBox, Loading } from '../ui'
 import { EXP_RULES, VIDEO_WATCH_RATIO } from '../../shared/points'
+import Icon from '../components/Icon'
 
 export default function StudentVideo() {
   const { id = '' } = useParams()
@@ -130,7 +131,7 @@ export default function StudentVideo() {
             </div>
             {got === 'quiz' && !v.rewarded && (
               <form onSubmit={submitQuiz} className="mx-2 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 flex flex-col gap-3" data-testid="video-quiz">
-                <b>📝 คำถามท้ายคลิป — ตอบถูกทุกข้อรับ +{EXP_RULES.video} EXP</b>
+                <b><Icon n="task" /> คำถามท้ายคลิป — ตอบถูกทุกข้อรับ +{EXP_RULES.video} EXP</b>
                 {v.quiz.map((q, i) => (
                   <fieldset key={i} className="flex flex-col gap-1">
                     <legend className="font-semibold text-sm mb-1">

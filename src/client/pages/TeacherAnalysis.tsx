@@ -12,6 +12,7 @@ import type { Term } from "../../shared/terms";
 import { Button, Card, ErrorBox, Loading } from "../ui";
 import TeacherLayout from "./TeacherLayout";
 import { useTeacherErrorHandler } from "./useTeacherGuard";
+import Icon, { type IconName } from "../components/Icon";
 
 const PILL: Record<RiskLevel, string> = {
   urgent: "bg-red-50 text-red-700",
@@ -127,10 +128,12 @@ function Detail({
       onError(e);
     }
   };
-  const sec = (title: string, items: string[], cls: string) =>
+  const sec = (icon: IconName, title: string, items: string[], cls: string) =>
     items.length > 0 && (
       <section className={`rounded-xl border-l-4 px-3 py-2 ${cls}`}>
-        <b>{title}</b>
+        <b>
+          <Icon n={icon} /> {title}
+        </b>
         <ul className="list-disc pl-5 text-sm">
           {items.map((x, i) => (
             <li key={i}>{x}</li>
@@ -179,15 +182,15 @@ function Detail({
           </div>
         </div>
         <ExamChart exams={s.exams} />
-        {sec("⚠️ ประเด็นที่พบ", s.issues, "border-red-600 bg-red-50/60")}
-        {sec("🎯 ครูควรเน้น", s.focus, "border-amber-500 bg-amber-50/70")}
-        {sec("✅ จุดแข็ง", s.strengths, "border-green-700 bg-board-soft/60")}
+        {sec("warning", "ประเด็นที่พบ", s.issues, "border-red-600 bg-red-50/60")}
+        {sec("target", "ครูควรเน้น", s.focus, "border-amber-500 bg-amber-50/70")}
+        {sec("check", "จุดแข็ง", s.strengths, "border-green-700 bg-board-soft/60")}
         <p className="text-xs text-stone-500">
           ทบทวนคลิป {s.videos.watched}/{s.videos.total} · เกมการ์ดตอบถูก{" "}
           {pct(s.cardsPct)}
         </p>
         <label className="text-sm font-semibold flex flex-col gap-1">
-          📝 โน้ตของครู (ใช้เป็น "ความเห็นครู" ในใบสรุปผล)
+          <Icon n="task" /> โน้ตของครู (ใช้เป็น "ความเห็นครู" ในใบสรุปผล)
           <textarea
             className="border-2 border-line rounded-xl px-3 py-2 font-normal"
             rows={3}
@@ -210,7 +213,7 @@ function Detail({
             className="ml-auto rounded-xl border-2 border-line bg-white px-3 py-2 font-bold"
             onClick={() => window.print()}
           >
-            🖨️ พิมพ์รายงานรายคน
+            <Icon n="printer" /> พิมพ์รายงานรายคน
           </button>
         </div>
       </Card>
@@ -256,7 +259,7 @@ export default function TeacherAnalysis() {
         <div className="flex flex-wrap justify-between items-end gap-2">
           <div>
             <h1 className="text-2xl font-extrabold">
-              📋 วิเคราะห์นักเรียนรายคน
+              <Icon n="clipboard" /> วิเคราะห์นักเรียนรายคน
             </h1>
             {data && (
               <p className="text-sm text-stone-500">
@@ -284,7 +287,7 @@ export default function TeacherAnalysis() {
               to={`/teacher/classes/${id}/report-cards`}
               className="rounded-xl border-2 border-line bg-white px-3 py-1.5 font-bold"
             >
-              📄 ใบสรุปผล
+              <Icon n="doc" /> ใบสรุปผล
             </Link>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { api } from "../api";
 import { SEASONS } from "../../shared/characters";
 import { nextTerm, seasonOfSemester, termName, type Term } from "../../shared/terms";
 import { Button, Card, ErrorBox } from "../ui";
+import Icon from './Icon'
 
 /** ชื่อเทอมถัดไปแบบไทย: 1/2569 → 2/2569 · 2/2569 → 1/2570 */
 export function nextTermName(name: string): string {
@@ -65,7 +66,7 @@ export default function TermCard() {
       <Card className="p-4 flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-bold">🗓️ เทอม {cur.name}</h2>
+            <h2 className="font-bold"><Icon n="calendar" /> เทอม {cur.name}</h2>
             <p className="text-xs text-stone-500">
               คอลเลกชัน{season(cur.season)}
               {cur.startedAt > 0 && <> · เริ่ม {new Date(cur.startedAt).toLocaleDateString("th-TH", { dateStyle: "medium" })}</>}

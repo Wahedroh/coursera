@@ -5,6 +5,7 @@ import ReportSheet from '../components/ReportSheet'
 import type { ReportCard } from '../../shared/report'
 import { downloadA4Pdf } from '../lib/pdf'
 import { Card, ErrorBox, Loading } from '../ui'
+import Icon from '../components/Icon'
 
 type Res = { available: false } | { available: true; card: ReportCard; releasedAt: number | null }
 
@@ -49,7 +50,7 @@ export default function StudentReport() {
         <Link to="/me" className="text-sm opacity-85">
           ← งานของฉัน
         </Link>
-        <h1 className="text-xl font-extrabold mt-2">📄 ใบสรุปผลการเรียน</h1>
+        <h1 className="text-xl font-extrabold mt-2"><Icon n="doc" /> ใบสรุปผลการเรียน</h1>
       </header>
       <section className="p-4 flex flex-col gap-4">
         <ErrorBox message={error} />
@@ -58,7 +59,7 @@ export default function StudentReport() {
         {res?.available && (
           <>
             <button type="button" onClick={() => void download()} disabled={busy} className="rounded-xl bg-board text-white px-4 py-3 font-bold disabled:opacity-60">
-              {busy ? 'กำลังสร้างไฟล์…' : '⬇️ ดาวน์โหลด PDF (A4)'}
+              {busy ? 'กำลังสร้างไฟล์…' : <><Icon n="download" /> ดาวน์โหลด PDF (A4)</>}
             </button>
             <div ref={box} className="w-full overflow-hidden" style={{ height: `${1123 * k}px` }}>
               <div style={{ transform: `scale(${k})`, transformOrigin: 'top left', width: 794 }}>

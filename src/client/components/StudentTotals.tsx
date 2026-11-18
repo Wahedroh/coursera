@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import type { StudentScoreBreakdown } from '../../shared/grades'
-import { EXP_SOURCE_LABEL, type ExpBreakdown, type ExpSource } from '../../shared/points'
+import { EXP_SOURCE_ICON, EXP_SOURCE_LABEL, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { CATEGORY_LABEL, type ScoreCategory } from '../../shared/scores'
+import Icon from './Icon'
 
 const day = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' })
 const STATUS: Record<StudentScoreBreakdown['assignments'][number]['status'], string> = {
@@ -29,7 +30,7 @@ export default function StudentTotals({ exp }: { exp: { exp: number; level: numb
     <section className="mx-4 mt-4" data-testid="student-totals">
       <div className="flex gap-2">
         <button type="button" className={tile(open === 'score')} onClick={() => setOpen(open === 'score' ? null : 'score')} aria-expanded={open === 'score'} aria-label="ดูที่มาของคะแนนรวม">
-          <span className="block text-xs text-stone-500">📊 คะแนนรวม</span>
+          <span className="block text-xs text-stone-500"><Icon n="chart" /> คะแนนรวม</span>
           <b className="text-xl tabular-nums">{score ? score.total : '–'}</b>
           {score && score.maxTotal > 0 && <span className="text-xs text-stone-500"> / {score.maxTotal}</span>}
           {score?.grade.visible && (
@@ -59,7 +60,7 @@ function ScoreDetail({ d }: { d: StudentScoreBreakdown }) {
         {d.grade.visible && d.grade.fullSetBonus && <span className="block text-xs text-board">🏆 สะสมสัตว์วิเศษครบชุด + สอบถึงเกณฑ์ ได้เกรดสูงสุดตามกติกาครู</span>}
       </p>
       <div>
-        <b className="text-xs text-stone-500">📝 งาน ({d.assignments.length})</b>
+        <b className="text-xs text-stone-500"><Icon n="task" /> งาน ({d.assignments.length})</b>
         {!d.assignments.length && <p className="text-xs text-stone-400">ยังไม่มีงาน</p>}
         <ul>
           {d.assignments.map((a) => (
@@ -77,7 +78,7 @@ function ScoreDetail({ d }: { d: StudentScoreBreakdown }) {
         </ul>
       </div>
       <div>
-        <b className="text-xs text-stone-500">🧪 คะแนนสอบ ({d.exams.length})</b>
+        <b className="text-xs text-stone-500"><Icon n="exam" /> คะแนนสอบ ({d.exams.length})</b>
         {!d.exams.length && <p className="text-xs text-stone-400">ยังไม่มีคะแนนสอบที่ครูเผยแพร่</p>}
         <ul>
           {d.exams.map((e) => (
@@ -113,7 +114,9 @@ function ExpDetail() {
         {d.bySource.map((x) => (
           <li key={x.source}>
             <button type="button" onClick={() => setOnly(only === x.source ? null : x.source)} className={`w-full flex items-center gap-2 rounded-lg px-1 py-0.5 text-left ${only === x.source ? 'bg-amber-100' : ''}`}>
-              <span className="w-28 shrink-0 text-xs">{EXP_SOURCE_LABEL[x.source]}</span>
+              <span className="w-28 shrink-0 text-xs">
+                <Icon n={EXP_SOURCE_ICON[x.source]} /> {EXP_SOURCE_LABEL[x.source]}
+              </span>
               <span className="h-2 flex-1 rounded-full bg-stone-200 overflow-hidden">
                 <span className="block h-full bg-amber-400" style={{ width: `${(Math.max(0, x.exp) / max) * 100}%` }} />
               </span>

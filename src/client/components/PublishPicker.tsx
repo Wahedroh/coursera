@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { localToEpoch } from '../lib/format'
 import type { PublishMode } from '../../shared/timetable'
+import Icon from './Icon'
 
 export type PublishValue = { mode: PublishMode; at: string }
 export const PUBLISH_NOW: PublishValue = { mode: 'now', at: '' }
@@ -48,6 +49,6 @@ const fmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', weekday
 export function ScheduleChip({ published, publishAt }: { published: boolean; publishAt: number | null }) {
   if (published) return null
   return publishAt ? (
-    <span className="inline-block rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-xs font-bold">⏰ เผยแพร่ {fmt.format(publishAt)}</span>
+    <span className="inline-block rounded-full bg-violet-100 text-violet-700 px-2 py-0.5 text-xs font-bold"><Icon n="alarm" /> เผยแพร่ {fmt.format(publishAt)}</span>
   ) : null
 }

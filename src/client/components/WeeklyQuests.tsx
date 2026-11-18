@@ -3,6 +3,7 @@ import { api, ApiClientError } from '../api'
 import type { WeeklyQuests as Quests, WheelState } from '../../shared/quests'
 import LuckyWheel from './LuckyWheel'
 import { Card } from '../ui'
+import Icon from './Icon'
 
 /** ภารกิจประจำสัปดาห์ — ทำครบแล้วกดรับ EXP */
 export default function WeeklyQuests({ onClaimed }: { onClaimed?: () => void }) {
@@ -43,7 +44,7 @@ export default function WeeklyQuests({ onClaimed }: { onClaimed?: () => void }) 
     <div data-testid="weekly-quests">
       <Card className="p-4 flex flex-col gap-2 border-amber-200">
         <div className="flex justify-between items-baseline">
-          <h2 className="font-bold">🎯 ภารกิจสัปดาห์นี้</h2>
+          <h2 className="font-bold"><Icon n="target" /> ภารกิจสัปดาห์นี้</h2>
           <span className="text-xs text-stone-500">
             สำเร็จ {done}/{q.quests.length} · เหลือ {daysLeft} วัน
           </span>

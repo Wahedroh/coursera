@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import type { StudentAssignment, StudentStatus } from '../../shared/assignments'
 import { formatDue, timeLeft } from '../lib/format'
 import { Chip } from '../ui'
+import Icon from './Icon'
 
 export type SheetTab = 'pending' | 'submitted' | 'graded' | 'returned'
 const TAB_OF: Record<StudentStatus, SheetTab> = { missing: 'pending', submitted: 'submitted', late: 'submitted', graded: 'graded', returned: 'returned' }
@@ -148,7 +149,7 @@ export default function AssignmentSheet({ items }: { items: StudentAssignment[] 
           <span className="mx-auto mb-2 block h-1.5 w-11 rounded-full bg-stone-300" aria-hidden />
           <span className="flex items-center gap-2">
             <span className="text-xl" aria-hidden>
-              📋
+              <Icon n="clipboard" />
             </span>
             <b className="flex-1">งานของฉัน</b>
             <span className={`rounded-full px-2.5 py-0.5 text-sm font-bold ${owed ? 'bg-red-100 text-red-700' : 'bg-stone-100 text-stone-500'}`}>ค้าง {owed}</span>
@@ -156,7 +157,7 @@ export default function AssignmentSheet({ items }: { items: StudentAssignment[] 
           </span>
           {next ? (
             <span className={`mt-1 block truncate text-xs ${overdue.length ? 'text-red-700' : 'text-stone-500'}`}>
-              {overdue.length ? `⚠️ เลยกำหนด ${overdue.length} งาน · ${overdue[0].title}` : `⏰ ${next.title} · ${formatDue(next.dueAt)}`}
+              <Icon n={overdue.length ? 'warning' : 'alarm'} /> {overdue.length ? `เลยกำหนด ${overdue.length} งาน · ${overdue[0].title}` : `${next.title} · ${formatDue(next.dueAt)}`}
             </span>
           ) : counts.returned ? (
             <span className="mt-1 block text-xs text-violet-700">↩ ครูส่งกลับให้แก้ {counts.returned} งาน</span>
@@ -223,7 +224,7 @@ function Row({ a, now }: { a: StudentAssignment; now: number }) {
     return (
       <Link to={`/me/assignments/${a.id}`} className="mb-1.5 flex items-center gap-3 rounded-2xl border border-stone-200 p-2.5 active:bg-stone-50">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold bg-stone-200" aria-hidden>
-          🚫
+          <Icon n="blocked" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-bold">{a.title}</span>
@@ -235,7 +236,7 @@ function Row({ a, now }: { a: StudentAssignment; now: number }) {
   const left = a.status === 'missing' ? timeLeft(a.dueAt, now) : null
   const overdue = a.status === 'missing' && a.dueAt !== null && a.dueAt < now
   const icon =
-    a.status === 'missing' ? (overdue ? ['⌛', 'bg-stone-100'] : left?.tone === 'red' ? ['⏰', 'bg-red-100'] : ['📝', 'bg-amber-100']) : a.status === 'graded' ? ['⭐', 'bg-board-soft'] : a.status === 'returned' ? ['↩', 'bg-violet-100 text-violet-700'] : ['✓', a.status === 'late' ? 'bg-amber-100 text-amber-800' : 'bg-board-soft text-board']
+    a.status === 'missing' ? (overdue ? ['hourglass', 'bg-stone-100'] : left?.tone === 'red' ? ['alarm', 'bg-red-100'] : ['task', 'bg-amber-100']) : a.status === 'graded' ? ['⭐', 'bg-board-soft'] : a.status === 'returned' ? ['↩', 'bg-violet-100 text-violet-700'] : ['✓', a.status === 'late' ? 'bg-amber-100 text-amber-800' : 'bg-board-soft text-board']
   const sub =
     a.status === 'missing'
       ? [overdue ? 'เลยกำหนดแล้ว' : left?.label ?? 'ไม่มีกำหนดส่ง', `${a.maxScore} คะแนน`].join(' · ')
@@ -251,7 +252,7 @@ function Row({ a, now }: { a: StudentAssignment; now: number }) {
   return (
     <Link to={`/me/assignments/${a.id}`} className="mb-1.5 flex items-center gap-3 rounded-2xl border border-stone-200 p-2.5 active:bg-stone-50">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-bold ${icon[1]}`} aria-hidden>
-        {icon[0]}
+        <Icon n={icon[0]} className="text-2xl" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-bold">{a.title}</span>

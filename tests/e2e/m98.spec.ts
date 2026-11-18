@@ -22,9 +22,9 @@ async function studentPage(browser: Browser) {
 test('หน้าแรกครู: สรุปวันนี้ (รอตรวจ/ขาด/ใกล้ครบกำหนด) และการ์ดเทอม', async ({ browser }) => {
   const t = await teacherHome(browser)
   const today = t.getByTestId('teacher-today')
-  await expect(today.getByRole('heading', { name: '📋 สรุปวันนี้' })).toBeVisible()
+  await expect(today.getByRole('heading', { name: 'สรุปวันนี้' })).toBeVisible()
   for (const name of ['งานรอตรวจ', 'ขาดเรียนวันนี้', 'ใกล้ครบกำหนด']) await expect(today.getByRole('region', { name })).toBeVisible()
-  await expect(t.getByTestId('term-card').getByRole('heading', { name: '🗓️ เทอม 2/2569' })).toBeVisible()
+  await expect(t.getByTestId('term-card').getByRole('heading', { name: 'เทอม 2/2569' })).toBeVisible()
   await expect(t.getByTestId('term-card').getByText(/คอลเลกชันซีซัน 1/)).toBeVisible()
 })
 
@@ -63,13 +63,13 @@ test('ครูเพิ่มคำถามท้ายคลิป · นั�
   await expect(sum).toContainText('ตอบแล้ว 1 คน')
   await expect(sum).toContainText('ถูก 1/1 (100%)')
   await expect(sum).toContainText('ตอบผิดบ่อย: ข')
-  await expect(t.getByTestId('video-viewers')).toContainText('📝 1/2')
+  await expect(t.getByTestId('video-viewers')).toContainText('1/2')
 })
 
 test('นักเรียน: ภารกิจสัปดาห์นี้บนหน้าแรก · คอลเลกชันแยกซีซัน', async ({ browser }) => {
   const s = await studentPage(browser)
   const q = s.getByTestId('weekly-quests')
-  await expect(q.getByRole('heading', { name: '🎯 ภารกิจสัปดาห์นี้' })).toBeVisible()
+  await expect(q.getByRole('heading', { name: 'ภารกิจสัปดาห์นี้' })).toBeVisible()
   for (const name of ['มาเรียนครบทุกคาบของสัปดาห์', 'ส่งงานตรงเวลา 1 ชิ้น', 'ทบทวนคลิป 1 คลิป']) await expect(q.getByText(name)).toBeVisible()
   await s.getByRole('link', { name: '⭐ ตัวละครและแต้มของฉัน' }).click()
   await expect(s.getByText('เทอม 2/2569')).toBeVisible()

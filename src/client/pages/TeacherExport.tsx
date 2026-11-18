@@ -7,6 +7,7 @@ import { attendanceSheet, classFeesSheet, exportWorkbook, gradebookSheet, grades
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type School = { schoolId: string; schoolName: string; classes: { id: string; name: string; grade: number | null }[] }
 const input = 'border-2 border-line rounded-xl px-3 py-2 bg-white'
@@ -155,7 +156,7 @@ export default function TeacherExport() {
             </div>
           )}
           <Button type="button" onClick={() => void run()} disabled={busy !== null || classIds.length === 0 || kinds.length === 0}>
-            {busy ?? '⬇ ส่งออก Excel'}
+            {busy ?? <><Icon n="download" /> ส่งออก Excel</>}
           </Button>
           <p className="text-xs text-stone-500">ได้ 1 ไฟล์ แยกชีตตามประเภทข้อมูลและห้อง (เช่น "คะแนน ชั้น 1", "เช็กชื่อ ชั้น 1")</p>
         </Card>

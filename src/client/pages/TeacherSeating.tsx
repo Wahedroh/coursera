@@ -6,6 +6,7 @@ import { DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 type Student = { id: string; firstName: string; lastName: string; active: boolean }
 type Layout = { cols: number; seats: (string | null)[] }
@@ -231,7 +232,7 @@ export default function TeacherSeating() {
             </Card>
           )}
           <div className="rounded-2xl p-4 bg-board text-white text-center flex flex-col items-center gap-2">
-            <span className="text-xs opacity-80">🎲 สุ่มชื่อ (เหลือ {remaining} คนที่ยังไม่ถูกสุ่ม)</span>
+            <span className="text-xs opacity-80"><Icon n="dice" /> สุ่มชื่อ (เหลือ {remaining} คนที่ยังไม่ถูกสุ่ม)</span>
             {picked && (
               <div className="flex flex-col items-center gap-1 pt-3 pb-1" data-testid="pick-result" data-student-id={picked} data-first-name={name(picked)}>
                 <div className={`rounded-2xl bg-white/95 p-2 ${countdown > 0 ? 'animate-hop' : ''}`}>
@@ -288,7 +289,7 @@ export default function TeacherSeating() {
                 <input type="number" min={2} max={20} value={groupCount} onChange={(e) => setGroupCount(Number(e.target.value))} className="w-16 border-2 border-line rounded-lg px-2 py-1 ml-2" />
               </label>
               <button type="button" onClick={makeGroups} className="rounded-xl border-2 border-line px-3 py-1 font-bold text-sm">
-                👥 แบ่งกลุ่ม
+                <Icon n="group" /> แบ่งกลุ่ม
               </button>
             </div>
             {groups?.map((g, i) => (

@@ -1,22 +1,24 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router'
 import { api } from '../api'
+import Icon, { type IconName } from '../components/Icon'
+import IconCredit from '../components/IconCredit'
 
-const NAV = [
-  { to: '/teacher', label: 'หน้าแรก', end: true },
-  { to: '/teacher/timetable', label: 'ตารางสอน', end: false },
-  { to: '/teacher/route', label: 'เส้นทาง & ปิดโรงเรียน', end: false },
-  { to: '/teacher/workload', label: 'ภาระสอน & เดินทาง', end: false },
-  { to: '/teacher/assignments/new', label: 'สร้างงาน', end: false },
-  { to: '/teacher/scheduled', label: 'รอเผยแพร่', end: false },
-  { to: '/teacher/library', label: 'คลังของครู', end: false },
-  { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', end: false },
-  { to: '/teacher/calendar', label: 'ปฏิทิน', end: false },
-  { to: '/teacher/card-game', label: 'เกมการ์ด QR', end: false },
-  { to: '/teacher/insights', label: 'กราฟห้องเรียน', end: false },
-  { to: '/teacher/export', label: 'ส่งออกข้อมูล', end: false },
-  { to: '/teacher/import', label: 'นำเข้ารายชื่อ', end: false },
-  { to: '/teacher/storage', label: 'พื้นที่ไฟล์', end: false },
+const NAV: { to: string; label: string; icon: IconName; end: boolean }[] = [
+  { to: '/teacher', label: 'หน้าแรก', icon: 'home', end: true },
+  { to: '/teacher/timetable', label: 'ตารางสอน', icon: 'planner', end: false },
+  { to: '/teacher/route', label: 'เส้นทาง & ปิดโรงเรียน', icon: 'compass', end: false },
+  { to: '/teacher/workload', label: 'ภาระสอน & เดินทาง', icon: 'chart', end: false },
+  { to: '/teacher/assignments/new', label: 'สร้างงาน', icon: 'task', end: false },
+  { to: '/teacher/scheduled', label: 'รอเผยแพร่', icon: 'alarm', end: false },
+  { to: '/teacher/library', label: 'คลังของครู', icon: 'books', end: false },
+  { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', icon: 'watch', end: false },
+  { to: '/teacher/calendar', label: 'ปฏิทิน', icon: 'calendar', end: false },
+  { to: '/teacher/card-game', label: 'เกมการ์ด QR', icon: 'cards', end: false },
+  { to: '/teacher/insights', label: 'กราฟห้องเรียน', icon: 'trend', end: false },
+  { to: '/teacher/export', label: 'ส่งออกข้อมูล', icon: 'download', end: false },
+  { to: '/teacher/import', label: 'นำเข้ารายชื่อ', icon: 'import', end: false },
+  { to: '/teacher/storage', label: 'พื้นที่ไฟล์', icon: 'folder', end: false },
 ]
 
 export default function TeacherLayout({ children }: { children: ReactNode }) {
@@ -44,12 +46,13 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
             end={n.end}
             className={({ isActive }) => `rounded-xl px-2.5 md:px-3 py-2 text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white/15 text-white' : 'text-green-100'}`}
           >
-            {n.label}
+            <Icon n={n.icon} /> {n.label}
           </NavLink>
         ))}
         <button type="button" onClick={logout} className="md:mt-auto text-xs text-green-100/80 px-2 md:px-3 py-2 text-left whitespace-nowrap">
-          ออกจากระบบ
+          <Icon n="logout" /> ออกจากระบบ
         </button>
+        <IconCredit className="hidden md:block px-3 text-green-100/60" />
       </aside>
       <main className="flex-1 p-4 md:p-7 flex flex-col gap-4 min-w-0">{children}</main>
     </div>
@@ -74,7 +77,7 @@ function TeacherBell() {
       aria-label={unread ? `แจ้งเตือน ${unread} รายการใหม่` : 'แจ้งเตือน'}
       className={({ isActive }) => `relative rounded-xl px-2.5 md:px-3 py-2 text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white/15 text-white' : 'text-green-100'}`}
     >
-      🔔 แจ้งเตือน
+      <Icon n="bell" /> แจ้งเตือน
       {unread > 0 && <span className="ml-1.5 inline-block rounded-full bg-red-500 text-white px-1.5 text-xs font-extrabold">{unread}</span>}
     </NavLink>
   )

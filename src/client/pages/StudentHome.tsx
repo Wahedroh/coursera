@@ -18,6 +18,8 @@ import type { Streak } from '../../shared/quests'
 import AssignmentSheet from '../components/AssignmentSheet'
 import { clearDrafts } from '../lib/session'
 import { Button, Card, Loading } from '../ui'
+import Icon from '../components/Icon'
+import IconCredit from '../components/IconCredit'
 
 type StudentMe = Extract<Me, { kind: 'student' }>
 
@@ -78,7 +80,7 @@ export default function StudentHome() {
         <NotificationBell />
         {avatar && (
           <Link to="/me/avatar" aria-label="แต่งตัวละคร" className="absolute top-4 right-4 z-10 rounded-full bg-amber-400 text-amber-950 px-3 py-1 text-xs font-extrabold shadow">
-            ✏️ แต่งตัว
+            <Icon n="edit" /> แต่งตัว
           </Link>
         )}
         {/* เวทีตัวละคร: ตัวใหญ่ มีเงาใต้เท้าและประกาย */}
@@ -144,22 +146,22 @@ export default function StudentHome() {
             ⭐ ตัวละครและแต้มของฉัน
           </Link>
           <Link to="/me/scores" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            📊 คะแนนสอบ
+            <Icon n="chart" /> คะแนนสอบ
           </Link>
           <Link to="/me/videos" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            🎬 คลิปย้อนหลัง
+            <Icon n="clip" /> คลิปย้อนหลัง
           </Link>
           <Link to="/me/materials" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            📄 เอกสารเรียน
+            <Icon n="doc" /> เอกสารเรียน
           </Link>
           <Link to="/me/fees" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            🧾 ค่าเอกสาร
+            <Icon n="receipt" /> ค่าเอกสาร
           </Link>
           <Link to="/me/calendar" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            📅 ปฏิทิน
+            <Icon n="calendar" /> ปฏิทิน
           </Link>
           <Link to="/me/stats" className="rounded-xl bg-white/15 px-3 py-1.5 text-sm font-semibold">
-            📈 สถิติของฉัน
+            <Icon n="trend" /> สถิติของฉัน
           </Link>
         </div>
       </header>
@@ -174,7 +176,7 @@ export default function StudentHome() {
           <Link to="/me/fees" className="block">
             <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">
               <span className="text-xl" aria-hidden>
-                🧾
+                <Icon n="receipt" />
               </span>
               <p className="text-sm">
                 <b>ค้างค่าเอกสาร {baht(feeOwed)}</b> · แตะเพื่อดูรายละเอียด
@@ -185,6 +187,7 @@ export default function StudentHome() {
         <Button variant="ghost" onClick={logout} className="mt-4">
           ออกจากระบบ
         </Button>
+        <IconCredit className="text-center text-stone-400" />
       </section>
       <AssignmentSheet items={items} />
     </main>

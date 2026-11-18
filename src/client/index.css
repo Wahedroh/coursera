@@ -45,3 +45,16 @@ body {
     margin: 0 !important;
   }
 }
+
+/* ไอคอน IconSaga (สองสี): เส้น = สีตัวอักษร · พื้น = --acc */
+.ic {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.24em;
+  flex-shrink: 0;
+  --acc: #f2b544;
+}
+.ic .w {
+  stroke-width: 1.7;
+}

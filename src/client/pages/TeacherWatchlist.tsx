@@ -7,6 +7,7 @@ import { REASON_LABEL, type WatchReason, type Watchlist, type WatchlistQuery } f
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
+import Icon from '../components/Icon'
 
 const TONE: Record<WatchReason, 'red' | 'amber' | 'purple' | 'gray'> = { missing: 'red', absent: 'amber', grade: 'purple', no_pin: 'gray' }
 const num = 'w-14 border-2 border-line rounded-lg px-2 py-1 mx-1'
@@ -38,7 +39,7 @@ export default function TeacherWatchlist() {
         <h1 className="text-2xl font-extrabold">นักเรียนที่ต้องติดตาม</h1>
         {data && (
           <button type="button" onClick={() => void exportWatchlist({ ...data, classes: shown ?? [] })} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
-            ⬇ Excel
+            <Icon n="download" /> Excel
           </button>
         )}
       </div>
