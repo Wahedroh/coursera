@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
 import { charactersOfSeason, RARITY_WEIGHTS, type Character, type Rarity } from '../../shared/characters'
-import { BONUS_CHANCE, EGG_ITEMS, missingItems } from '../../shared/eggItems'
+import { BONUS_CHANCE, EGG_ITEMS, missingItems, TEST_ZIPGRADE_IDS } from '../../shared/eggItems'
 import { EXP_PER_LEVEL, EXP_SOURCES, levelOf, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { classes, eggs, pointEvents, seating, settings, studentAvatars, students, terms } from '../db/schema'
@@ -101,6 +101,8 @@ export function rollBonus(rand: () => number, owned: ReadonlySet<string>): strin
 }
 
 export async function ownedItems(db: Db, studentId: string): Promise<string[]> {
+  const [st] = await db.select({ zipgradeId: students.zipgradeId }).from(students).where(eq(students.id, studentId))
+  if (st && TEST_ZIPGRADE_IDS.includes(st.zipgradeId)) return EGG_ITEMS.map((x) => x.id)
   const rows = await db
     .select({ item: eggs.bonusItem })
     .from(eggs)

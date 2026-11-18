@@ -6,6 +6,9 @@ export type ItemKind = 'hand' | 'offhand' | 'outfit' | 'secret'
 export const ITEM_KIND_LABEL: Record<ItemKind, string> = { hand: 'อุปกรณ์ (มือขวา)', offhand: 'อุปกรณ์ (มือซ้าย)', outfit: 'ชุดพิเศษ', secret: 'ตัวละครลึกลับ' }
 export type EggItem = { id: string; kind: ItemKind; name: string; rarity: Rarity }
 
+/** นักเรียนทดสอบของครู (ZipGrade ID) — มีของแถมครบทุกอย่างเสมอ ไว้ลองแต่งตัว/ดูหน้าตา */
+export const TEST_ZIPGRADE_IDS = ['99999']
+
 /** โอกาสได้ของแถมต่อไข่ 1 ใบ */
 export const BONUS_CHANCE = 0.75
 
