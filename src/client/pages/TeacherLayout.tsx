@@ -39,6 +39,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
           </span>
         </Link>
         <TeacherBell />
+        <LeaveLink />
         {NAV.map((n) => (
           <NavLink
             key={n.to}
@@ -79,6 +80,30 @@ function TeacherBell() {
     >
       <Icon n="bell" /> แจ้งเตือน
       {unread > 0 && <span className="ml-1.5 inline-block rounded-full bg-red-500 text-white px-1.5 text-xs font-extrabold">{unread}</span>}
+    </NavLink>
+  )
+}
+
+/** ใบลานักเรียน (จำนวนที่รออนุมัติ) */
+function LeaveLink() {
+  const [pending, setPending] = useState(0)
+  useEffect(() => {
+    const load = () =>
+      api<{ pending: number }>('/api/teacher/leaves/count')
+        .then((r) => setPending(r.pending))
+        .catch(() => {})
+    load()
+    const id = window.setInterval(load, 120_000)
+    return () => window.clearInterval(id)
+  }, [])
+  return (
+    <NavLink
+      to="/teacher/leaves"
+      aria-label={pending ? `ใบลา ${pending} รายการรออนุมัติ` : 'ใบลา'}
+      className={({ isActive }) => `relative rounded-xl px-2.5 md:px-3 py-2 text-sm font-semibold whitespace-nowrap ${isActive ? 'bg-white/15 text-white' : 'text-green-100'}`}
+    >
+      <Icon n="doc" /> ใบลา
+      {pending > 0 && <span className="ml-1.5 inline-block rounded-full bg-amber-400 text-amber-950 px-1.5 text-xs font-extrabold">{pending}</span>}
     </NavLink>
   )
 }

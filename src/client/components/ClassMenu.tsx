@@ -20,6 +20,7 @@ export const CLASS_MENU: MenuEntry[] = [
   { label: 'ผังห้อง & แต้ม', kind: 'seating', path: (id) => `/teacher/classes/${id}/seating` },
   { label: 'คะแนนสอบ', kind: 'scores', empty: 'ยังไม่มีรายการสอบเทอมนี้', path: (id) => `/teacher/classes/${id}/scores` },
   { label: 'เกรด', kind: 'grades', path: (id) => `/teacher/classes/${id}/grades` },
+  { label: '0 · ร · มส', kind: 'at-risk', path: (id) => `/teacher/classes/${id}/at-risk` },
   { label: 'กราฟ', kind: 'insights', all: { icon: 'chart', label: 'เทียบทุกห้อง', to: '/teacher/insights' }, path: (id) => `/teacher/insights?class=${id}` },
   { label: 'ปฏิทิน', kind: 'calendar', all: { icon: 'calendar', label: 'ปฏิทินรวมทุกห้อง', to: '/teacher/calendar' }, empty: 'ไม่มีวันสำคัญที่กำลังจะถึง', path: (id) => `/teacher/calendar?class=${id}` },
   { label: 'เกมการ์ด', kind: 'card-game', all: { icon: 'cards', label: 'ชุดคำถาม & เริ่มเกม', to: '/teacher/card-game' }, empty: 'ยังไม่เคยเล่น', path: (id) => `/teacher/card-game?class=${id}` },

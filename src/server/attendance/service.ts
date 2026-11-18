@@ -3,7 +3,7 @@ import type { BatchItem } from 'drizzle-orm/batch'
 import { type AttendanceDay, type AttendanceRange, type AttendanceStatus } from '../../shared/attendance'
 import { EXP_RULES } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
-import { attendanceDays, attendanceRecords, classes, students } from '../db/schema'
+import { attendanceDays, attendanceRecords, classes, leaveRequests, students } from '../db/schema'
 import { hmacSha256Hex } from '../auth/crypto'
 import { apiError } from '../http'
 
@@ -57,7 +57,18 @@ export async function openDay(db: Db, classId: string, date: string): Promise<At
   const existing = new Set(
     (await db.select({ studentId: attendanceRecords.studentId }).from(attendanceRecords).where(eq(attendanceRecords.dayId, day.id))).map((r) => r.studentId),
   )
-  const missing = roster.filter((s) => !existing.has(s.id)).map((s) => ({ id: newId(), dayId: day.id, studentId: s.id, status: 'present' as const, source: 'teacher' as const, updatedAt: t }))
+  // ใบลาที่ครูอนุมัติแล้วครอบคลุมวันนี้ → ใส่ป่วย/ลาให้แทน "มา"
+  const leaves = new Map(
+    (
+      await db
+        .select({ studentId: leaveRequests.studentId, kind: leaveRequests.kind })
+        .from(leaveRequests)
+        .where(and(eq(leaveRequests.classId, classId), eq(leaveRequests.status, 'approved'), lte(leaveRequests.fromDate, date), gte(leaveRequests.toDate, date)))
+    ).map((r) => [r.studentId, r.kind]),
+  )
+  const missing = roster
+    .filter((s) => !existing.has(s.id))
+    .map((s) => ({ id: newId(), dayId: day.id, studentId: s.id, status: (leaves.get(s.id) ?? 'present') as AttendanceStatus, source: 'teacher' as const, updatedAt: t }))
   const stmts: BatchItem<'sqlite'>[] = []
   for (let i = 0; i < missing.length; i += CHUNK) stmts.push(db.insert(attendanceRecords).values(missing.slice(i, i + CHUNK)).onConflictDoNothing())
   await runBatches(db, stmts)

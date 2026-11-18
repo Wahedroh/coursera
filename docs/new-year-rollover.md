@@ -38,6 +38,8 @@
 ตารางที่มีตอนตกลง: schools classes students sessions settings rate_limits assignments submissions point_events attendance_days attendance_records seating eggs terms score_items scores videos materials announcements announcement_reads fee_items fee_charges student_avatars stored_files storage_stats push_subscriptions notifications calendar_events card_quizzes card_games card_answers student_notes timetable_slots teacher_push_subscriptions teacher_notifications school_closures teacher_appointments makeup_classes video_progress
 
 เพิ่มหลังตกลง: `assignment_closed` (ครูบันทึกว่าไม่ส่งงาน — ผูกกับนักเรียน/งาน → เก็บถาวรไปกับห้อง)
+- `leave_requests` (ใบลา — ผูกนักเรียน/ห้อง → เก็บถาวรไปกับห้อง · รูปแนบ `sub/<studentId>/…` ลบพร้อมรูปงานนักเรียน)
+- `remedials` (งานซ่อม 0/ร/มส — ผูกนักเรียน/ห้อง → เก็บถาวร · ผลหลังซ่อมควรออกในเมนู "ปีที่ผ่านมา"/Excel · รูปแนบลบพร้อมรูปงาน)
 
 - ตารางใหม่ที่ผูกกับห้อง/นักเรียน → ต้องถูกซ่อนเมื่อห้องเก็บถาวร และไม่ชนกับห้อง/รหัสใหม่
 - ตารางใหม่ที่เป็นของครู → ตัดสินใจว่าคงไว้ข้ามปีหรือไม่ (ถามครูถ้าไม่ชัด)

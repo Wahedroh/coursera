@@ -9,6 +9,7 @@ import {
   type OverviewKind,
 } from "../../shared/overview";
 import { allClassGrades } from "../grades/service";
+import { atRiskCounts } from "../remedial/service";
 import type { Db } from "../db/client";
 import { termWindow } from "../terms/service";
 
@@ -166,6 +167,18 @@ export async function overview(
                 .join(" · ")
             : "ยังไม่มีคะแนน",
         );
+      }
+      break;
+    }
+    case "at-risk": {
+      for (const [classId, c] of await atRiskCounts(db, t)) {
+        const parts = [
+          c.attendance && `มส ${c.attendance}`,
+          c.incomplete && `ร ${c.incomplete}`,
+          c.zero && `0: ${c.zero}`,
+          (c.remedialOpen || c.remedialPassed) && `งานซ่อมผ่าน ${c.remedialPassed}/${c.remedialOpen + c.remedialPassed}`,
+        ].filter(Boolean);
+        stats.set(classId, parts.length ? parts.join(" · ") : "ไม่มีนักเรียนติด 0/ร/มส");
       }
       break;
     }

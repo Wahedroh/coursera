@@ -40,7 +40,7 @@ test('ครูดูพื้นที่ไฟล์ แล้วลบรู�
   await expect(sheet).toHaveCount(0)
   await student.getByRole('button', { name: /งานของฉัน/ }).click()
   await sheet.getByRole('tab', { name: /ตรวจแล้ว/ }).click()
-  await student.getByRole('link', { name: /ใบงานเศษส่วน/ }).click()
+  await sheet.getByRole('link', { name: /ใบงานเศษส่วน/ }).click()
   await expect(student.getByText('ครูลบรูปงานนี้แล้วเพื่อประหยัดพื้นที่ (คะแนนยังอยู่)')).toBeVisible()
   await expect(student.getByText('ครูตรวจแล้ว')).toBeVisible()
 })

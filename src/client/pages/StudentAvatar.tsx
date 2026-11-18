@@ -28,12 +28,18 @@ export default function StudentAvatar() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
+    // คำตอบที่มาช้าจากรอบที่ยกเลิกแล้ว ห้ามทับสิ่งที่นักเรียนกำลังแก้
+    let live = true
     api<{ nickname: string; config: AvatarConfig }>('/api/student/avatar')
       .then((a) => {
+        if (!live) return
         setCfg(a.config)
         setNickname(a.nickname)
       })
-      .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+      .catch((e) => live && (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+    return () => {
+      live = false
+    }
   }, [navigate])
 
   if (!cfg) return error ? <ErrorBox message={error} /> : <Loading />
