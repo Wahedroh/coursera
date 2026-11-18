@@ -3,7 +3,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { characterById, charactersOfSeason, RARITY_LABEL, SEASONS } from '../../shared/characters'
-import { AvatarArt, CharacterArt, EggArt } from '../components/PixelArt'
+import { AvatarArt, CharacterArt, EggArt, ItemArt } from '../components/PixelArt'
+import { EGG_ITEMS, eggItemById, ITEM_KIND_LABEL, type ItemKind } from '../../shared/eggItems'
 import type { AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import BadgeGrid from '../components/BadgeGrid'
@@ -18,6 +19,9 @@ type Progress = {
   history: { delta: number; reason: string; createdAt: number }[]
   /** กติกาครู: สะสมครบชุดซีซันเทอมนี้ได้เกรดนี้ (null = ไม่ได้เปิดกติกา) */
   fullSetReward: { grade: string; minExamPct: number } | null
+  /** ของแถมที่มี · กล่องของขวัญรอเปิด (ไข่ที่เปิดก่อนมีของแถม) */
+  items: string[]
+  gifts: number
 }
 type Rank = { rank: number; firstName: string; exp: number; level: number; isMe: boolean; avatar: AvatarConfig }
 
@@ -26,7 +30,7 @@ export default function StudentProgress() {
   const [p, setP] = useState<Progress | null>(null)
   const [board, setBoard] = useState<Rank[] | null>(null)
   const [badges, setBadges] = useState<StudentBadge[] | null>(null)
-  const [opened, setOpened] = useState<string | null>(null)
+  const [opened, setOpened] = useState<{ characterId: string | null; bonus: string | null } | null>(null)
   // กันกดรัว (กดซ้ำระหว่างรอจะได้ 409)
   const [opening, setOpening] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -44,11 +48,24 @@ export default function StudentProgress() {
     if (opening) return
     setOpening(eggId)
     try {
-      const { characterId } = await api<{ characterId: string }>(`/api/student/eggs/${eggId}/open`, { body: {} })
-      setOpened(characterId)
+      setOpened(await api<{ characterId: string; bonus: string | null }>(`/api/student/eggs/${eggId}/open`, { body: {} }))
       load()
     } catch (e) {
       setError(e instanceof ApiClientError ? e.message : 'เปิดไข่ไม่สำเร็จ')
+    } finally {
+      setOpening(null)
+    }
+  }
+
+  async function openGift() {
+    if (opening) return
+    setOpening('gift')
+    try {
+      const r = await api<{ bonus: string | null }>('/api/student/gifts/open', { body: {} })
+      setOpened({ characterId: null, bonus: r.bonus })
+      load()
+    } catch (e) {
+      setError(e instanceof ApiClientError ? e.message : 'เปิดกล่องไม่สำเร็จ')
     } finally {
       setOpening(null)
     }
@@ -59,7 +76,9 @@ export default function StudentProgress() {
   const pending = p.eggs.filter((e) => !e.characterId)
   const prev = p.level * EXP_PER_LEVEL
   const pct = Math.max(0, Math.min(100, ((p.exp - prev) / (p.nextLevelAt - prev)) * 100))
-  const got = opened ? characterById(opened) : null
+  const got = opened?.characterId ? characterById(opened.characterId) : null
+  const bonus = opened?.bonus ? eggItemById(opened.bonus) : null
+  const mine = new Set(p.items)
 
   return (
     <main className="min-h-screen max-w-md mx-auto pb-8">
@@ -85,12 +104,51 @@ export default function StudentProgress() {
       </header>
       <section className="p-5 flex flex-col gap-3">
         <ErrorBox message={error} />
-        {got && (
-          <Card className="p-4 text-center bg-amber-50 border-amber-200 flex flex-col items-center gap-2">
-            <CharacterArt id={got.id} size={8} />
-            <b>
-              ได้ตัวละคร {got.name} ({RARITY_LABEL[got.rarity]})
-            </b>
+        {opened && (
+          <div data-testid="egg-result">
+            <Card className="p-4 text-center bg-amber-50 border-amber-200 flex flex-col items-center gap-3">
+              <div className="flex items-end justify-center gap-4 flex-wrap">
+                {got && (
+                  <div className="flex flex-col items-center gap-1">
+                    <CharacterArt id={got.id} size={8} />
+                    <b>
+                      {got.name} ({RARITY_LABEL[got.rarity]})
+                    </b>
+                    <span className="text-xs text-stone-500">สัตว์วิเศษ</span>
+                  </div>
+                )}
+                {got && bonus && <span className="text-3xl font-extrabold text-amber-600 self-center">+</span>}
+                {bonus && (
+                  <div className="flex flex-col items-center gap-1">
+                    <ItemArt id={bonus.id} size={7} />
+                    <b>
+                      {bonus.name} ({RARITY_LABEL[bonus.rarity]})
+                    </b>
+                    <span className="text-xs text-stone-500">{ITEM_KIND_LABEL[bonus.kind]}</span>
+                  </div>
+                )}
+              </div>
+              {!bonus && <p className="text-sm text-stone-500">{got ? 'ครั้งนี้ไม่ได้ของแถม — ไข่ใบหน้าลุ้นใหม่!' : 'กล่องนี้ว่างเปล่า — ลุ้นกล่องต่อไปนะ!'}</p>}
+              {bonus && bonus.kind !== 'secret' && (
+                <Link to="/me/avatar" className="rounded-xl bg-board text-white px-4 py-1.5 text-sm font-bold">
+                  ไปใส่ที่ตัวละคร
+                </Link>
+              )}
+            </Card>
+          </div>
+        )}
+        {p.gifts > 0 && (
+          <Card className="p-4 flex items-center gap-3 bg-violet-50 border-violet-200">
+            <span className="text-4xl" aria-hidden>
+              🎁
+            </span>
+            <div className="flex-1">
+              <b>กล่องของขวัญ {p.gifts} กล่อง</b>
+              <p className="text-xs text-stone-500">จากไข่ที่เคยเปิดไปแล้ว · ลุ้นอุปกรณ์ ชุดพิเศษ ตัวละครลึกลับ</p>
+            </div>
+            <Button onClick={openGift} disabled={opening !== null} className="px-3 py-2">
+              เปิดกล่อง
+            </Button>
           </Card>
         )}
         {pending.map((e) => (
@@ -143,6 +201,7 @@ export default function StudentProgress() {
               </section>
             )
           })}
+        <ItemCollection mine={mine} />
         {board && (
           <>
             <h2 className="font-bold mt-2">กระดานจัดอันดับห้อง</h2>
@@ -177,5 +236,37 @@ export default function StudentProgress() {
         </Card>
       </section>
     </main>
+  )
+}
+
+const KINDS: ItemKind[] = ['hand', 'offhand', 'outfit', 'secret']
+
+/** ของสะสมจากไข่: อุปกรณ์ · ชุดพิเศษ · ตัวละครลึกลับ (ยังไม่ได้ = ???) */
+function ItemCollection({ mine }: { mine: ReadonlySet<string> }) {
+  const have = EGG_ITEMS.filter((x) => mine.has(x.id)).length
+  return (
+    <section className="flex flex-col gap-2" data-testid="item-collection">
+      <h2 className="font-bold flex items-baseline gap-2">
+        ของแถมจากไข่ ({have}/{EGG_ITEMS.length})
+        <Link to="/me/avatar" className="ml-auto text-xs font-semibold text-board underline">
+          ไปแต่งตัวละคร
+        </Link>
+      </h2>
+      <p className="text-xs text-stone-500">เปิดไข่มีโอกาสได้ของแถม 75% · ตัวละครลึกลับไม่นับในชุดสัตว์วิเศษ</p>
+      {KINDS.map((k) => (
+        <div key={k}>
+          <b className="text-xs text-stone-500">{ITEM_KIND_LABEL[k]}</b>
+          <div className="grid grid-cols-4 gap-2 mt-1">
+            {EGG_ITEMS.filter((x) => x.kind === k).map((x) => (
+              <Card key={x.id} className={`p-2 flex flex-col items-center text-center ${mine.has(x.id) ? (k === 'secret' ? 'border-violet-300 bg-violet-50' : '') : 'bg-stone-50'}`}>
+                <span className="h-12 flex items-center">{mine.has(x.id) ? <ItemArt id={x.id} size={4} /> : <span className="text-2xl text-stone-300">?</span>}</span>
+                <span className="text-[10px] font-semibold mt-1">{mine.has(x.id) || k !== 'secret' ? x.name : '???'}</span>
+                <span className="text-[10px] text-stone-400">{RARITY_LABEL[x.rarity]}</span>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
   )
 }

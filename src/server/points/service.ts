@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { avatarConfigSchema, DEFAULT_AVATAR, type AvatarConfig } from '../../shared/avatar'
-import { charactersOfSeason, RARITY_WEIGHTS, type Character } from '../../shared/characters'
+import { charactersOfSeason, RARITY_WEIGHTS, type Character, type Rarity } from '../../shared/characters'
+import { BONUS_CHANCE, EGG_ITEMS, missingItems } from '../../shared/eggItems'
 import { EXP_PER_LEVEL, EXP_SOURCES, levelOf, type ExpBreakdown, type ExpSource } from '../../shared/points'
 import { newId, now, type Db } from '../db/client'
 import { classes, eggs, pointEvents, seating, settings, studentAvatars, students, terms } from '../db/schema'
@@ -72,7 +73,11 @@ export async function saveSeating(db: Db, classId: string, layout: Layout): Prom
  *  ไม่ซ้ำกับตัวที่มีแล้ว จนกว่าจะครบทั้งชุด (ระดับที่ครบแล้วถูกตัดออก แล้วเฉลี่ยน้ำหนักระดับที่เหลือ) · ครบแล้วสุ่มได้ทุกตัวในชุด */
 export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = new Set(), set: Character[] = charactersOfSeason(1)): string {
   const left = set.filter((c) => !owned.has(c.id))
-  const pool0 = left.length ? left : set
+  return rollByRarity(rand, left.length ? left : set).id
+}
+
+/** สุ่ม 1 อย่างตามน้ำหนักความหายาก (ระดับที่ไม่มีในกองถูกตัดออก แล้วเฉลี่ยน้ำหนักระดับที่เหลือ) */
+function rollByRarity<T extends { rarity: Rarity }>(rand: () => number, pool0: T[]): T {
   const tiers = RARITY_WEIGHTS.filter(([k]) => pool0.some((c) => c.rarity === k))
   const total = tiers.reduce((n, [, w]) => n + w, 0)
   let r = rand() * total
@@ -85,7 +90,23 @@ export function rollCharacter(rand: () => number, owned: ReadonlySet<string> = n
     r -= w
   }
   const pool = pool0.filter((c) => c.rarity === rarity)
-  return pool[Math.floor(rand() * pool.length) % pool.length].id
+  return pool[Math.floor(rand() * pool.length) % pool.length]
+}
+
+/** ของแถมจากไข่: โอกาส BONUS_CHANCE · ไม่ซ้ำของที่มีแล้ว (มีครบทุกอย่างแล้ว = ไม่ได้) */
+export function rollBonus(rand: () => number, owned: ReadonlySet<string>): string | null {
+  if (rand() >= BONUS_CHANCE) return null
+  const left = EGG_ITEMS.filter((x) => !owned.has(x.id))
+  return left.length ? rollByRarity(rand, left).id : null
+}
+
+export async function ownedItems(db: Db, studentId: string): Promise<string[]> {
+  const rows = await db
+    .select({ item: eggs.bonusItem })
+    .from(eggs)
+    .where(and(eq(eggs.studentId, studentId), isNotNull(eggs.bonusItem)))
+    .orderBy(eggs.bonusAt)
+  return rows.map((r) => r.item!)
 }
 
 /** ที่มาของ EXP เทอมนี้ของนักเรียน 1 คน: รวมตามประเภท + รายการทั้งหมด (ใหม่ก่อน) */
@@ -149,10 +170,10 @@ export async function progress(db: Db, studentId: string) {
     .where(and(eq(pointEvents.studentId, studentId), inTerm(w)))
     .orderBy(desc(pointEvents.createdAt))
     .limit(30)
-  return { exp, level, nextLevelAt: (level + 1) * EXP_PER_LEVEL, term: { name: w.term.name, season: w.term.season }, eggs: myEggs, history }
+  return { exp, level, nextLevelAt: (level + 1) * EXP_PER_LEVEL, term: { name: w.term.name, season: w.term.season }, eggs: myEggs, history, items: await ownedItems(db, studentId), gifts: await giftCount(db, studentId) }
 }
 
-export async function openEgg(db: Db, studentId: string, eggId: string, rand = secureRandom): Promise<{ characterId: string }> {
+export async function openEgg(db: Db, studentId: string, eggId: string, rand = secureRandom): Promise<{ characterId: string; bonus: string | null }> {
   const [egg] = await db
     .select({ id: eggs.id, season: sql<number>`coalesce(${terms.season}, 1)` })
     .from(eggs)
@@ -162,14 +183,41 @@ export async function openEgg(db: Db, studentId: string, eggId: string, rand = s
   const owned = new Set(
     (await db.select({ c: eggs.characterId }).from(eggs).where(and(eq(eggs.studentId, studentId), isNotNull(eggs.characterId)))).map((e) => e.c!),
   )
+  // สัตว์วิเศษสุ่มเหมือนเดิม (ไม่กระทบโอกาสครบชุด) แล้วค่อยสุ่มของแถม
   const characterId = rollCharacter(rand, owned, charactersOfSeason(egg.season))
+  const bonus = rollBonus(rand, new Set(await ownedItems(db, studentId)))
+  const t = now()
   const res = await db
     .update(eggs)
-    .set({ characterId, openedAt: now() })
+    .set({ characterId, openedAt: t, bonusItem: bonus, bonusAt: t })
     .where(and(eq(eggs.id, eggId), eq(eggs.studentId, studentId), isNull(eggs.openedAt)))
     .returning({ id: eggs.id })
   if (!res.length) throw apiError('egg_already_opened', 'ไข่ใบนี้เปิดไปแล้ว', 409)
-  return { characterId }
+  return { characterId, bonus }
+}
+
+/** กล่องของขวัญ: ไข่ที่เปิดก่อนมีระบบของแถม ได้สุ่มของแถมย้อนหลังใบละครั้ง */
+export async function giftCount(db: Db, studentId: string): Promise<number> {
+  const [r] = await db.select({ n: sql<number>`count(*)` }).from(eggs).where(and(eq(eggs.studentId, studentId), isNotNull(eggs.openedAt), isNull(eggs.bonusAt)))
+  return r.n
+}
+
+export async function openGift(db: Db, studentId: string, rand = secureRandom): Promise<{ bonus: string | null; left: number }> {
+  const [egg] = await db
+    .select({ id: eggs.id })
+    .from(eggs)
+    .where(and(eq(eggs.studentId, studentId), isNotNull(eggs.openedAt), isNull(eggs.bonusAt)))
+    .orderBy(eggs.openedAt)
+    .limit(1)
+  if (!egg) throw apiError('no_gift', 'ไม่มีกล่องของขวัญแล้ว', 404)
+  const bonus = rollBonus(rand, new Set(await ownedItems(db, studentId)))
+  const res = await db
+    .update(eggs)
+    .set({ bonusItem: bonus, bonusAt: now() })
+    .where(and(eq(eggs.id, egg.id), isNull(eggs.bonusAt)))
+    .returning({ id: eggs.id })
+  if (!res.length) throw apiError('gift_already_opened', 'กล่องนี้เปิดไปแล้ว', 409)
+  return { bonus, left: await giftCount(db, studentId) }
 }
 
 const leaderboardKey = (classId: string) => `leaderboard_enabled:${classId}`
@@ -208,12 +256,15 @@ const parseAvatar = (v: unknown): AvatarConfig => {
   return r.success ? r.data : DEFAULT_AVATAR
 }
 
-export async function getAvatar(db: Db, studentId: string): Promise<{ nickname: string; config: AvatarConfig; isDefault: boolean }> {
+export async function getAvatar(db: Db, studentId: string): Promise<{ nickname: string; config: AvatarConfig; isDefault: boolean; items: string[] }> {
   const [row] = await db.select().from(studentAvatars).where(eq(studentAvatars.studentId, studentId))
-  return row ? { nickname: row.nickname, config: parseAvatar(row.config), isDefault: false } : { nickname: '', config: DEFAULT_AVATAR, isDefault: true }
+  const items = await ownedItems(db, studentId)
+  return row ? { nickname: row.nickname, config: parseAvatar(row.config), isDefault: false, items } : { nickname: '', config: DEFAULT_AVATAR, isDefault: true, items }
 }
 
 export async function saveAvatar(db: Db, studentId: string, nickname: string, config: AvatarConfig, t: number): Promise<void> {
+  const missing = missingItems(config, new Set(await ownedItems(db, studentId)))
+  if (missing.length) throw apiError('item_locked', `ยังไม่มี ${missing.join(', ')} — เปิดไข่เพื่อปลดล็อก`, 400)
   const values = { nickname, config, updatedAt: t }
   await db.insert(studentAvatars).values({ studentId, ...values }).onConflictDoUpdate({ target: studentAvatars.studentId, set: values })
 }

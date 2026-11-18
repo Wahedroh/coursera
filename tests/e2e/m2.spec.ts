@@ -56,6 +56,6 @@ test('เช็กชื่อ + QR เช็กอิน + แจกแต้�
   await expect(student.getByText('LV 1', { exact: true })).toBeVisible()
   await expect(student.getByText('ตอบคำถาม').first()).toBeVisible()
   await student.getByRole('button', { name: /เปิดไข่/ }).click()
-  await expect(student.getByText(/ได้ตัวละคร/)).toBeVisible()
+  await expect(student.getByTestId('egg-result')).toContainText('สัตว์วิเศษ')
   await expect(student.getByText('ซีซัน 1 · สัตว์วิเศษ (1/16)')).toBeVisible()
 })
