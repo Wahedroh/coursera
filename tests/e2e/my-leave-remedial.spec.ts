@@ -91,3 +91,29 @@ test('เฝ้าระวัง 0·ร·มส: ครูเห็นนัก
   await row.getByRole('button', { name: 'ลบ', exact: true }).click()
   await setManee(t, 'present')
 })
+
+test('กล่องของขวัญจากไข่ที่เปิดไปแล้ว → ได้ของแถม → ใส่ที่ตัวละครได้ (ของที่ยังไม่มีล็อกไว้)', async ({ browser }) => {
+  const s = await studentPage(browser)
+  await s.goto('/me/progress')
+  await expect(s.getByTestId('item-collection')).toBeVisible()
+  // เปิดกล่องของขวัญทั้งหมด (ไข่ที่เปิดก่อนมีของแถม)
+  while (await s.getByRole('button', { name: 'เปิดกล่อง' }).count()) {
+    await s.getByRole('button', { name: 'เปิดกล่อง' }).click()
+    await expect(s.getByTestId('egg-result')).toBeVisible()
+  }
+  const { items } = await (await s.request.get('/api/student/progress')).json()
+  await s.goto('/me/avatar')
+  await expect(s.getByRole('group', { name: /ชุดพิเศษ/ })).toBeVisible()
+  await expect(s.getByLabel('ชุดนินจา (ยังไม่มี)').or(s.getByRole('button', { name: 'ชุดนินจา' }))).toBeVisible()
+  const hand = (items as string[]).find((x) => x.startsWith('hand:'))
+  if (hand) {
+    const names: Record<string, string> = { pencil: 'ดินสอยักษ์', umbrella: 'ร่มวิเศษ', balloon: 'ลูกโป่ง', flag: 'ธงประจำห้อง', staff: 'ไม้พลอง', wand: 'ไม้กายสิทธิ์', sword: 'ดาบอัศวิน', bow: 'ธนู', laser: 'ปืนเลเซอร์' }
+    await s.getByRole('button', { name: names[hand.slice(5)], exact: true }).click()
+    await s.getByRole('button', { name: 'บันทึกตัวละคร' }).click()
+    await expect(s.getByRole('button', { name: '✓ บันทึกแล้ว' })).toBeVisible()
+    // เอาออก (ไม่กระทบเทสต์อื่น)
+    await s.getByRole('group', { name: /มือขวา/ }).getByRole('button', { name: 'ไม่ถือ' }).click()
+    await s.getByRole('button', { name: 'บันทึกตัวละคร' }).click()
+    await expect(s.getByRole('button', { name: '✓ บันทึกแล้ว' })).toBeVisible()
+  }
+})

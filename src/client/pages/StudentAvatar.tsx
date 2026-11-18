@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
 import { AvatarArt } from '../components/PixelArt'
-import { DEFAULT_AVATAR, OUTFIT_COLORS, OUTFIT_COLOR_NAMES, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, JOB_IDS, JOBS, SKINS, type AvatarConfig } from '../../shared/avatar'
+import { DEFAULT_AVATAR, OUTFIT_COLORS, OUTFIT_COLOR_NAMES, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HAND_IDS, HAND_ITEMS, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, isSpecialJob, JOB_IDS, JOBS, OFFHAND_IDS, OFFHAND_ITEMS, SKINS, SPECIAL_JOBS, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
@@ -16,6 +16,15 @@ function Group({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/** ของที่ยังไม่มี: ให้รู้ว่ามี แต่ต้องเปิดไข่ก่อน */
+function Locked({ label }: { label: string }) {
+  return (
+    <span className="rounded-xl border-[3px] border-dashed border-line px-3 py-1.5 text-sm font-bold text-stone-400" title="เปิดไข่เพื่อปลดล็อก" aria-label={`${label} (ยังไม่มี)`}>
+      🔒 {label}
+    </span>
+  )
+}
+
 const chip = (on: boolean) => `rounded-xl border-[3px] px-3 py-1.5 text-sm font-bold ${on ? 'border-ink ring-2 ring-amber-400' : 'border-line bg-white'}`
 const swatch = (on: boolean) => `w-10 h-10 rounded-lg border-[3px] ${on ? 'border-ink ring-2 ring-amber-400' : 'border-line'}`
 
@@ -26,15 +35,17 @@ export default function StudentAvatar() {
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [items, setItems] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     // คำตอบที่มาช้าจากรอบที่ยกเลิกแล้ว ห้ามทับสิ่งที่นักเรียนกำลังแก้
     let live = true
-    api<{ nickname: string; config: AvatarConfig }>('/api/student/avatar')
+    api<{ nickname: string; config: AvatarConfig; items: string[] }>('/api/student/avatar')
       .then((a) => {
         if (!live) return
         setCfg(a.config)
         setNickname(a.nickname)
+        setItems(new Set(a.items))
       })
       .catch((e) => live && (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
     return () => {
@@ -67,7 +78,7 @@ export default function StudentAvatar() {
       skin: Math.floor(Math.random() * SKINS.length),
       hair: pick(HAIR_STYLES),
       hairColor: Math.floor(Math.random() * HAIR_COLORS.length),
-      job: pick(JOB_IDS),
+      job: pick(JOB_IDS.filter((j) => !isSpecialJob(j) || items.has(`outfit:${j}`))),
       glasses: Math.random() < 0.25,
       headwear: Math.random() < 0.5 ? 'none' : pick(HEADWEAR),
       headwearColor: Math.floor(Math.random() * HEADWEAR_COLORS.length),
@@ -151,12 +162,51 @@ export default function StudentAvatar() {
               ))}
             </Group>
           )}
-          <Group label={`อาชีพ / ชุด (${JOB_IDS.length} แบบ)`}>
-            {JOB_IDS.map((j) => (
+          <Group label={`อาชีพ / ชุด (${JOB_IDS.length - SPECIAL_JOBS.length} แบบ)`}>
+            {JOB_IDS.filter((j) => !isSpecialJob(j)).map((j) => (
               <button key={j} type="button" aria-pressed={cfg.job === j} className={chip(cfg.job === j)} onClick={() => set({ job: j })}>
                 {JOBS[j].label}
               </button>
             ))}
+          </Group>
+          <Group label="✦ ชุดพิเศษ (ได้จากการเปิดไข่)">
+            {SPECIAL_JOBS.map((j) =>
+              items.has(`outfit:${j}`) ? (
+                <button key={j} type="button" aria-pressed={cfg.job === j} className={chip(cfg.job === j)} onClick={() => set({ job: j })}>
+                  {JOBS[j].label}
+                </button>
+              ) : (
+                <Locked key={j} label={JOBS[j].label} />
+              ),
+            )}
+          </Group>
+          <Group label="อุปกรณ์มือขวา (ได้จากการเปิดไข่)">
+            <button type="button" aria-pressed={cfg.hand === 'none'} className={chip(cfg.hand === 'none')} onClick={() => set({ hand: 'none' })}>
+              ไม่ถือ
+            </button>
+            {HAND_IDS.map((h) =>
+              items.has(`hand:${h}`) ? (
+                <button key={h} type="button" aria-pressed={cfg.hand === h} className={chip(cfg.hand === h)} onClick={() => set({ hand: h })}>
+                  {HAND_ITEMS[h].label}
+                </button>
+              ) : (
+                <Locked key={h} label={HAND_ITEMS[h].label} />
+              ),
+            )}
+          </Group>
+          <Group label="อุปกรณ์มือซ้าย (ได้จากการเปิดไข่)">
+            <button type="button" aria-pressed={cfg.offhand === 'none'} className={chip(cfg.offhand === 'none')} onClick={() => set({ offhand: 'none' })}>
+              ไม่ถือ
+            </button>
+            {OFFHAND_IDS.map((h) =>
+              items.has(`offhand:${h}`) ? (
+                <button key={h} type="button" aria-pressed={cfg.offhand === h} className={chip(cfg.offhand === h)} onClick={() => set({ offhand: h })}>
+                  {OFFHAND_ITEMS[h].label}
+                </button>
+              ) : (
+                <Locked key={h} label={OFFHAND_ITEMS[h].label} />
+              ),
+            )}
           </Group>
           {(
             [

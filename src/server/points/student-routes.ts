@@ -4,7 +4,7 @@ import { getDb, now } from '../db/client'
 import { avatarInputSchema } from '../../shared/avatar'
 import { parseBody } from '../http'
 import type { AppEnv, SessionInfo } from '../env'
-import { expBreakdown, getAvatar, leaderboard, openEgg, progress, saveAvatar } from './service'
+import { expBreakdown, getAvatar, leaderboard, openEgg, openGift, progress, saveAvatar } from './service'
 import { expSummary, studentStats } from './stats'
 import { studentBadges } from './badges'
 import { getGrading } from '../grades/service'
@@ -20,6 +20,7 @@ studentPointsRoutes.get('/progress', requireStudent, async (c) => {
   return c.json({ ...(await progress(db, me(c).studentId)), fullSetReward: g.fullSetTopGrade ? { grade: g.bands[0].grade, minExamPct: g.fullSetMinExamPct } : null })
 })
 studentPointsRoutes.post('/eggs/:id/open', requireStudent, async (c) => c.json(await openEgg(getDb(c.env), me(c).studentId, c.req.param('id'))))
+studentPointsRoutes.post('/gifts/open', requireStudent, async (c) => c.json(await openGift(getDb(c.env), me(c).studentId)))
 studentPointsRoutes.get('/leaderboard', requireStudent, async (c) => c.json(await leaderboard(getDb(c.env), me(c).classId, me(c).studentId)))
 studentPointsRoutes.get('/avatar', requireStudent, async (c) => c.json(await getAvatar(getDb(c.env), me(c).studentId)))
 studentPointsRoutes.put('/avatar', requireStudent, async (c) => {

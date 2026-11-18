@@ -98,7 +98,80 @@ export const JOBS = {
   mechanic: { label: 'ช่างยนต์', shirt: '#1565C0', pants: '#1565C0', belt: '#0D47A1', extras: [[3, 10, '#9E9E9E'], [3, 11, '#9E9E9E']], hat: [...row(1, 4, 8, '#1565C0'), ...row(2, 3, 9, '#0D47A1')] },
   youtuber: { label: 'ยูทูบเบอร์', shirt: '#E53935', pants: '#212121', extras: [[5, 9, WHITE], [5, 10, WHITE], [6, 10, WHITE], [5, 11, WHITE]] },
   vet: { label: 'สัตวแพทย์', shirt: '#26A69A', accent: '#00897B', pants: '#26A69A', extras: [[7, 9, WHITE]] },
+  // ---------- ชุดพิเศษ (ได้จากการเปิดไข่ · ต้องมีก่อนจึงใส่ได้) ----------
+  ninja: {
+    label: 'ชุดนินจา',
+    shirt: '#1E1E1E',
+    pants: '#1E1E1E',
+    shoes: '#1E1E1E',
+    hidesHair: true,
+    // ผ้าคลุมหัว + ผ้าปิดปาก + ผ้าคาดหัวแดง
+    hat: [...row(1, 3, 8, '#1E1E1E'), ...row(2, 2, 9, '#1E1E1E'), ...row(3, 2, 9, '#C62828'), [10, 3, '#C62828'], [11, 4, '#C62828'], [2, 4, '#1E1E1E'], [9, 4, '#1E1E1E'], [2, 5, '#1E1E1E'], [9, 5, '#1E1E1E'], ...row(6, 3, 8, '#1E1E1E'), ...row(7, 3, 8, '#1E1E1E')],
+  },
+  wizard: {
+    label: 'ชุดพ่อมด',
+    shirt: '#7E57C2',
+    pants: '#7E57C2',
+    robe: true,
+    extras: [[7, 9, GOLD], [4, 11, GOLD], [6, 15, GOLD]],
+    hat: [[6, -2, '#5B3FA8'], ...row(-1, 5, 6, '#5B3FA8'), ...row(0, 5, 7, '#5B3FA8'), ...row(1, 4, 7, '#5B3FA8'), ...row(2, 1, 10, '#4527A0'), [6, 0, GOLD]],
+  },
+  knight: {
+    label: 'ชุดเกราะอัศวิน',
+    shirt: '#9EA7AD',
+    accent: '#B0BEC5',
+    pants: '#8D959A',
+    shoes: '#78909C',
+    hidesHair: true,
+    extras: [...row(9, 4, 7, '#ECEFF1'), [5, 10, GOLD], [6, 10, GOLD]],
+    hat: [[6, -1, '#E53935'], [6, 0, '#E53935'], ...row(1, 3, 8, '#B0BEC5'), ...row(2, 2, 9, '#B0BEC5'), ...col(2, 3, 7, '#B0BEC5'), ...col(9, 3, 7, '#B0BEC5'), ...row(4, 3, 8, '#78909C')],
+  },
+  hero: {
+    label: 'ชุดซูเปอร์ฮีโร่',
+    shirt: '#2F5C9E',
+    pants: '#E53935',
+    shoes: '#E53935',
+    // ผ้าคลุมหลัง + ตราที่อก + หน้ากาก
+    extras: [...col(1, 8, 16, '#E53935'), ...col(10, 8, 16, '#E53935'), ...row(9, 5, 6, GOLD), ...row(10, 5, 6, GOLD)],
+    // หน้ากากรอบตา (เว้นช่องตา)
+    hat: [...row(4, 3, 8, '#C62828'), [3, 5, '#C62828'], [5, 5, '#C62828'], [6, 5, '#C62828'], [8, 5, '#C62828']],
+  },
+  royal: {
+    label: 'ชุดเจ้าชาย/เจ้าหญิง',
+    shirt: '#C9A15B',
+    accent: '#B8435A',
+    pants: WHITE,
+    shoes: '#8D6E63',
+    hat: [[3, 0, GOLD], [5, 0, GOLD], [8, 0, GOLD], ...row(1, 3, 8, GOLD), [5, 1, '#E53935']],
+  },
 } satisfies Record<string, Job>
+/** ชุดพิเศษ: ต้องได้จากการเปิดไข่ก่อนจึงใส่ได้ */
+export const SPECIAL_JOBS = ['ninja', 'wizard', 'knight', 'hero', 'royal'] as const
+export type SpecialJob = (typeof SPECIAL_JOBS)[number]
+export const isSpecialJob = (j: string): j is SpecialJob => (SPECIAL_JOBS as readonly string[]).includes(j)
+
+// ---------- อุปกรณ์ในมือ (ได้จากการเปิดไข่) ----------
+/** มือขวา (มือที่ x=9 y=12) */
+export const HAND_ITEMS = {
+  pencil: { label: 'ดินสอยักษ์', px: [[10, 6, '#F7A1B5'], [10, 7, '#BDBDBD'], ...col(10, 8, 13, '#F2C14E'), [10, 14, '#E8C9A0'], [10, 15, '#333333']] },
+  umbrella: { label: 'ร่มวิเศษ', px: [...row(4, 9, 13, '#E53935'), ...row(3, 10, 12, '#E53935'), [11, 2, '#E53935'], [10, 4, '#FFFFFF'], [12, 4, '#FFFFFF'], ...col(11, 5, 12, '#5D4037'), [10, 13, '#5D4037']] },
+  balloon: { label: 'ลูกโป่ง', px: [...row(2, 10, 12, '#E58FB7'), ...row(3, 10, 12, '#E58FB7'), ...row(4, 10, 12, '#E58FB7'), [11, 1, '#E58FB7'], [10, 2, '#FFFFFF'], [11, 5, '#B8435A'], ...col(10, 6, 11, '#9E9E9E')] },
+  flag: { label: 'ธงประจำห้อง', px: [...col(10, 3, 13, '#8D6E63'), ...row(3, 11, 13, '#2E7D5B'), ...row(4, 11, 13, '#F2C14E'), ...row(5, 11, 13, '#2E7D5B')] },
+  staff: { label: 'ไม้พลอง', px: col(10, 4, 17, '#8D6E63') },
+  wand: { label: 'ไม้กายสิทธิ์', px: [...col(10, 6, 13, '#6D4C41'), [10, 5, GOLD], [9, 4, '#FFF59D'], [11, 4, '#FFF59D'], [10, 3, '#FFF59D'], [11, 6, '#FFF59D']] },
+  sword: { label: 'ดาบอัศวิน', px: [...col(10, 3, 10, '#CFD8DC'), [10, 2, '#ECEFF1'], ...row(11, 9, 11, GOLD), ...col(10, 12, 13, '#6D4C41')] },
+  bow: { label: 'ธนู', px: [[11, 6, '#8D6E63'], [12, 7, '#8D6E63'], ...col(12, 8, 15, '#8D6E63'), [12, 16, '#8D6E63'], [11, 17, '#8D6E63'], ...col(10, 6, 17, '#EEEEEE'), ...row(12, 8, 12, '#6D4C41'), [13, 12, '#B0BEC5']] },
+  laser: { label: 'ปืนเลเซอร์', px: [...row(11, 10, 12, '#4F7FE8'), [13, 11, '#7FE8F2'], [10, 12, '#263238'], [10, 13, '#263238'], [11, 10, '#90CAF9']] },
+} satisfies Record<string, { label: string; px: Px[] }>
+export type HandItem = keyof typeof HAND_ITEMS
+export const HAND_IDS = Object.keys(HAND_ITEMS) as HandItem[]
+/** มือซ้าย (มือที่ x=2 y=12) */
+export const OFFHAND_ITEMS = {
+  book: { label: 'หนังสือเวทมนตร์', px: [...row(11, -1, 1, '#6A1B9A'), ...row(12, -1, 1, '#6A1B9A'), ...row(13, -1, 1, '#6A1B9A'), [0, 12, GOLD], [1, 11, '#F7F7F7'], [1, 12, '#F7F7F7'], [1, 13, '#F7F7F7']] },
+  shield: { label: 'โล่อัศวิน', px: [...col(-1, 9, 12, GOLD), ...col(0, 9, 13, GOLD), ...col(1, 9, 14, GOLD), [0, 11, '#E53935'], [-1, 13, '#C9A15B'], [1, 15, '#C9A15B']] },
+} satisfies Record<string, { label: string; px: Px[] }>
+export type OffhandItem = keyof typeof OFFHAND_ITEMS
+export const OFFHAND_IDS = Object.keys(OFFHAND_ITEMS) as OffhandItem[]
 export type JobId = keyof typeof JOBS
 export const JOB_IDS = Object.keys(JOBS) as JobId[]
 
@@ -116,11 +189,14 @@ export const avatarConfigSchema = z.object({
   shirtColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
   pantsColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
   shoesColor: z.number().int().min(-1).max(OUTFIT_COLORS.length - 1).default(-1),
+  /** อุปกรณ์มือขวา/มือซ้าย (ได้จากการเปิดไข่) */
+  hand: z.enum(['none', ...HAND_IDS] as [string, ...string[]]).default('none'),
+  offhand: z.enum(['none', ...OFFHAND_IDS] as [string, ...string[]]).default('none'),
 })
 export type AvatarConfig = z.infer<typeof avatarConfigSchema>
 export const avatarInputSchema = z.object({ nickname: z.string().trim().max(20), config: avatarConfigSchema })
 
-export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1 }
+export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1, hand: 'none', offhand: 'none' }
 
 function headwearPixels(h: Headwear, c: string): Px[] {
   switch (h) {
@@ -207,8 +283,28 @@ export function avatarPixels(cfg: AvatarConfig): Px[] {
   if (cfg.glasses) px.push([4, 4, '#333333'], [7, 4, '#333333'], [5, 5, '#333333'], [6, 5, '#333333'], [3, 5, '#333333'], [8, 5, '#333333'])
   // ผ้าคลุม/หมวกที่เลือกเอง แทนหมวกของชุดอาชีพ
   if (head === 'none') px.push(...(job.hat ?? []))
+  // อุปกรณ์ในมือ (อยู่หน้าสุด)
+  if (cfg.offhand && cfg.offhand !== 'none') px.push(...(OFFHAND_ITEMS[cfg.offhand as OffhandItem]?.px ?? []))
+  if (cfg.hand && cfg.hand !== 'none') px.push(...(HAND_ITEMS[cfg.hand as HandItem]?.px ?? []))
   // ช่องเดียวกันเอาสีที่วาดทีหลังสุด
   const m = new Map<string, Px>()
-  for (const p of px) if (p[0] >= 0 && p[0] < AVATAR_W && p[1] >= 0 && p[1] < AVATAR_H) m.set(`${p[0]},${p[1]}`, p)
+  for (const p of px) if (p[0] >= -MARGIN && p[0] < AVATAR_W + MARGIN && p[1] >= -MARGIN && p[1] < AVATAR_H) m.set(`${p[0]},${p[1]}`, p)
   return [...m.values()]
+}
+
+/** ขอบที่ชุดพิเศษ/อุปกรณ์ล้นออกนอกตัวละครได้ */
+const MARGIN = 2
+/** กรอบภาพ: ปกติ 12×19 · ขยายเฉพาะเมื่อมีชุด/อุปกรณ์ล้นออกไป */
+export function avatarBounds(px: readonly Px[]): { x: number; y: number; w: number; h: number } {
+  let x0 = 0
+  let y0 = 0
+  let x1 = AVATAR_W
+  for (const [x, y] of px) {
+    x0 = Math.min(x0, x)
+    y0 = Math.min(y0, y)
+    x1 = Math.max(x1, x + 1)
+  }
+  // ล้นข้างเดียวก็ขยายสองข้างเท่ากัน ตัวละครจะได้อยู่กลาง
+  const side = Math.max(-x0, x1 - AVATAR_W)
+  return { x: side ? -side : 0, y: y0, w: AVATAR_W + 2 * side, h: AVATAR_H - y0 }
 }

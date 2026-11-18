@@ -188,6 +188,10 @@ export const eggs = sqliteTable(
     level: integer('level').notNull(),
     characterId: text('character_id'),
     openedAt: integer('opened_at'),
+    /** ของแถมที่ได้ (อุปกรณ์/ชุดพิเศษ/ตัวละครลึกลับ · null = ไม่ได้) */
+    bonusItem: text('bonus_item'),
+    /** เวลาที่สุ่มของแถมแล้ว · ไข่ที่เปิดแล้วแต่ยังเป็น null = กล่องของขวัญรอเปิด (ไข่ที่เปิดก่อนมีของแถม) */
+    bonusAt: integer('bonus_at'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [uniqueIndex('eggs_student_term_level_unique').on(t.studentId, t.termId, t.level)],

@@ -68,6 +68,14 @@ export const SEASONS = [
 ] as const
 export const SEASON_COUNT = SEASONS.length
 
+/** ตัวละครลึกลับ: ได้เป็นของแถมจากไข่เท่านั้น · ไม่อยู่ในซีซันไหน (ไม่นับในชุด 16 ตัว) */
+export const SECRET_CHARACTERS: Character[] = [
+  { id: 'secret-shadow-dragon', name: 'มังกรเงา', rarity: 'epic', shape: 'dragon', palette: p('#000000', '#2A2A3A', { y: '#B388FF', w: '#E040FB' }), season: 0 },
+  { id: 'secret-angel-cat', name: 'แมวเทวดา', rarity: 'epic', shape: 'cat', palette: p('#3a2a00', '#FFF59D', { p: '#FFB74D', w: '#FFFFFF' }), season: 0 },
+  { id: 'secret-rainbow-unicorn', name: 'ยูนิคอร์นสายรุ้ง', rarity: 'legendary', shape: 'unicorn', palette: p('#5a3fb0', '#FFFFFF', { p: '#FF8A80', y: '#69F0AE' }), season: 0 },
+  { id: 'secret-crystal-owl', name: 'ฮูกคริสตัล', rarity: 'legendary', shape: 'owl', palette: p('#0d47a1', '#80DEEA', { y: '#FFFFFF', c: '#E0F7FA', w: '#FFFFFF' }), season: 0 },
+]
+
 export const CHARACTERS: Character[] = [...SEASON_1.map((c) => ({ ...c, season: 1 })), ...SEASON_2.map((c) => ({ ...c, season: 2 }))]
 /** ตัวละครของซีซัน (เกินจำนวนซีซันที่มี = ซีซันสุดท้าย) */
 export const charactersOfSeason = (season: number) => {
@@ -75,5 +83,5 @@ export const charactersOfSeason = (season: number) => {
   return CHARACTERS.filter((c) => c.season === s)
 }
 
-export const characterById = (id: string) => CHARACTERS.find((c) => c.id === id)
+export const characterById = (id: string) => CHARACTERS.find((c) => c.id === id) ?? SECRET_CHARACTERS.find((c) => c.id === id)
 export const shapeRows = (c: Character) => SHAPES[c.shape]

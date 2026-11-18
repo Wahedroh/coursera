@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, JOB_IDS, JOBS, OUTFIT_COLORS, SKINS } from '../src/shared/avatar'
+import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, isSpecialJob, JOB_IDS, JOBS, OUTFIT_COLORS, SKINS } from '../src/shared/avatar'
 import { getDb } from '../src/server/db/client'
 import { getJson, json, loginTeacher, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
@@ -12,7 +12,9 @@ describe('avatarPixels', () => {
       for (const hair of HAIR_STYLES)
         for (const gender of ['m', 'f'] as const) {
           const px = avatarPixels({ ...DEFAULT_AVATAR, job, hair, gender, glasses: true })
-          expect(px.every(([x, y]) => x >= 0 && x < AVATAR_W && y >= 0 && y < AVATAR_H)).toBe(true)
+          // ชุดปกติอยู่ในกรอบ 12×19 · ชุดพิเศษล้นได้ไม่เกินขอบ 2 ช่อง
+          const m = isSpecialJob(job) ? 2 : 0
+          expect(px.every(([x, y]) => x >= -m && x < AVATAR_W + m && y >= -m && y < AVATAR_H)).toBe(true)
           expect(new Set(px.map(([x, y]) => `${x},${y}`)).size).toBe(px.length)
         }
   })
@@ -42,10 +44,12 @@ describe('avatarPixels', () => {
       for (const headwear of HEADWEAR)
         for (const [gender, longSkirt] of [['m', false], ['f', false], ['f', true]] as const) {
           const px = avatarPixels({ ...DEFAULT_AVATAR, job, headwear, gender, longSkirt, glasses: true })
-          expect(px.every(([x, y]) => x >= 0 && x < AVATAR_W && y >= 0 && y < AVATAR_H)).toBe(true)
+          // ชุดปกติอยู่ในกรอบ 12×19 · ชุดพิเศษล้นได้ไม่เกินขอบ 2 ช่อง
+          const m = isSpecialJob(job) ? 2 : 0
+          expect(px.every(([x, y]) => x >= -m && x < AVATAR_W + m && y >= -m && y < AVATAR_H)).toBe(true)
           expect(new Set(px.map(([x, y]) => `${x},${y}`)).size).toBe(px.length)
         }
-    expect(JOB_IDS.length).toBe(26)
+    expect(JOB_IDS.length).toBe(31)
   })
   it('ผ้าคลุมซ่อนผมและหมวกอาชีพ เห็นใบหน้า · ไม่มีแก้มแดงทับผ้า · หมวกกะปิเยาะยังเห็นผมข้าง', () => {
     const c = HEADWEAR_COLORS[3]
@@ -110,13 +114,13 @@ describe('API ตัวละคร', () => {
   it('ค่าเริ่มต้น → บันทึก → อ่านกลับ', async () => {
     const { classId } = await seedClass(db())
     const c = await studentCookie((await seedStudent(db(), classId)).id)
-    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: '', config: DEFAULT_AVATAR, isDefault: true })
+    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: '', config: DEFAULT_AVATAR, isDefault: true, items: [] })
     expect((await putJson('/api/student/avatar', { nickname: '  ฟ้าใส  ', config: CFG }, c)).status).toBe(200)
-    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: SAVED, isDefault: false })
+    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: { ...SAVED, hand: 'none', offhand: 'none' }, isDefault: false, items: [] })
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้า', config: { ...CFG, job: 'hacker' } }, c)).status).toBe(400)
     const hijab = { ...CFG, headwear: 'hijab_long', headwearColor: 4, longSkirt: true, job: 'nurse', shirtColor: 12, pantsColor: 2, shoesColor: -1 }
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้าใส', config: hijab }, c)).status).toBe(200)
-    expect((await json(await getJson('/api/student/avatar', c))).config).toEqual(hijab)
+    expect((await json(await getJson('/api/student/avatar', c))).config).toEqual({ ...hijab, hand: 'none', offhand: 'none' })
     expect((await putJson('/api/student/avatar', { nickname: 'ก'.repeat(21), config: CFG }, c)).status).toBe(400)
     expect((await getJson('/api/student/avatar')).status).toBe(401)
     expect((await putJson('/api/student/avatar', { nickname: '', config: CFG }, await loginTeacher())).status).toBe(401)
@@ -131,7 +135,7 @@ describe('API ตัวละคร', () => {
     const ca = await studentCookie(a.id)
     await putJson('/api/student/avatar', { nickname: 'เทพฟิสิกส์', config: CFG }, ca)
     const board = await json(await getJson('/api/student/leaderboard', await studentCookie(b.id)))
-    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual(SAVED)
+    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual({ ...SAVED, hand: 'none', offhand: 'none' })
     expect(board.find((r: { firstName: string }) => r.firstName === 'ปิติ').avatar).toEqual(DEFAULT_AVATAR)
     expect(JSON.stringify(board)).not.toContain('เทพฟิสิกส์')
   })
