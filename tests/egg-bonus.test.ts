@@ -81,3 +81,11 @@ it('เปิดไข่ได้สัตว์วิเศษ + ของแ�
   const cfg = { ...DEFAULT_AVATAR, ...(kind === 'outfit' ? { job: key } : kind === 'hand' ? { hand: key } : kind === 'offhand' ? { offhand: key } : {}) }
   expect((await putJson('/api/student/avatar', { nickname: 'x', config: cfg }, sc)).status).toBe(200)
 })
+
+it('นักเรียนทดสอบ (99999) มีของแถมครบทุกอย่าง ใส่อะไรก็ได้', async () => {
+  const { classId } = await seedClass(db())
+  const s = await seedStudent(db(), classId, { zipgradeId: '99999' })
+  const sc = await studentCookie(s.id)
+  expect((await json(await getJson('/api/student/progress', sc))).items).toHaveLength(EGG_ITEMS.length)
+  expect((await putJson('/api/student/avatar', { nickname: 'ทดสอบ', config: { ...DEFAULT_AVATAR, job: 'royal', hand: 'laser', offhand: 'shield' } }, sc)).status).toBe(200)
+})
