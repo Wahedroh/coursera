@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { Db } from '../db/client'
-import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers, studentNotes, videoProgress, assignmentClosed } from '../db/schema'
+import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers, studentNotes, videoProgress, assignmentClosed, leaveRequests, remedials } from '../db/schema'
 import { apiError } from '../http'
 import { removeFiles } from '../storage/service'
 
@@ -9,7 +9,9 @@ export async function deleteStudent(db: Db, bucket: R2Bucket, id: string): Promi
   const [s] = await db.select({ id: students.id, firstName: students.firstName, lastName: students.lastName }).from(students).where(eq(students.id, id))
   if (!s) throw apiError('student_not_found', 'ไม่พบนักเรียน', 404)
   const subs = await db.select({ imageKeys: submissions.imageKeys, annotatedKeys: submissions.annotatedKeys }).from(submissions).where(eq(submissions.studentId, id))
-  const keys = subs.flatMap((x) => [...x.imageKeys, ...x.annotatedKeys])
+  const leaves = await db.select({ k: leaveRequests.imageKey }).from(leaveRequests).where(eq(leaveRequests.studentId, id))
+  const rems = await db.select({ keys: remedials.imageKeys }).from(remedials).where(eq(remedials.studentId, id))
+  const keys = [...subs.flatMap((x) => [...x.imageKeys, ...x.annotatedKeys]), ...leaves.flatMap((x) => (x.k ? [x.k] : [])), ...rems.flatMap((x) => x.keys)]
   await db.batch([
     db.delete(sessions).where(eq(sessions.studentId, id)),
     db.delete(submissions).where(eq(submissions.studentId, id)),
@@ -26,6 +28,8 @@ export async function deleteStudent(db: Db, bucket: R2Bucket, id: string): Promi
     db.delete(studentNotes).where(eq(studentNotes.studentId, id)),
     db.delete(videoProgress).where(eq(videoProgress.studentId, id)),
     db.delete(assignmentClosed).where(eq(assignmentClosed.studentId, id)),
+    db.delete(leaveRequests).where(eq(leaveRequests.studentId, id)),
+    db.delete(remedials).where(eq(remedials.studentId, id)),
     db.delete(students).where(eq(students.id, id)),
   ])
   // รูปงานที่ส่ง/รูปที่ครูเขียนทับ — ลบหลังลบข้อมูลแล้ว (ถ้าพลาด "ลบไฟล์ค้าง" จะเก็บให้ภายหลัง)

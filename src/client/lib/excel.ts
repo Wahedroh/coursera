@@ -6,6 +6,7 @@ import type { ClassGrades } from '../../shared/grades'
 import { outstanding, type FeeSheet } from '../../shared/fees'
 import { ATTENDANCE_STATUSES, STATUS_LABEL, todayBangkok, type AttendanceRange } from '../../shared/attendance'
 import { REASON_LABEL, type Watchlist } from '../../shared/watchlist'
+import { REMEDIAL_STATUS_LABEL, RISK_LABEL, type AtRisk } from '../../shared/remedial'
 
 /** สมุดคะแนนรวม: คอลัมน์งาน แล้วต่อด้วยคอลัมน์คะแนนสอบ */
 export function gradebookSheet(gb: Gradebook, book: ScoreBook): SheetData {
@@ -161,4 +162,25 @@ export function sheetName(raw: string, used: Set<string>): string {
 export async function exportWorkbook(sheets: { name: string; data: SheetData }[], fileName: string): Promise<void> {
   const used = new Set<string>()
   await writeXlsxFile(sheets.map((s) => ({ data: s.data, sheet: sheetName(s.name, used) }))).toFile(fileName)
+}
+
+/** รายชื่อติด 0/ร/มส + ผลงานซ่อม (ส่งฝ่ายวัดผล) */
+export async function exportAtRisk(r: AtRisk): Promise<void> {
+  const header = ['ZipGrade ID', 'ชื่อ-นามสกุล', 'ติด', 'เกรดตอนนี้', 'เวลาเรียน (%)', 'ขาด/เช็กชื่อ', 'งานค้าง', 'งานซ่อม', 'สถานะงานซ่อม', 'ผลหลังซ่อม'].map((value) => ({ value, fontWeight: 'bold' as const }))
+  const rows = r.students.map((s) => {
+    const last = s.remedials[0]
+    return [
+      { value: s.zipgradeId },
+      { value: s.name },
+      { value: s.flags.map((f) => RISK_LABEL[f]).join(', ') },
+      { value: s.grade ?? '' },
+      { value: s.attendance.pct ?? '' },
+      { value: `${s.attendance.absent}/${s.attendance.days}` },
+      { value: s.incomplete.titles.join(', ') },
+      { value: s.remedials.map((x) => x.title).join(', ') },
+      { value: last ? REMEDIAL_STATUS_LABEL[last.status] : '' },
+      { value: s.remedials.find((x) => x.resultGrade)?.resultGrade ?? '' },
+    ]
+  })
+  await writeXlsxFile([header, ...rows] as SheetData, { sheet: '0 ร มส' }).toFile(`0-ร-มส-${r.class.name}-${todayBangkok()}.xlsx`)
 }

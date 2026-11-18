@@ -10,6 +10,10 @@ import StudentMaterials from './pages/StudentMaterials'
 import StudentStats from './pages/StudentStats'
 import StudentVideo from './pages/StudentVideo'
 import StudentFees from './pages/StudentFees'
+import StudentLeave from './pages/StudentLeave'
+import TeacherLeaves from './pages/TeacherLeaves'
+import TeacherAtRisk from './pages/TeacherAtRisk'
+import StudentRemedial from './pages/StudentRemedial'
 import StudentAvatar from './pages/StudentAvatar'
 import TeacherVideos from './pages/TeacherVideos'
 import TeacherMaterials from './pages/TeacherMaterials'
@@ -68,6 +72,8 @@ export default function App() {
         <Route path="/me/videos/:id" element={<StudentVideo />} />
         <Route path="/me/card-game/:id" element={<StudentCardGame />} />
         <Route path="/me/fees" element={<StudentFees />} />
+        <Route path="/me/leave" element={<StudentLeave />} />
+        <Route path="/me/remedial/:id" element={<StudentRemedial />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />
         <Route path="/checkin" element={<StudentCheckin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
@@ -78,6 +84,7 @@ export default function App() {
         <Route path="/teacher/workload" element={<TeacherWorkload />} />
         <Route path="/teacher/route" element={<TeacherRoute />} />
         <Route path="/teacher/scheduled" element={<TeacherScheduled />} />
+        <Route path="/teacher/leaves" element={<TeacherLeaves />} />
         <Route path="/teacher/library" element={<TeacherLibrary />} />
         <Route path="/teacher/notifications" element={<TeacherNotifications />} />
         <Route path="/teacher/classes/:id" element={<TeacherClass />} />
@@ -103,6 +110,7 @@ export default function App() {
         <Route path="/teacher/fee-items/:id" element={<TeacherFeeItem />} />
         <Route path="/teacher/storage" element={<TeacherStorage />} />
         <Route path="/teacher/classes/:id/grades" element={<TeacherGrades />} />
+        <Route path="/teacher/classes/:id/at-risk" element={<TeacherAtRisk />} />
         <Route path="/teacher/attendance/:dayId/qr" element={<TeacherCheckinScreen />} />
         <Route path="/teacher/assignments/new" element={<TeacherAssignmentForm />} />
         <Route path="/teacher/assignments/:id/edit" element={<TeacherAssignmentForm />} />

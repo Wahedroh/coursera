@@ -20,6 +20,7 @@ import { clearDrafts } from '../lib/session'
 import { Button, Card, Loading } from '../ui'
 import Icon from '../components/Icon'
 import IconCredit from '../components/IconCredit'
+import StudentHomeCards from '../components/StudentHomeCards'
 
 type StudentMe = Extract<Me, { kind: 'student' }>
 
@@ -170,8 +171,12 @@ export default function StudentHome() {
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
         <ReportReadyCard />
+        <StudentHomeCards />
         <WeeklyQuests onClaimed={loadExp} />
         <AppSetupCard />
+        <Link to="/me/leave" className="self-center rounded-xl border-2 border-board text-board px-4 py-1.5 text-sm font-bold">
+          <Icon n="doc" /> ขอลาป่วย / ลากิจ
+        </Link>
         {feeOwed > 0 && (
           <Link to="/me/fees" className="block">
             <Card className="p-3 flex gap-2 items-center bg-amber-50 border-amber-200">

@@ -6,6 +6,7 @@ export const OVERVIEW_KINDS = [
   'seating',
   'scores',
   'grades',
+  'at-risk',
   'insights',
   'calendar',
   'card-game',

@@ -622,3 +622,56 @@ export const assignmentClosed = sqliteTable(
   },
   (t) => [uniqueIndex('assignment_closed_unique').on(t.assignmentId, t.studentId), index('assignment_closed_student_idx').on(t.studentId)],
 )
+
+/** ใบลาของนักเรียน (ป่วย/กิจ) — ครูอนุมัติแล้ว ระบบใส่สถานะเช็กชื่อให้ (วันที่เช็กแล้วและวันที่จะเปิดเช็กภายหลัง) */
+export const leaveRequests = sqliteTable(
+  'leave_requests',
+  {
+    id: text('id').primaryKey(),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    kind: text('kind', { enum: ['sick', 'leave'] }).notNull(),
+    fromDate: text('from_date').notNull(),
+    toDate: text('to_date').notNull(),
+    reason: text('reason').notNull().default(''),
+    imageKey: text('image_key'),
+    status: text('status', { enum: ['pending', 'approved', 'rejected'] }).notNull().default('pending'),
+    teacherNote: text('teacher_note').notNull().default(''),
+    decidedAt: integer('decided_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('leave_requests_student_idx').on(t.studentId), index('leave_requests_class_idx').on(t.classId, t.status)],
+)
+
+/** งานซ่อมเฉพาะคน (ติด 0 / ร / มส) — ไม่อยู่ในสมุดคะแนนหลัก · ครูตรวจแล้วกด "ผ่าน" พร้อมผลหลังซ่อม */
+export const remedials = sqliteTable(
+  'remedials',
+  {
+    id: text('id').primaryKey(),
+    classId: text('class_id')
+      .notNull()
+      .references(() => classes.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    reason: text('reason', { enum: ['zero', 'incomplete', 'attendance'] }).notNull(),
+    title: text('title').notNull(),
+    instructions: text('instructions').notNull().default(''),
+    dueAt: integer('due_at'),
+    status: text('status', { enum: ['assigned', 'submitted', 'returned', 'passed'] }).notNull().default('assigned'),
+    text: text('text').notNull().default(''),
+    imageKeys: text('image_keys', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    submittedAt: integer('submitted_at'),
+    comment: text('comment').notNull().default(''),
+    /** ผลหลังซ่อม เช่น "1" (0 → 1) หรือเกรดที่ได้หลังแก้ ร/มส */
+    resultGrade: text('result_grade'),
+    decidedAt: integer('decided_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('remedials_class_idx').on(t.classId), index('remedials_student_idx').on(t.studentId)],
+)
