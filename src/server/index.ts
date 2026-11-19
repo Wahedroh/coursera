@@ -18,6 +18,7 @@ import { fileRoutes } from './files/routes'
 import { studentLeaveRoutes, teacherLeaveRoutes } from './leave/routes'
 import { studentRemedialRoutes, teacherRemedialRoutes } from './remedial/routes'
 import { studentHomeRoutes } from './studentHome/routes'
+import { teacherInsightsRoutes } from './teacherInsights/routes'
 import { rosterRoutes } from './roster/routes'
 import { studentScoreRoutes } from './scores/student-routes'
 import { studentGradeRoutes, teacherGradeRoutes } from './grades/routes'
@@ -75,6 +76,7 @@ app.route('/api/teacher', teacherNotifyRoutes)
 app.route('/api/teacher', teacherWorkloadRoutes)
 app.route('/api/teacher', teacherLeaveRoutes)
 app.route('/api/teacher', teacherRemedialRoutes)
+app.route('/api/teacher', teacherInsightsRoutes)
 app.route('/api/student/assignments', studentAssignmentRoutes)
 app.route('/api/student/checkin', studentCheckinRoutes)
 app.route('/api/student/scores', studentScoreRoutes)

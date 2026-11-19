@@ -1,3 +1,4 @@
+import { teacherNav } from './nav'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
 async function teacherPage(browser: Browser): Promise<Page> {
@@ -17,7 +18,7 @@ test('ตารางสอน: เพิ่มคาบที่กำลัง
   const end = hhmm(now + 40 * 60_000)
   test.skip(start >= end, 'ใกล้เที่ยงคืน')
   const t = await teacherPage(browser)
-  await t.getByRole('link', { name: 'ตารางสอน', exact: true }).click()
+  await teacherNav(t, 'ตารางสอน')
   await expect(t.getByRole('heading', { name: 'ตารางสอน' })).toBeVisible()
   for (const d of ['จันทร์', 'ศุกร์', 'เสาร์', 'อาทิตย์']) await expect(t.getByTestId('timetable-grid').getByText(d, { exact: true })).toBeVisible()
   await t.getByLabel('ห้องของคาบ').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
@@ -67,7 +68,7 @@ test('สร้างงานแบบร่าง → นักเรียน
   await expect(s.getByText(/สวัสดี/)).toBeVisible()
   expect(JSON.stringify(await (await s.request.get('/api/student/assignments')).json())).not.toContain('งานร่าง E2E')
 
-  await t.getByRole('link', { name: 'รอเผยแพร่', exact: true }).click()
+  await teacherNav(t, 'รอเผยแพร่')
   const row = t.getByTestId('scheduled-list').locator('div', { hasText: 'งานร่าง E2E' }).first()
   await expect(row).toContainText('ร่าง')
   await row.getByRole('button', { name: 'เผยแพร่ตอนนี้' }).click()
@@ -91,7 +92,7 @@ test('คัดลอกคลิปไปห้องอื่นจากป�
   await dlg.getByRole('button', { name: 'คัดลอกไป 1 ห้อง' }).click()
   await expect(t.getByText(/คัดลอกคลิปแล้ว 1 ชิ้น/)).toBeVisible()
 
-  await t.getByRole('link', { name: 'คลังของครู', exact: true }).click()
+  await teacherNav(t, 'คลังของครู')
   await t.getByRole('tab', { name: 'ประกาศ' }).click()
   const lib = t.getByTestId('library-list')
   await expect(lib.getByRole('checkbox').first()).toBeVisible()
@@ -237,7 +238,7 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   const cls = schools.flatMap((s: { classes: { id: string; name: string }[] }) => s.classes).find((c: { name: string }) => c.name === 'โรงเรียนทดสอบ ชั้น 1')
   const { id: slotId } = await (await t.request.post('/api/teacher/timetable', { data: { classId: cls.id, weekday: 1, start: '06:00', end: '07:40' } })).json()
 
-  await t.getByRole('link', { name: 'ภาระสอน & เดินทาง' }).click()
+  await teacherNav(t, 'ภาระสอน & เดินทาง')
   const target = t.getByLabel('เป้าคาบต่อสัปดาห์ โรงเรียนทดสอบ ชั้น 1')
   await target.fill('3')
   await target.blur()
@@ -251,7 +252,7 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await expect(t.getByRole('row').filter({ has: t.getByLabel('นับคาบ โรงเรียนทดสอบ') })).not.toContainText('ไม่นับในรวม')
   await expect(t.getByTestId('month-totals')).toContainText('คาบ')
 
-  await t.getByRole('link', { name: 'เส้นทาง & ปิดโรงเรียน' }).click()
+  await teacherNav(t, 'เส้นทาง & ปิดโรงเรียน')
   await t.getByLabel('วันที่').fill('2030-01-07')
   await expect(t.getByTestId('day-stops')).toContainText('โรงเรียนทดสอบ (3 คาบ)')
   await expect(t.getByTestId('day-summary')).toContainText('3 คาบ · 1 ที่')

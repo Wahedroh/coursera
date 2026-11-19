@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import { absencesLeft, attendancePct, MIN_ATTENDANCE_PCT } from '../../shared/remedial'
-import { pointsForBands, type StudentHomeCards } from '../../shared/studentHome'
+import { pointsForBands, UPCOMING_DAYS, type StudentHomeCards, type UpcomingItem } from '../../shared/studentHome'
 import { slotActiveOn } from '../../shared/timetable'
 import { addDays } from '../../shared/leave'
 import type { Db } from '../db/client'
@@ -91,7 +91,22 @@ export async function studentHomeCards(db: Db, studentId: string, classId: strin
   // งานซ่อมที่ผ่านแล้วแสดงต่ออีก 7 วัน
   const remedialsShown = rem.filter((r) => r.status !== 'passed' || (r.decidedAt ?? 0) > t - 7 * 86400_000).map(({ decidedAt: _, ...r }) => r)
 
+  const today = todayBangkok(t)
+  const until = addDays(today, UPCOMING_DAYS)
+  const dueSoon = await db.all<{ id: string; title: string; dueAt: number; maxScore: number }>(sql`
+    SELECT a.id, a.title, a.due_at AS dueAt, a.max_score AS maxScore FROM assignments a
+    LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ${studentId}
+    WHERE a.class_id = ${classId} AND a.published = 1 AND a.due_at >= ${t} AND a.due_at < ${Date.parse(`${until}T00:00:00+07:00`)} AND (s.id IS NULL OR s.status = 'returned')
+      AND NOT EXISTS (SELECT 1 FROM assignment_closed x WHERE x.assignment_id = a.id AND x.student_id = ${studentId})`)
+  const events = await db.all<{ id: string; kind: 'exam' | 'activity' | 'holiday'; title: string; date: string; period: string; detail: string }>(sql`
+    SELECT id, kind, title, date, period, detail FROM calendar_events WHERE class_id = ${classId} AND date >= ${today} AND date < ${until}`)
+  const upcoming: UpcomingItem[] = [
+    ...dueSoon.map((a) => ({ kind: 'assignment' as const, id: a.id, title: a.title, date: todayBangkok(a.dueAt), at: a.dueAt, maxScore: a.maxScore, detail: '' })),
+    ...events.map((e) => ({ kind: e.kind, id: e.id, title: e.title, date: e.date, at: null, maxScore: null, detail: [e.period, e.detail].filter(Boolean).join(' · ') })),
+  ].sort((x, y) => x.date.localeCompare(y.date) || (x.at ?? 0) - (y.at ?? 0))
+
   return {
+    upcoming,
     next: nx ? { ...nx, now: nx.start <= t, due } : null,
     attendance: { ...att, pct: attendancePct(att.days, att.absent), left: absencesLeft(att.days, att.absent), min: MIN_ATTENDANCE_PCT },
     target,

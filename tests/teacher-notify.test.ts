@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
 import { openDay } from '../src/server/attendance/service'
-import { drainTeacher, generateTeacherNotifications, notifyResubmitted } from '../src/server/teacherNotify/service'
+import { drainTeacher, generateTeacherNotifications, notifyResubmitted, takeTeacherUnshown } from '../src/server/teacherNotify/service'
 import { inQuietHours, DEFAULT_TEACHER_NOTIFY } from '../src/shared/teacherNotify'
 import { getJson, json, loginTeacher, postJson, putJson, resetDb, seedAssignment, seedClass, seedStudent, studentCookie } from './helpers'
 
@@ -106,7 +106,8 @@ it('ช่วงห้ามรบกวน: ไม่ส่ง push แต่�
   expect(await drainTeacher(db(), at('08:23'), sender)).toBe(2)
   expect(sent).toHaveLength(2)
   expect(await drainTeacher(db(), at('08:24'), sender)).toBe(0)
-  const take = await json(await postJson('/api/teacher/push/take', {}, { cookie }))
+  // ใช้เวลาเดียวกับเทสต์ (route ใช้นาฬิกาจริง — วันที่ในเทสต์เป็นค่าคงที่)
+  const take = await takeTeacherUnshown(db(), at('08:25'))
   expect(take[0]).toMatchObject({ title: expect.stringMatching(/^⏰ อีก/) })
   const left = (await env.DB.prepare('SELECT endpoint FROM teacher_push_subscriptions').all<{ endpoint: string }>()).results
   expect(left.map((r) => r.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/abc'])

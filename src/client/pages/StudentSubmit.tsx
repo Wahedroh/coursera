@@ -31,14 +31,20 @@ export default function StudentSubmit() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
+    // คำตอบที่มาช้าจากรอบที่ยกเลิกแล้ว ห้ามทับรูป/ข้อความที่นักเรียนเพิ่งใส่
+    let live = true
     api<StudentAssignment>(`/api/student/assignments/${id}`)
       .then((x) => {
+        if (!live) return
         setA(x)
         const draft = storage(() => localStorage.getItem(draftKey), null)
         setText(draft ?? x.submission?.text ?? '')
         setImages((x.submission?.imageKeys ?? []).map((key) => ({ id: key, preview: fileUrl(key), key })))
       })
-      .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+      .catch((e) => live && (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+    return () => {
+      live = false
+    }
   }, [id, draftKey, navigate])
 
   function updateText(v: string) {
