@@ -1,3 +1,4 @@
+import { teacherNav } from './nav'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
 // ห้อง "โรงเรียนทดสอบ ชั้น 1": มานี (3, PIN 1357)
@@ -40,8 +41,9 @@ test('ใบลาออนไลน์: นักเรียนขอลาป
   await expect(s.getByText('รอครูอนุมัติ', { exact: true })).toBeVisible()
 
   const t = await teacherHome(browser)
-  await expect(t.getByRole('link', { name: /^ใบลา 1 รายการรออนุมัติ$/ })).toBeVisible()
-  await t.getByRole('link', { name: /ใบลา/ }).first().click()
+  // แถบล่าง: ปุ่มเมนูมีตัวเลขใบลารอ · ในแผ่นเมนูมีลิงก์ใบลาพร้อมจำนวน
+  await expect(t.getByRole('button', { name: 'เมนูทั้งหมด (ใบลารอ 1)' })).toBeVisible()
+  await teacherNav(t, /^ใบลา 1 รายการรออนุมัติ$/)
   const card = t.getByTestId('leave-3')
   await expect(card).toContainText('“มีไข้ หมอให้พัก”')
   await card.getByLabel(/หมายเหตุถึง/).fill('หายไว ๆ')

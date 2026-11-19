@@ -21,13 +21,19 @@ export default function StudentRemedial() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // คำตอบที่มาช้าจากรอบที่ยกเลิกแล้ว ห้ามทับสิ่งที่นักเรียนกำลังพิมพ์
+    let live = true
     api<RemedialItem>(`/api/student/remedials/${id}`)
       .then((x) => {
+        if (!live) return
         setR(x)
         setText(x.text)
         setImages(x.imageKeys)
       })
-      .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+      .catch((e) => live && (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
+    return () => {
+      live = false
+    }
   }, [id, navigate])
 
   async function add(files: FileList | null) {

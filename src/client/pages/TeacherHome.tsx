@@ -6,6 +6,7 @@ import { OverviewMenu } from '../components/ClassMenu'
 import TeacherToday from '../components/TeacherToday'
 import TermCard from '../components/TermCard'
 import NowCard from '../components/NowCard'
+import TeacherInsightRows from '../components/TeacherInsightRows'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 import Icon from '../components/Icon'
@@ -59,6 +60,7 @@ export default function TeacherHome() {
         </Link>
       )}
       {classCount > 0 && <NowCard classes={schools!.flatMap((s) => s.classes)} />}
+      {classCount > 0 && <TeacherInsightRows />}
       {classCount > 0 && <TeacherToday />}
       {classCount > 0 && (
         <Card className="p-4 flex flex-col gap-3">

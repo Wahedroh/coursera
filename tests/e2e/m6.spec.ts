@@ -1,3 +1,4 @@
+import { teacherNav } from './nav'
 import { expect, test } from '@playwright/test'
 
 // ต่อจาก m1: "ใบงานเศษส่วน" ของมานี (รหัส 3, PIN 1357) ตรวจแล้วและมีรูป
@@ -6,7 +7,7 @@ test('ครูดูพื้นที่ไฟล์ แล้วลบรู�
   await teacher.goto('/teacher/login')
   await teacher.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await teacher.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await teacher.getByRole('link', { name: 'พื้นที่ไฟล์' }).click()
+  await teacherNav(teacher, 'พื้นที่ไฟล์')
   await expect(teacher.getByText(/ใช้ไป .* จาก 10.00 GB/)).toBeVisible()
   await expect(teacher.getByRole('heading', { name: /โควตาวันนี้ของบัญชี Cloudflare/ })).toBeVisible()
   await expect(teacher.getByText('CF_ANALYTICS_TOKEN')).toBeVisible()

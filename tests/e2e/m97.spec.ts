@@ -1,3 +1,4 @@
+import { teacherNav } from './nav'
 import { expect, test, type Browser } from '@playwright/test'
 
 async function studentPage(browser: Browser) {
@@ -131,7 +132,7 @@ test('เกมการ์ด QR: สร้างชุดคำถาม → �
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await t.getByRole('link', { name: 'เกมการ์ด QR' }).click()
+  await teacherNav(t, 'เกมการ์ด QR')
   await t.getByRole('button', { name: '+ สร้างชุดคำถาม' }).click()
   await t.getByLabel('ชื่อชุด').fill('ทบทวนนิวตัน')
   await t.getByLabel('คำถามข้อ 1', { exact: true }).fill('แรงลัพธ์ศูนย์ วัตถุจะ?')
@@ -207,7 +208,7 @@ test('เกมการ์ด: ครูใส่รูปโจทย์ (ต�
   await page.goto('/teacher/login')
   await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await page.getByRole('link', { name: 'เกมการ์ด QR' }).click()
+  await teacherNav(page, 'เกมการ์ด QR')
   await page.getByRole('button', { name: '+ สร้างชุดคำถาม' }).click()
   await page.getByLabel('ชื่อชุด').fill('โจทย์จากหนังสือ')
   const png = await page.screenshot({ clip: { x: 0, y: 0, width: 200, height: 120 } })
@@ -226,7 +227,7 @@ test('เกมการ์ด: ตั้งเวลาข้อละ 10 ว�
   await page.goto('/teacher/login')
   await page.getByLabel('รหัสผ่านครู').fill('teacher-pass')
   await page.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
-  await page.getByRole('link', { name: 'เกมการ์ด QR' }).click()
+  await teacherNav(page, 'เกมการ์ด QR')
   await page.getByRole('button', { name: '+ สร้างชุดคำถาม' }).click()
   await page.getByLabel('ชื่อชุด').fill('จับเวลา 10 วิ')
   await page.getByLabel('คำถามข้อ 1', { exact: true }).fill('1+1=?')

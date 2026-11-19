@@ -1,3 +1,4 @@
+import { teacherNav } from './nav'
 import { expect, test, type Browser } from '@playwright/test'
 
 // ห้อง "โรงเรียนทดสอบ ชั้น 1": สมใจ (1), สมชาย (2), มานี (3, PIN 1357)
@@ -73,7 +74,7 @@ test('ครูประกาศ → นักเรียนเห็นที
 
 test('หน้านักเรียนที่ต้องติดตาม', async ({ browser }) => {
   const t = await teacherPage(browser)
-  await t.getByRole('link', { name: 'ติดตามนักเรียน' }).click()
+  await teacherNav(t, 'ติดตามนักเรียน')
   await expect(t.getByRole('heading', { name: 'นักเรียนที่ต้องติดตาม' })).toBeVisible()
   await expect(t.getByRole('tab', { name: /ทั้งหมด \d+/ })).toBeVisible()
   await t.getByLabel('ค้างงานอย่างน้อย').fill('1')
@@ -85,7 +86,7 @@ test('ส่งออก Excel ทั้งโรงเรียน และเ
   const { execFileSync } = await import('node:child_process')
   const sheetsOf = (file: string) => [...execFileSync('unzip', ['-p', file, 'xl/workbook.xml']).toString().matchAll(/<sheet [^>]*name="([^"]+)"/g)].map((m) => m[1])
   const t = await teacherPage(browser)
-  await t.getByRole('link', { name: 'ส่งออกข้อมูล' }).click()
+  await teacherNav(t, 'ส่งออกข้อมูล')
   await expect(t.getByRole('heading', { name: 'ส่งออกข้อมูล (Excel)' })).toBeVisible()
   await t.getByLabel('โรงเรียน', { exact: true }).selectOption({ label: 'โรงเรียนทดสอบ' })
   const [dl] = await Promise.all([t.waitForEvent('download'), t.getByRole('button', { name: 'ส่งออก Excel' }).click()])

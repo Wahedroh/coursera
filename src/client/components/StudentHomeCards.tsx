@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { REMEDIAL_STATUS_LABEL } from '../../shared/remedial'
-import type { StudentHomeCards as Data } from '../../shared/studentHome'
+import type { StudentHomeCards as Data, UpcomingItem } from '../../shared/studentHome'
+import { todayBangkok } from '../../shared/attendance'
+import type { IconName } from './Icon'
 import Icon from './Icon'
 
 const hm = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' })
@@ -33,6 +35,7 @@ export default function StudentHomeCards() {
   if (!d) return null
   return (
     <div className="flex flex-col gap-3" data-testid="home-cards">
+      <Upcoming items={d.upcoming} now={now} />
       {d.remedials.length > 0 && <Remedials items={d.remedials} />}
       {d.next && <NextClass n={d.next} now={now} />}
       <Attendance a={d.attendance} />
@@ -202,6 +205,89 @@ function Remedials({ items }: { items: Data['remedials'] }) {
           <span className="text-xs">{REMEDIAL_STATUS_LABEL[r.status]}</span>
         </Link>
       ))}
+    </section>
+  )
+}
+
+const monthFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', month: 'short' })
+const wdFmt = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', weekday: 'short' })
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400_000)
+const inDays = (n: number) => (n <= 0 ? 'วันนี้' : n === 1 ? 'พรุ่งนี้' : `อีก ${n} วัน`)
+const KIND: Record<UpcomingItem['kind'], { icon: IconName; label: string }> = {
+  assignment: { icon: 'task', label: 'งาน' },
+  exam: { icon: 'exam', label: 'สอบ' },
+  activity: { icon: 'calendar', label: 'กิจกรรม' },
+  holiday: { icon: 'calendar', label: 'วันหยุด' },
+}
+const linkOf = (x: UpcomingItem) => (x.kind === 'assignment' ? `/me/assignments/${x.id}` : '/me/calendar')
+
+/** ปฏิทินแผ่น: เดือน · วันที่ · วัน */
+function CalendarTile({ date }: { date: string }) {
+  const t = Date.parse(`${date}T00:00:00Z`)
+  return (
+    <span className="w-[4.5rem] shrink-0 overflow-hidden rounded-xl bg-white text-center text-ink shadow" aria-hidden="true">
+      <span className="block bg-amber-400 text-xs font-extrabold py-0.5">{monthFmt.format(t)}</span>
+      <span className="block text-3xl font-extrabold leading-tight">{Number(date.slice(8))}</span>
+      <span className="block text-[11px] text-stone-500 pb-1">{wdFmt.format(t)}</span>
+    </span>
+  )
+}
+
+/** งานถัดไป (การ์ดเด่น) + ภายใน 7 วัน / 30 วัน */
+function Upcoming({ items, now }: { items: UpcomingItem[]; now: number }) {
+  const today = todayBangkok(now)
+  if (!items.length) return null
+  const hero = items.find((x) => x.kind === 'assignment') ?? items[0]
+  const rest = items.filter((x) => x !== hero)
+  const week = rest.filter((x) => daysBetween(today, x.date) < 7)
+  const month = rest.filter((x) => daysBetween(today, x.date) >= 7)
+  const heroIn = daysBetween(today, hero.date)
+  return (
+    <>
+      <Link to={linkOf(hero)} className="flex items-center gap-4 rounded-3xl bg-gradient-to-br from-[#1f6e52] to-board p-4 text-white shadow-lg shadow-board/30" data-testid="next-up">
+        <CalendarTile date={hero.date} />
+        <span className="min-w-0">
+          <span className="block text-sm opacity-85">
+            {hero.kind === 'assignment' ? 'งานถัดไป' : KIND[hero.kind].label} · {inDays(heroIn)}
+          </span>
+          <b className="block text-xl leading-tight truncate">{hero.title}</b>
+          <span className="block text-sm opacity-95">
+            {hero.maxScore !== null && `${hero.maxScore} คะแนน · `}
+            {hero.at !== null ? `ส่งก่อน ${hm.format(hero.at)} น.` : hero.detail}
+          </span>
+        </span>
+      </Link>
+      {week.length > 0 && <Group title="ภายใน 7 วัน" items={week} today={today} />}
+      {month.length > 0 && <Group title="ภายใน 30 วัน" items={month} today={today} />}
+    </>
+  )
+}
+
+function Group({ title, items, today }: { title: string; items: UpcomingItem[]; today: string }) {
+  return (
+    <section aria-label={title} className="flex flex-col gap-2">
+      <h2 className="px-1">
+        <b className="text-lg">{title}</b>
+        <span className="block text-xs text-stone-500">{items.length} รายการ</span>
+      </h2>
+      {items.map((x) => {
+        const n = daysBetween(today, x.date)
+        return (
+          <Link key={`${x.kind}-${x.id}`} to={linkOf(x)} className="flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm border border-line">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-xl">
+              <Icon n={KIND[x.kind].icon} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <b className="block truncate">{x.title}</b>
+              {x.detail && <span className="block truncate text-xs text-stone-500">{x.detail}</span>}
+            </span>
+            <span className="text-right text-sm">
+              <b className="block whitespace-nowrap">{x.maxScore !== null ? `${x.maxScore} คะแนน` : KIND[x.kind].label}</b>
+              <span className={`text-xs whitespace-nowrap ${n <= 3 ? 'font-bold text-amber-700' : 'text-stone-500'}`}>{inDays(n)}</span>
+            </span>
+          </Link>
+        )
+      })}
     </section>
   )
 }

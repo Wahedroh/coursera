@@ -58,3 +58,10 @@ body {
 .ic .w {
   stroke-width: 1.7;
 }
+
+/* มือถือ: เวลาเลื่อนหาช่อง/ปุ่ม ให้พ้นแถบเมนูล่างของครู */
+@media (max-width: 767px) {
+  html {
+    scroll-padding-bottom: 6.5rem;
+  }
+}

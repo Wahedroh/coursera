@@ -24,7 +24,22 @@ export type StudentHomeCards = {
   } | null
   feedback: { assignmentId: string; title: string; status: 'graded' | 'returned'; score: number | null; maxScore: number; comment: string; at: number }[]
   remedials: { id: string; title: string; status: 'assigned' | 'submitted' | 'returned' | 'passed'; dueAt: number | null }[]
+  /** ภายใน 30 วันข้างหน้า: งานที่ยังไม่ส่ง + วันสำคัญในปฏิทิน (เรียงตามวัน) */
+  upcoming: UpcomingItem[]
 }
+export type UpcomingItem = {
+  kind: 'assignment' | 'exam' | 'activity' | 'holiday'
+  id: string
+  title: string
+  /** YYYY-MM-DD (เวลาไทย) */
+  date: string
+  /** กำหนดส่งของงาน (null = วันสำคัญทั้งวัน) */
+  at: number | null
+  maxScore: number | null
+  /** คาบ/รายละเอียดของวันสำคัญ */
+  detail: string
+}
+export const UPCOMING_DAYS = 30
 
 /**
  * คะแนนรวมขั้นต่ำที่ต้องมีเพื่อให้เปอร์เซ็นไทล์ถึงเกณฑ์ของแต่ละเกรด (เกรดอิงกลุ่ม)

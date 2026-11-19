@@ -76,5 +76,5 @@ test('ครูสร้างรายการคะแนน → วางค
   await student.reload()
   await expect(student.getByText('สอบย่อย บทที่ 3')).toBeVisible()
   await expect(student.getByTestId('my-score')).toHaveText('17.5/20')
-  await expect(student.getByText('19')).toHaveCount(0)
+  await expect(student.getByText('19', { exact: true })).toHaveCount(0)
 })
