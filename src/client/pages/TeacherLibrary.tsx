@@ -23,9 +23,14 @@ export default function TeacherLibrary() {
   useEffect(() => {
     setItems(null)
     setPicked([])
+    // สลับแท็บเร็ว ๆ: คำตอบของแท็บก่อนที่มาช้าห้ามทับรายการของแท็บนี้ (จะคัดลอกผิดประเภท)
+    let live = true
     api<LibraryItem[]>(`/api/teacher/library?type=${type}`)
-      .then(setItems)
-      .catch((e) => setError(handle(e)))
+      .then((x) => live && setItems(x))
+      .catch((e) => live && setError(handle(e)))
+    return () => {
+      live = false
+    }
   }, [type, handle])
 
   const shown = (items ?? []).filter((it) => !q.trim() || it.title.includes(q.trim()))

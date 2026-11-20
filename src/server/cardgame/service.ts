@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull, like, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
-import { CARD_EXP, DEVICE_GAME_WINDOW_MS, TIME_GRACE_MS, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary, type StudentActiveGame, type StudentCardGame } from '../../shared/cardgame'
+import { CARD_EXP, DEVICE_GAME_WINDOW_MS, START_COUNTDOWN_MS, TIME_GRACE_MS, type CardGameResult, type CardGameState, type CardQuizInput, type CardQuizSummary, type StudentActiveGame, type StudentCardGame } from '../../shared/cardgame'
 import { newId, type Db } from '../db/client'
 import { attendanceDays, cardAnswers, cardGames, cardQuizzes, classes, pointEvents, scoreItems, scores, studentAvatars, students } from '../db/schema'
 import { apiError } from '../http'
@@ -58,15 +58,22 @@ export async function startGame(db: Db, quizId: string, classId: string, t: numb
   const [cls] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, classId))
   if (!cls) throw apiError('class_not_found', 'ไม่พบห้องเรียนนี้', 404)
   const id = newId()
-  await db.insert(cardGames).values({ id, quizId, classId, questions: quiz.questions, questionStartedAt: t, createdAt: t })
+  // ข้อแรกเริ่มหลังนับถอยหลัง (ครูกด "เริ่มเลย" ข้ามได้)
+  await db.insert(cardGames).values({ id, quizId, classId, questions: quiz.questions, questionStartedAt: t + START_COUNTDOWN_MS, createdAt: t })
   return id
+}
+
+/** ยังนับถอยหลังก่อนเริ่มเกมอยู่ (ms ที่เหลือ · 0 = เริ่มแล้ว) */
+function startsInMs(g: { endedAt?: number | null; questionStartedAt: number | null }, t: number): number {
+  if (g.endedAt != null || g.questionStartedAt === null) return 0
+  return Math.max(0, g.questionStartedAt - t)
 }
 
 /** เวลาเหลือของข้อปัจจุบัน (ms) · null = ไม่จำกัด */
 function remainingMs(g: { questions: { seconds?: number }[]; current: number; questionStartedAt: number | null }, t: number): number | null {
   const sec = g.questions[g.current]?.seconds ?? 0
   if (!sec) return null
-  return Math.max(0, (g.questionStartedAt ?? t) + sec * 1000 - t)
+  return Math.max(0, Math.min(sec * 1000, (g.questionStartedAt ?? t) + sec * 1000 - t))
 }
 
 async function getGame(db: Db, id: string) {
@@ -90,6 +97,7 @@ export async function gameState(db: Db, id: string, t = Date.now()): Promise<Car
     questions: g.questions,
     current: g.current,
     remainingMs: remainingMs(g, t),
+    startsInMs: startsInMs(g, t),
     revealed: g.revealed,
     ended: g.endedAt !== null,
     roster: (await roster(db, g.classId)).map(({ id, no, zipgradeId, name }) => ({ id, no, zipgradeId, name })),
@@ -101,6 +109,8 @@ export async function gameState(db: Db, id: string, t = Date.now()): Promise<Car
 /** ยังรับคำตอบของข้อปัจจุบันไหม: ยังไม่เฉลย ยังไม่จบ และยังไม่หมดเวลา (เผื่อเวลาส่ง 2 วินาที) */
 function accepting(g: { endedAt: number | null; revealed: boolean; questions: { seconds?: number }[]; current: number; questionStartedAt: number | null }, t: number): boolean {
   if (g.endedAt !== null || g.revealed) return false
+  // ยังนับถอยหลังก่อนเริ่มเกม: ยังไม่รับ
+  if (g.questionStartedAt !== null && t < g.questionStartedAt) return false
   const sec = g.questions[g.current]?.seconds ?? 0
   return !sec || t <= (g.questionStartedAt ?? 0) + sec * 1000 + TIME_GRACE_MS
 }
@@ -156,14 +166,17 @@ export async function studentGameView(db: Db, id: string, me: { studentId: strin
   const mine = await db.select({ qIndex: cardAnswers.qIndex, answer: cardAnswers.answer }).from(cardAnswers).where(and(eq(cardAnswers.gameId, id), eq(cardAnswers.studentId, me.studentId)))
   const q = g.questions[g.current]
   const ended = g.endedAt !== null
+  const wait = startsInMs(g, t)
   const correct = mine.filter((a) => g.questions[a.qIndex]?.answer === a.answer).length
   return {
     id,
     quizTitle: quiz?.title ?? '',
     total: g.questions.length,
     current: g.current,
-    question: { q: q.q, ...(q.image ? { image: q.image } : {}), choices: q.choices },
+    // ยังไม่เริ่ม: ไม่ส่งโจทย์ก่อนเวลา
+    question: wait ? { q: '', choices: [] } : { q: q.q, ...(q.image ? { image: q.image } : {}), choices: q.choices },
     remainingMs: ended || g.revealed ? null : remainingMs(g, t),
+    startsInMs: wait,
     revealed: g.revealed || ended,
     correct: g.revealed || ended ? q.answer : null,
     mine: mine.find((a) => a.qIndex === g.current)?.answer ?? null,

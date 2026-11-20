@@ -23,7 +23,7 @@ export function useCountdown(state: CardGameState | null): number | null {
   const [deadline, setDeadline] = useState<number | null>(null)
   const [now, setNow] = useState(Date.now())
   useEffect(() => {
-    setDeadline(state && state.remainingMs !== null && !state.revealed && !state.ended ? Date.now() + state.remainingMs : null)
+    setDeadline(state && state.remainingMs !== null && !state.revealed && !state.ended && !state.startsInMs ? Date.now() + state.remainingMs : null)
   }, [state])
   useEffect(() => {
     if (deadline === null) return
@@ -31,6 +31,28 @@ export function useCountdown(state: CardGameState | null): number | null {
     return () => clearInterval(t)
   }, [deadline])
   return deadline === null ? null : Math.max(0, Math.ceil((deadline - now) / 1000))
+}
+
+/** นับถอยหลังก่อนเริ่มเกม (วินาที · 0 = เริ่มแล้ว) — ครบแล้วเรียก onStart (โหลดข้อแรก) */
+export function useStartIn(startsInMs: number | undefined, onStart: () => void): number {
+  const [at, setAt] = useState<number | null>(null)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    setAt(startsInMs ? Date.now() + startsInMs : null)
+  }, [startsInMs])
+  useEffect(() => {
+    if (at === null) return
+    const t = setInterval(() => {
+      const n = Date.now()
+      setNow(n)
+      if (n >= at) {
+        setAt(null)
+        onStart()
+      }
+    }, 200)
+    return () => clearInterval(t)
+  }, [at, onStart])
+  return at === null ? 0 : Math.max(0, Math.ceil((at - now) / 1000))
 }
 
 export function Countdown({ left, big }: { left: number | null; big?: boolean }) {

@@ -39,6 +39,8 @@ export const cardQuestionSchema = z
 export const TIME_OPTIONS = [0, 10, 20, 30, 45, 60, 90, 120] as const
 /** เผื่อเวลาส่งคำตอบจากมือถือหลังหมดเวลา */
 export const TIME_GRACE_MS = 2000
+/** ครูกดเริ่มเกม → นับถอยหลังก่อนขึ้นข้อแรก (ให้นักเรียนเปิดเกมในเครื่องทัน) */
+export const START_COUNTDOWN_MS = 10_000
 
 export const cardQuizInputSchema = z.object({
   title: z.string().trim().min(1).max(120),
@@ -63,6 +65,8 @@ export type CardGameState = {
   current: number
   /** เวลาเหลือของข้อปัจจุบัน (ms) · null = ไม่จำกัดเวลา · ไม่นับต่อหลังเฉลย */
   remainingMs: number | null
+  /** นับถอยหลังก่อนเริ่มเกม (ms) · 0 = เริ่มแล้ว */
+  startsInMs: number
   revealed: boolean
   ended: boolean
   /** เลขที่ = ลำดับในห้อง (เริ่ม 1) */
@@ -83,8 +87,11 @@ export type StudentCardGame = {
   quizTitle: string
   total: number
   current: number
+  /** ระหว่างนับถอยหลังก่อนเริ่มเกม: ยังไม่แสดงโจทย์ (q ว่าง ตัวเลือกว่าง) */
   question: { q: string; image?: string; choices: string[] }
   remainingMs: number | null
+  /** นับถอยหลังก่อนเริ่มเกม (ms) · 0 = เริ่มแล้ว */
+  startsInMs: number
   revealed: boolean
   /** เฉลยของข้อปัจจุบัน (เฉพาะหลังเฉลย) */
   correct: number | null

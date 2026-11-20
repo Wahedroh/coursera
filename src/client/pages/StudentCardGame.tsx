@@ -5,6 +5,7 @@ import { LETTERS, type StudentCardGame as Game } from '../../shared/cardgame'
 import { fileUrl } from '../lib/upload'
 import { ErrorBox, Loading } from '../ui'
 import Icon from '../components/Icon'
+import { useStartIn } from '../components/CardGameParts'
 
 const COLORS = ['bg-red-500', 'bg-blue-500', 'bg-amber-500', 'bg-green-600']
 
@@ -25,7 +26,7 @@ export default function StudentCardGame() {
           setG(x)
           setError(null)
           // ตั้งนาฬิกาใหม่เฉพาะเมื่อเปลี่ยนข้อ/สถานะ (ไม่ให้เวลากระโดดทุกครั้งที่ดึง)
-          const k = `${x.current}:${x.revealed}:${x.ended}`
+          const k = `${x.current}:${x.revealed}:${x.ended}:${x.startsInMs > 0}`
           if (k !== key.current) {
             key.current = k
             setDeadline(x.remainingMs === null ? null : Date.now() + x.remainingMs)
@@ -44,6 +45,7 @@ export default function StudentCardGame() {
       document.removeEventListener('visibilitychange', load)
     }
   }, [load])
+  const startIn = useStartIn(g?.startsInMs, load)
   useEffect(() => {
     if (deadline === null) return
     const t = setInterval(() => setNow(Date.now()), 250)
@@ -87,7 +89,15 @@ export default function StudentCardGame() {
       </header>
       <section className="p-4 flex flex-col gap-3 flex-1">
         <ErrorBox message={error} />
-        {g.ended && g.summary ? (
+        {startIn > 0 && !g.ended ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center" data-testid="device-start-countdown">
+            <p className="text-lg font-bold text-stone-600">เกมจะเริ่มใน</p>
+            <span className="flex h-36 w-36 items-center justify-center rounded-full bg-amber-400 text-7xl font-extrabold text-amber-950 tabular-nums animate-pulse" aria-live="polite" aria-label={`เริ่มใน ${startIn} วินาที`}>
+              {startIn}
+            </span>
+            <p className="text-sm text-stone-500">เตรียมตัว! โจทย์จะขึ้นที่นี่ แล้วแตะคำตอบได้เลย</p>
+          </div>
+        ) : g.ended && g.summary ? (
           <div className="rounded-3xl bg-white border-2 border-line p-6 text-center flex flex-col gap-2" data-testid="device-summary">
             <span className="text-5xl">{g.summary.answered ? '🎉' : <Icon n="cards" />}</span>
             <b className="text-2xl">

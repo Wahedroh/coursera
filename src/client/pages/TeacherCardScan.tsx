@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
-import { Countdown, GameControls, useCardGame, useCountdown } from '../components/CardGameParts'
+import { Countdown, GameControls, useCardGame, useCountdown, useStartIn } from '../components/CardGameParts'
 import { loadReader, scanImage, type CardScan } from '../lib/cardScanner'
 import { ErrorBox, Loading } from '../ui'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -26,6 +26,7 @@ export default function TeacherCardScan() {
   const revealed = useRef(false)
   const [, bump] = useState(0)
   const left = useCountdown(state)
+  const startIn = useStartIn(state?.startsInMs, reload)
   const timeUp = useRef(false)
   timeUp.current = left === 0
 
@@ -187,6 +188,14 @@ export default function TeacherCardScan() {
       </div>
       <section className="bg-[#FDFBF3] text-stone-900 p-4 flex flex-col gap-3 flex-1">
         <ErrorBox message={camError ?? error} />
+        {startIn > 0 && (
+          <div className="flex items-center gap-3 rounded-xl bg-amber-300 px-3 py-2 font-bold text-amber-950" data-testid="scan-start-countdown">
+            <span className="flex-1">เกมจะเริ่มใน {startIn} วินาที — ยังไม่รับคำตอบ</span>
+            <button type="button" className="rounded-lg bg-white px-3 py-1" onClick={() => void api(`/api/teacher/card-games/${id}/goto`, { body: { index: 0 } }).then(() => reload()).catch(onError)}>
+              เริ่มเลย
+            </button>
+          </div>
+        )}
         {!state.ended && <GameControls state={state} reload={reload} onError={onError} compact />}
         {!state.ended && missing.length > 0 && (
           <p className="text-sm">

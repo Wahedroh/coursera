@@ -72,6 +72,7 @@ describe('เล่นเกม', () => {
   it('สแกน → เฉลย (ล็อก) → ข้อถัดไป → จบเกม: EXP · คะแนนเก็บ · เช็กชื่อ', async () => {
     const { teacher, classId, st, quizId } = await setup()
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     const scan = (qIndex: number, scans: { zipgradeId: string; answer: number }[]) => postJson(`/api/teacher/card-games/${id}/scans`, { qIndex, scans }, { cookie: teacher })
 
     // ข้อ 1: ฟ้าใสสแกนผิดก่อนแล้วเปลี่ยนเป็นถูก · การ์ดห้องอื่นข้ามไป
@@ -130,6 +131,7 @@ describe('เล่นเกม', () => {
     await putJson(`/api/teacher/attendance/${day.id}/records/${st[0].id}`, { status: 'absent' }, teacher)
     await putJson(`/api/teacher/attendance/${day.id}/records/${st[2].id}`, { status: 'sick' }, teacher)
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     await postJson(`/api/teacher/card-games/${id}/scans`, { qIndex: 0, scans: [{ zipgradeId: '34101', answer: 0 }] }, { cookie: teacher })
     await postJson(`/api/teacher/card-games/${id}/end`, { attendance: true }, { cookie: teacher })
     const d = await json(await getJson(`/api/teacher/classes/${classId}/attendance?date=${todayBangkok()}`, teacher))
@@ -165,6 +167,7 @@ describe('ลบเกม', () => {
   it('ลบเกมที่เล่นแล้ว: คำตอบ EXP และคะแนนเก็บหายไป · ชุดคำถามลบได้อีกครั้ง', async () => {
     const { teacher, classId, st, quizId } = await setup()
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     await postJson(`/api/teacher/card-games/${id}/scans`, { qIndex: 0, scans: [{ zipgradeId: '34101', answer: 0 }] }, { cookie: teacher })
     const r = await json(await postJson(`/api/teacher/card-games/${id}/end`, { saveScore: true }, { cookie: teacher }))
     const sc = await studentCookie(st[0].id)
@@ -189,6 +192,7 @@ describe('ตั้งเวลารายข้อ', () => {
     expect((await postJson('/api/teacher/card-quizzes', { ...quiz, questions: [{ ...quiz.questions[0], seconds: 999 }] }, { cookie: teacher })).status).toBe(400)
     const { id: quizId } = await json(await postJson('/api/teacher/card-quizzes', quiz, { cookie: teacher }))
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     const s0 = await json(await getJson(`/api/teacher/card-games/${id}`, teacher))
     expect(s0.remainingMs).toBeGreaterThan(18_000)
     expect(s0.remainingMs).toBeLessThanOrEqual(20_000)
@@ -210,6 +214,7 @@ describe('ตอบในเครื่องตัวเอง (iPad/มือ
     const outsider = await studentCookie((await seedStudent(db(), (await seedClass(db(), { name: 'ห้องอื่น' })).classId)).id)
     expect(await json(await getJson('/api/student/card-games/active', fa))).toBeNull()
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     expect(await json(await getJson('/api/student/card-games/active', fa))).toEqual({ id, quizTitle: 'กฎของนิวตัน' })
     expect(await json(await getJson('/api/student/card-games/active', outsider))).toBeNull()
     expect((await getJson(`/api/student/card-games/${id}`, outsider)).status).toBe(404)
@@ -256,11 +261,42 @@ describe('ตอบในเครื่องตัวเอง (iPad/มือ
     const outsider = await studentCookie((await seedStudent(db(), (await seedClass(db(), { name: 'ห้องอื่น' })).classId)).id)
     expect((await getJson(`/api/files/${key}`, fa)).status).toBe(404)
     const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${id}/goto`, { index: 0 }, { cookie: teacher }) // เริ่มเลย (ข้ามนับถอยหลัง)
     expect((await getJson(`/api/files/${key}`, fa)).status).toBe(200)
     expect((await getJson(`/api/files/${key}`, outsider)).status).toBe(404)
     const { answerOnDevice } = await import('../src/server/cardgame/service')
     const me = { studentId: st[0].id, classId }
     await expect(answerOnDevice(db(), id, me, 0, 1, Date.now() + 13_000)).rejects.toMatchObject({ status: 409 })
     expect(await answerOnDevice(db(), id, me, 0, 1, Date.now() + 5_000)).toEqual({ ok: true })
+  })
+})
+
+describe('นับถอยหลังก่อนเริ่มเกม', () => {
+  it('ครูกดเริ่ม → นับ 10 วินาที: ยังไม่เห็นโจทย์ ยังไม่รับคำตอบ · ครบเวลา/กด "เริ่มเลย" แล้วเล่นได้ · ข้อที่ตั้งเวลาเริ่มนับหลังนับถอยหลัง', async () => {
+    const teacher = await loginTeacher()
+    const { classId } = await seedClass(db())
+    const s = await seedStudent(db(), classId, { zipgradeId: '601' })
+    const sc = await studentCookie(s.id)
+    const { recordScans, gameState } = await import('../src/server/cardgame/service')
+    const { id: quizId } = await json(await postJson('/api/teacher/card-quizzes', { title: 'นับถอยหลัง', questions: [{ q: 'ข้อ 1', choices: ['ก', 'ข'], answer: 0, seconds: 20 }] }, { cookie: teacher }))
+    const { id } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    const t0 = Date.now()
+    const st = await json(await getJson(`/api/teacher/card-games/${id}`, teacher))
+    expect(st.startsInMs).toBeGreaterThan(8_000)
+    expect(st.startsInMs).toBeLessThanOrEqual(10_000)
+    expect(st.remainingMs).toBe(20_000)
+    const sv = await json(await getJson(`/api/student/card-games/${id}`, sc))
+    expect(sv).toMatchObject({ startsInMs: expect.any(Number), question: { q: '', choices: [] } })
+    expect((await putJson(`/api/student/card-games/${id}/answer`, { qIndex: 0, answer: 0 }, sc)).status).toBe(409)
+    expect(await recordScans(db(), id, 0, [{ zipgradeId: '601', answer: 0 }], t0 + 1_000)).toMatchObject({ locked: true })
+    // ครบ 10 วินาที → เริ่มเอง: เวลาข้อแรกเต็ม 20 วินาที
+    expect((await gameState(db(), id, t0 + 10_500)).startsInMs).toBe(0)
+    expect(await recordScans(db(), id, 0, [{ zipgradeId: '601', answer: 1 }], t0 + 11_000)).toMatchObject({ accepted: 1 })
+    expect((await gameState(db(), id, t0 + 11_000)).remainingMs).toBeGreaterThan(18_000)
+    // เกมใหม่ → ครูกด "เริ่มเลย"
+    const { id: g2 } = await json(await postJson('/api/teacher/card-games', { quizId, classId }, { cookie: teacher }))
+    await postJson(`/api/teacher/card-games/${g2}/goto`, { index: 0 }, { cookie: teacher })
+    expect((await json(await getJson(`/api/student/card-games/${g2}`, sc))).question.q).toBe('ข้อ 1')
+    expect((await putJson(`/api/student/card-games/${g2}/answer`, { qIndex: 0, answer: 0 }, sc)).status).toBe(200)
   })
 })
