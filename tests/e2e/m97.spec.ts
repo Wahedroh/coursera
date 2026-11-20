@@ -148,6 +148,10 @@ test('เกมการ์ด QR: สร้างชุดคำถาม → �
   await t.goBack()
   await t.getByLabel('ห้องที่เล่น').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
   await t.getByRole('button', { name: 'เริ่มเกม' }).click()
+  // นับถอยหลัง 10 วินาทีก่อนขึ้นข้อแรก (ยังไม่โชว์โจทย์) → ครูกด "เริ่มเลย"
+  await expect(t.getByTestId('start-countdown')).toBeVisible()
+  await expect(t.getByTestId('game-question')).toHaveCount(0)
+  await t.getByRole('button', { name: 'เริ่มเลย ▶' }).click()
   await expect(t.getByTestId('game-question')).toHaveText('แรงลัพธ์ศูนย์ วัตถุจะ?')
   const gameId = new URL(t.url()).pathname.split('/').pop()!
 
@@ -219,6 +223,7 @@ test('เกมการ์ด: ครูใส่รูปโจทย์ (ต�
   await page.getByLabel('ชุดคำถาม').selectOption({ label: 'โจทย์จากหนังสือ (1 ข้อ)' })
   await page.getByLabel('ห้องที่เล่น').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
   await page.getByRole('button', { name: 'เริ่มเกม' }).click()
+  await page.getByRole('button', { name: 'เริ่มเลย ▶' }).click()
   await expect(page.getByRole('img', { name: 'รูปโจทย์ข้อ 1' })).toBeVisible()
   await expect(page.getByText('ตัวเลือก C (ในรูป)')).toBeVisible()
 })
@@ -241,6 +246,7 @@ test('เกมการ์ด: ตั้งเวลาข้อละ 10 ว�
   await page.getByLabel('ชุดคำถาม').selectOption({ label: 'จับเวลา 10 วิ (1 ข้อ)' })
   await page.getByLabel('ห้องที่เล่น').selectOption({ label: 'โรงเรียนทดสอบ ชั้น 1' })
   await page.getByRole('button', { name: 'เริ่มเกม' }).click()
+  await page.getByRole('button', { name: 'เริ่มเลย ▶' }).click()
   await expect(page.getByTestId('countdown')).toHaveAccessibleName(/เหลือ \d+ วินาที/)
   await expect(page.getByTestId('game-reveal')).toBeVisible({ timeout: 20_000 })
 })
@@ -410,6 +416,10 @@ test('เกมการ์ด: นักเรียนที่เปิดแ
   // รอบเช็กอัตโนมัติ (ทุก 10 วิ) อาจเจอเกมก่อนกดก็ได้
   if (await refresh.isVisible()) await refresh.click()
   await s.getByTestId('card-game-banner').click()
+  // ระหว่างนับถอยหลังก่อนเริ่มเกม: เครื่องนักเรียนขึ้นตัวเลข ยังไม่มีโจทย์/ปุ่มตอบ → ครูกด "เริ่มเลย"
+  await expect(s.getByTestId('device-start-countdown')).toBeVisible()
+  await expect(s.getByRole('button', { name: /^ตอบ / })).toHaveCount(0)
+  await t.getByRole('button', { name: 'เริ่มเลย ▶' }).click()
   await expect(s.getByTestId('device-q-no')).toHaveText('ข้อ 1 / 2')
   await s.getByRole('button', { name: 'ตอบ B 7' }).click()
   await expect(s.getByTestId('device-status')).toContainText('ส่งแล้ว ✓ เลือก B')

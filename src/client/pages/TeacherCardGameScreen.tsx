@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api } from '../api'
-import { Countdown, GameControls, GameResults, useCardGame, useCountdown } from '../components/CardGameParts'
+import { Countdown, GameControls, GameResults, useCardGame, useCountdown, useStartIn } from '../components/CardGameParts'
 import { qrSvg } from '../components/QrCard'
 import { LETTERS, type CardGameResult } from '../../shared/cardgame'
 import { fileUrl } from '../lib/upload'
@@ -25,6 +25,15 @@ export default function TeacherCardGameScreen() {
   useEffect(() => setShowWrong(false), [state?.current])
   // หมดเวลา → เฉลยอัตโนมัติ (ครั้งเดียวต่อข้อ)
   const left = useCountdown(state)
+  const startIn = useStartIn(state?.startsInMs, reload)
+  async function startNow() {
+    try {
+      await api(`/api/teacher/card-games/${id}/goto`, { body: { index: 0 } })
+      await reload()
+    } catch (e) {
+      onError(e)
+    }
+  }
   const autoRevealed = useRef(-1)
   // ตั้งเวลาเฉลยครั้งเดียวต่อข้อ (รอคำตอบที่กำลังส่งจากมือถืออีก 2.5 วินาที) — การดึงสถานะทุก 1.5 วินาทีต้องไม่ยกเลิกตัวจับเวลา
   useEffect(() => {
@@ -92,6 +101,19 @@ export default function TeacherCardGameScreen() {
         ) : (
           <Loading />
         )
+      ) : startIn > 0 ? (
+        <section className="flex flex-1 flex-col items-center justify-center gap-5 text-center" data-testid="start-countdown">
+          <p className="text-2xl font-bold opacity-90">เกมจะเริ่มใน</p>
+          <span className="flex h-48 w-48 items-center justify-center rounded-full bg-amber-300 text-8xl font-extrabold text-amber-950 tabular-nums animate-pulse" aria-live="polite" aria-label={`เริ่มใน ${startIn} วินาที`}>
+            {startIn}
+          </span>
+          <p className="text-xl">
+            <Icon n="phone" /> มีมือถือ/iPad: เปิดแอป → แตะแบนเนอร์ <Icon n="cards" /> (หรือกด ⟳ เช็กเกมการ์ด) · ไม่มี → เตรียมชูการ์ด QR
+          </p>
+          <button type="button" onClick={() => void startNow()} className="rounded-2xl bg-white px-6 py-3 text-lg font-extrabold text-board">
+            เริ่มเลย ▶
+          </button>
+        </section>
       ) : (
         <>
           <div className="rounded-2xl bg-white text-stone-900 p-5 text-2xl sm:text-3xl font-extrabold" data-testid="game-question">
