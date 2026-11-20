@@ -7,6 +7,7 @@ import { Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
 import Icon from '../components/Icon'
+import WeeklySummary from '../components/WeeklySummary'
 
 const input = 'border-2 border-line rounded-lg px-2 py-1 bg-white text-sm'
 const todayStr = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
@@ -117,6 +118,7 @@ export default function TeacherWorkload() {
         </Link>
       </div>
       <ErrorBox message={error} />
+      <WeeklySummary />
       <div className="grid gap-4 xl:grid-cols-2 items-start">
         <Card className="p-4">
           <b>ต่อสัปดาห์: เป้าคาบ vs ตารางสอน</b>
