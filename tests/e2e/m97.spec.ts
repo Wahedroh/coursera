@@ -401,10 +401,14 @@ test('เกมการ์ด: นักเรียนที่เปิดแ
       data: { title: 'ตอบในเครื่อง', questions: [{ q: 'ขนาดของ 3i + 4j', choices: ['5', '7', '12', '25'], answer: 0 }, { q: 'หน่วยของแรง', choices: ['จูล', 'นิวตัน'], answer: 1 }] },
     })
   ).json()
+  // นักเรียนเปิดหน้าแรกไว้ก่อนครูเริ่มเกม → กด "เช็กเกมการ์ด" แล้วแบนเนอร์ขึ้นทันที (ไม่ต้องรอรอบเช็กอัตโนมัติ)
+  const s = await studentPage(browser)
+  const refresh = s.getByRole('button', { name: /เช็กเกมการ์ด/ })
+  await expect(refresh).toBeVisible()
   const { id: gameId } = await (await t.request.post('/api/teacher/card-games', { data: { quizId, classId } })).json()
   await t.goto(`/teacher/card-games/${gameId}`)
-
-  const s = await studentPage(browser)
+  // รอบเช็กอัตโนมัติ (ทุก 10 วิ) อาจเจอเกมก่อนกดก็ได้
+  if (await refresh.isVisible()) await refresh.click()
   await s.getByTestId('card-game-banner').click()
   await expect(s.getByTestId('device-q-no')).toHaveText('ข้อ 1 / 2')
   await s.getByRole('button', { name: 'ตอบ B 7' }).click()
