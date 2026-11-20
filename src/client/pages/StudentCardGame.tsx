@@ -80,6 +80,9 @@ export default function StudentCardGame() {
             {g.ended ? 'จบเกมแล้ว' : `ข้อ ${g.current + 1} / ${g.total}`}
           </b>
         </div>
+        <button type="button" onClick={() => void load()} aria-label="รีเฟรชเกม" className="rounded-full bg-white/15 w-10 h-10 text-xl font-bold active:bg-white/30">
+          ⟳
+        </button>
         {!g.ended && (g.revealed ? <span className="rounded-full bg-white/20 px-3 py-1 text-sm font-bold">เฉลยแล้ว</span> : left !== null && <span className={`rounded-full w-12 h-12 flex items-center justify-center text-xl font-extrabold tabular-nums ${left <= 5 ? 'bg-red-500 animate-pulse' : 'bg-amber-400 text-amber-950'}`}>{left || <Icon n="alarm" />}</span>)}
       </header>
       <section className="p-4 flex flex-col gap-3 flex-1">
