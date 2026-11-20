@@ -198,3 +198,71 @@ export type WorkloadRange = {
 }
 export const weeklyPeriodsSchema = z.object({ weeklyPeriods: z.number().int().min(0).max(60).nullable() })
 export const slotPeriodsSchema = z.object({ periods: z.number().int().min(1).max(12).nullable() })
+
+// ---------- สรุปรายสัปดาห์ (คัดลอกส่งต่อ) ----------
+/** สัปดาห์ของครู: เสาร์–ศุกร์ */
+export function weekOf(date: string): { from: string; to: string } {
+  const t = Date.parse(`${date}T00:00:00Z`)
+  const dow = new Date(t).getUTCDay() // 0 อา … 6 ส
+  const back = (dow + 1) % 7 // ถอยไปเสาร์
+  const from = new Date(t - back * 86400_000).toISOString().slice(0, 10)
+  const to = new Date(t + (6 - back) * 86400_000).toISOString().slice(0, 10)
+  return { from, to }
+}
+/** สัปดาห์ที่ควรสรุป: เสาร์/อาทิตย์ = สัปดาห์ที่เพิ่งจบ · วันอื่น = สัปดาห์นี้ */
+export function summaryWeek(today: string): { from: string; to: string } {
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay()
+  if (dow === 6 || dow === 0) return weekOf(new Date(Date.parse(`${today}T00:00:00Z`) - 2 * 86400_000).toISOString().slice(0, 10))
+  return weekOf(today)
+}
+
+const dm = (d: string) => `${Number(d.slice(8, 10))}/${Number(d.slice(5, 7))}`
+
+/**
+ * ข้อความสรุปรายสัปดาห์ แบบที่ครูส่งทุกสัปดาห์:
+ * ชื่อครู · แต่ละโรงเรียน "9/11 จำนวน 4 คาบ" (ชดเชย/ชดออนไลน์แยกบรรทัด) · บรรทัดเดินทางต่อโรงเรียน
+ * ไม่นับวันที่ปิด · โรงเรียนที่ตั้งไม่นับคาบไม่มีบรรทัดคาบ · ที่ตั้งไม่นับการเดินทางไม่อยู่ในบรรทัดเดินทาง
+ */
+export function weeklySummaryText(days: DayPlan[], teacherName: string): string {
+  const order: string[] = []
+  const lines = new Map<string, string[]>()
+  const trips = new Map<string, number>()
+  const seen = (name: string) => {
+    if (!lines.has(name)) {
+      order.push(name)
+      lines.set(name, [])
+    }
+  }
+  for (const d of days) {
+    const perDay = new Map<string, { regular: number; onsite: number; online: number }>()
+    let prev: string | null = null
+    for (const s of d.stops) {
+      if (s.closed) continue
+      if (s.kind === 'appointment') {
+        prev = s.key
+        continue
+      }
+      if (s.countPeriods) {
+        const x = perDay.get(s.name) ?? { regular: 0, onsite: 0, online: 0 }
+        if (s.kind === 'makeup') x[s.makeup?.mode === 'online' ? 'online' : 'onsite'] += s.periods
+        else x.regular += s.periods
+        perDay.set(s.name, x)
+      }
+      if (s.key !== prev && s.countTrips !== false) {
+        seen(s.name)
+        trips.set(s.name, (trips.get(s.name) ?? 0) + 1)
+      }
+      prev = s.key
+    }
+    for (const [name, x] of perDay) {
+      seen(name)
+      const out = lines.get(name)!
+      if (x.regular) out.push(`${dm(d.date)} จำนวน ${x.regular} คาบ`)
+      if (x.onsite) out.push(`${dm(d.date)} จำนวน ${x.onsite} คาบ(ชดเชย)`)
+      if (x.online) out.push(`${dm(d.date)} จำนวน ${x.online} คาบ(ชดออนไลน์)`)
+    }
+  }
+  const blocks = order.filter((n) => lines.get(n)!.length).map((n) => [n, ...lines.get(n)!].join('\n'))
+  const tripLine = order.filter((n) => trips.get(n)).map((n) => `${n}${trips.get(n)}`)
+  return [teacherName.trim(), ...blocks, tripLine.length ? `เดินทาง ${tripLine.join(' ')}` : ''].filter(Boolean).join('\n\n')
+}

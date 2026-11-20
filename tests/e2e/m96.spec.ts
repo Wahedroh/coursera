@@ -239,6 +239,12 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   const { id: slotId } = await (await t.request.post('/api/teacher/timetable', { data: { classId: cls.id, weekday: 1, start: '06:00', end: '07:40' } })).json()
 
   await teacherNav(t, 'ภาระสอน & เดินทาง')
+  // สรุปรายสัปดาห์ (ส.–ศ.): คาบวันจันทร์ 06:00–07:40 = 2 คาบ ของโรงเรียนทดสอบ
+  const summary = t.getByLabel('ข้อความสรุปรายสัปดาห์')
+  await expect(summary).toHaveValue(/จำนวน 2 คาบ/)
+  await t.getByLabel('ชื่อครู (บรรทัดแรก)').fill('ครูทดสอบ')
+  await expect(summary).toHaveValue(/^ครูทดสอบ\n\n/)
+  await expect(summary).toHaveValue(/เดินทาง /)
   const target = t.getByLabel('เป้าคาบต่อสัปดาห์ โรงเรียนทดสอบ ชั้น 1')
   await target.fill('3')
   await target.blur()
