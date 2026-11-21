@@ -263,7 +263,9 @@ describe('สอนชดเชย', () => {
     await postJson('/api/teacher/makeups', { closureId: null, classIds: [a.classId], date: '2030-01-12', start: '09:00', end: '10:40', mode: 'onsite' }, { cookie })
     await generateTeacherNotifications(db(), at('2030-01-12', '08:52'))
     const items = (await json(await getJson('/api/teacher/notifications', cookie))).items
-    expect(items[0]).toMatchObject({ title: expect.stringMatching(/^⏰ อีก/), body: expect.stringContaining('ดรุณ ชั้น 5') })
+    expect(items.find((n: { title: string }) => n.title.startsWith('⏰'))).toMatchObject({ title: expect.stringMatching(/^⏰ อีก/), body: expect.stringContaining('ดรุณ ชั้น 5') })
+    // คาบชดเชยที่โรงเรียน: มีแจ้งเตือนนำทางด้วย (ล่วงหน้า 1 ชม.)
+    expect(items.find((n: { title: string }) => n.title.startsWith('🚗'))).toMatchObject({ url: expect.stringContaining('https://www.google.com/maps/dir/') })
   })
 })
 

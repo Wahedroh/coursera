@@ -298,6 +298,13 @@ test('ภาระสอน: ตั้งเป้าคาบ → แก้จ�
   await link.fill('6.4123, 101.8234')
   await link.press('Enter')
   await expect(t.getByTestId('place-ok-โรงเรียนทดสอบ')).toBeVisible()
+  // แจ้งเตือนนำทางก่อนเข้าสอน: ค่าเริ่มต้น 1 ชม. · เปลี่ยนรายโรงเรียนได้ (จำไว้หลังรีโหลด)
+  const lead = t.getByLabel('แจ้งเตือนนำทาง โรงเรียนทดสอบ')
+  await expect(lead).toHaveValue('60')
+  await lead.selectOption('30')
+  await expect
+    .poll(async () => ((await (await t.request.get('/api/teacher/places')).json()) as { name: string; navLeadMinutes: number | null }[]).find((p) => p.name === 'โรงเรียนทดสอบ')?.navLeadMinutes)
+    .toBe(30)
 
   // เก็บกวาด
   t.once('dialog', (d) => void d.accept())

@@ -77,8 +77,18 @@ export function navUrl(place: { lat: number | null; lng: number | null; name: st
   return `https://maps.apple.com/?daddr=${dest}&dirflg=d`
 }
 
+/** ลิงก์นำทางของ Google Maps (แจ้งเตือนนำทางไปสอน) — ไม่มีพิกัดใช้ชื่อค้นหาแทน */
+export function googleNavUrl(place: { lat: number | null; lng: number | null; name: string }): string {
+  const dest = place.lat !== null && place.lng !== null ? `${place.lat},${place.lng}` : encodeURIComponent(place.name)
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`
+}
+
 export const placeInputSchema = z.object({ mapUrl: z.string().trim().max(1000) })
-export type SchoolPlace = { id: string; name: string; mapUrl: string | null; lat: number | null; lng: number | null }
+export type SchoolPlace = { id: string; name: string; mapUrl: string | null; lat: number | null; lng: number | null; navLeadMinutes: number | null }
+/** แจ้งเตือนนำทางล่วงหน้า (นาที) ที่เลือกได้ · null = ไม่เตือน */
+export const NAV_LEAD_OPTIONS = [15, 30, 45, 60, 90, 120] as const
+export const navLeadSchema = z.object({ navLeadMinutes: z.number().int().min(5).max(240).nullable() })
+export const navLeadLabel = (m: number | null) => (m === null ? 'ไม่เตือน' : m % 60 === 0 ? `${m / 60} ชม.` : m > 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `${m} นาที`)
 
 // ---------- นัดพิเศษ ----------
 export const appointmentInputSchema = z.object({

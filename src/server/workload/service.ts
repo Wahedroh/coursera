@@ -83,7 +83,7 @@ async function closuresBetween(db: Db, from: string, to: string): Promise<Closur
 async function loadCtx(db: Db, from: string, to: string, withSlots = true): Promise<Ctx> {
   const [cls, sch, slots, closures, appts, makeups] = await Promise.all([
     historyClasses(db),
-    db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, countPeriods: schools.countPeriods, countTrips: schools.countTrips }).from(schools),
+    db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, countPeriods: schools.countPeriods, countTrips: schools.countTrips, navLeadMinutes: schools.navLeadMinutes }).from(schools),
     withSlots ? historySlots(db) : Promise.resolve([]),
     closuresBetween(db, from, to),
     db
@@ -254,7 +254,7 @@ export async function workloadRange(db: Db, from: string, to: string, t: number)
 
 /** เป้าคาบต่อสัปดาห์ เทียบกับคาบในตารางสอน */
 export async function workloadTargets(db: Db, today = todayBangkok(Date.now())): Promise<WorkloadTargets> {
-  const [cls, sch, slots] = await Promise.all([activeClasses(db), db.select({ id: schools.id, name: schools.name, countPeriods: schools.countPeriods, countTrips: schools.countTrips }).from(schools), allSlots(db)])
+  const [cls, sch, slots] = await Promise.all([activeClasses(db), db.select({ id: schools.id, name: schools.name, countPeriods: schools.countPeriods, countTrips: schools.countTrips, navLeadMinutes: schools.navLeadMinutes }).from(schools), allSlots(db)])
   const out: WorkloadTargets['schools'] = []
   for (const s of sch.sort((a, b) => a.name.localeCompare(b.name, 'th'))) {
     const rows = cls
@@ -273,6 +273,11 @@ export async function workloadTargets(db: Db, today = todayBangkok(Date.now())):
 /** ตั้งรายโรงเรียน: นับคาบ / นับการเดินทาง */
 export async function setSchoolCounting(db: Db, schoolId: string, v: { countPeriods: boolean; countTrips: boolean }): Promise<void> {
   const r = await db.update(schools).set(v).where(eq(schools.id, schoolId)).returning({ id: schools.id })
+  if (!r.length) throw apiError('school_not_found', 'ไม่พบโรงเรียนนี้', 404)
+}
+
+export async function setSchoolNavLead(db: Db, schoolId: string, navLeadMinutes: number | null): Promise<void> {
+  const r = await db.update(schools).set({ navLeadMinutes }).where(eq(schools.id, schoolId)).returning({ id: schools.id })
   if (!r.length) throw apiError('school_not_found', 'ไม่พบโรงเรียนนี้', 404)
 }
 
@@ -355,7 +360,7 @@ async function resolvePlace(mapUrl: string): Promise<{ lat: number; lng: number 
 
 export async function listPlaces(db: Db): Promise<SchoolPlace[]> {
   const used = new Set((await activeClasses(db)).map((c) => c.schoolId))
-  const rows = await db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng }).from(schools).orderBy(schools.name)
+  const rows = await db.select({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, navLeadMinutes: schools.navLeadMinutes }).from(schools).orderBy(schools.name)
   return rows.filter((r) => used.has(r.id))
 }
 
@@ -365,7 +370,7 @@ export async function setSchoolPlace(db: Db, schoolId: string, mapUrl: string): 
     .update(schools)
     .set({ mapUrl: mapUrl || null, lat: p?.lat ?? null, lng: p?.lng ?? null })
     .where(eq(schools.id, schoolId))
-    .returning({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng })
+    .returning({ id: schools.id, name: schools.name, mapUrl: schools.mapUrl, lat: schools.lat, lng: schools.lng, navLeadMinutes: schools.navLeadMinutes })
   if (!r) throw apiError('school_not_found', 'ไม่พบโรงเรียนนี้', 404)
   return r
 }

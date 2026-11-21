@@ -253,6 +253,13 @@
       "when": 1794978932677,
       "tag": "0035_egg_bonus",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1795229285905,
+      "tag": "0036_school_nav_lead",
+      "breakpoints": true
     }
   ]
 }

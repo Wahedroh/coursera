@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { dateSchema, todayBangkok } from '../../shared/attendance'
 import { z } from 'zod'
-import { appointmentInputSchema, closureInputSchema, makeupInputSchema, schoolCountingSchema, placeInputSchema, slotPeriodsSchema, weeklyPeriodsSchema } from '../../shared/workload'
+import { appointmentInputSchema, closureInputSchema, makeupInputSchema, schoolCountingSchema, navLeadSchema, placeInputSchema, slotPeriodsSchema, weeklyPeriodsSchema } from '../../shared/workload'
 import { requireTeacher } from '../auth/middleware'
 import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
@@ -21,6 +21,7 @@ import {
   listClosures,
   listPlaces,
   setSchoolCounting,
+  setSchoolNavLead,
   setSchoolPlace,
   setSlotPeriods,
   setWeeklyPeriods,
@@ -48,6 +49,10 @@ teacherWorkloadRoutes.get('/workload', async (c) => {
 teacherWorkloadRoutes.put('/classes/:id/weekly-periods', async (c) => {
   const { weeklyPeriods } = await parseBody(c, weeklyPeriodsSchema)
   await setWeeklyPeriods(getDb(c.env), c.req.param('id'), weeklyPeriods)
+  return c.json({ ok: true })
+})
+teacherWorkloadRoutes.put('/schools/:id/nav-lead', async (c) => {
+  await setSchoolNavLead(getDb(c.env), c.req.param('id'), (await parseBody(c, navLeadSchema)).navLeadMinutes)
   return c.json({ ok: true })
 })
 teacherWorkloadRoutes.put('/schools/:id/counting', async (c) => {
