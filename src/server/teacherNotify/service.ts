@@ -3,12 +3,13 @@ import { todayBangkok } from '../../shared/attendance'
 import { DEFAULT_TEACHER_NOTIFY, inQuietHours, teacherNotifySchema, type TeacherInbox, type TeacherNotification, type TeacherNotifySettings } from '../../shared/teacherNotify'
 import { bangkokClock, slotTimes } from '../../shared/timetable'
 import { newId, type Db } from '../db/client'
-import { settings, teacherNotifications, teacherPushSubscriptions } from '../db/schema'
+import { schools, settings, teacherNotifications, teacherPushSubscriptions } from '../db/schema'
 import { apiError } from '../http'
 import { httpPushSender, type PushSender } from '../push/service'
 import { isPushEndpoint, vapidAuthorization, vapidKeys } from '../push/vapid'
 import { isPaused, listSlots } from '../timetable/service'
-import { closedChecker, makeupsOn } from '../workload/service'
+import { closedChecker, dayPlan, makeupsOn } from '../workload/service'
+import { googleNavUrl } from '../../shared/workload'
 
 const KEY = 'teacher_notify'
 const RECENT = 24 * 3600_000
@@ -121,6 +122,30 @@ export async function generateTeacherNotifications(db: Db, t: number): Promise<n
     }
   }
 
+  // นำทางไปสอน: ก่อนถึงโรงเรียนแต่ละแห่งของวันนี้ (ตามลำดับการเดินทางจริง · ข้ามที่ปิด/ออนไลน์) ล่วงหน้าตามที่ตั้งรายโรงเรียน
+  if (s.navigate.on && !(await isPaused(db))) {
+    const plan = await dayPlan(db, date)
+    const leads = new Map((await db.select({ id: schools.id, lead: schools.navLeadMinutes }).from(schools)).map((x) => [x.id, x.lead]))
+    let prev: string | null = null
+    for (const st of plan.stops) {
+      if (st.closed) continue
+      const arrive = st.key !== prev
+      prev = st.key
+      if (!arrive || st.kind === 'appointment' || (st.kind === 'makeup' && st.makeup?.mode === 'online')) continue
+      const lead = leads.get(st.key)
+      if (!lead) continue
+      const startAt = dayStart + (Number(st.start.slice(0, 2)) * 60 + Number(st.start.slice(3, 5))) * 60_000
+      if (t >= startAt - lead * 60_000 && t < startAt)
+        await add({
+          kind: 'navigate',
+          title: `🚗 ออกเดินทางไป ${st.name}`,
+          body: `เริ่มสอน ${st.start} น. (อีก ${Math.max(1, Math.round((startAt - t) / 60_000))} นาที) · ${st.periods} คาบ · แตะเพื่อนำทางด้วย Google Maps`,
+          url: googleNavUrl({ lat: st.lat, lng: st.lng, name: st.name }),
+          dedupeKey: `nav:${date}:${st.key}:${st.start}`,
+        })
+    }
+  }
+
   // สรุปงานรอตรวจ วันละครั้ง
   const at = Number(s.toGrade.at.slice(0, 2)) * 60 + Number(s.toGrade.at.slice(3, 5))
   if (s.toGrade.on && minute >= at) {
@@ -162,7 +187,11 @@ export async function drainTeacher(db: Db, t: number, send: PushSender = httpPus
   const [pending] = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM teacher_notifications WHERE pushed_at IS NULL AND created_at >= ${t - RECENT}`)
   if (!pending?.n) return 0
   const s = await getNotifySettings(db)
-  if (inQuietHours(s.quiet, bangkokClock(t).minute)) return 0
+  // ช่วงห้ามรบกวน: เก็บไว้ส่งทีหลัง ยกเว้นแจ้งเตือนนำทางไปสอน (ต้องออกเดินทางตามเวลา)
+  if (inQuietHours(s.quiet, bangkokClock(t).minute)) {
+    const [nav] = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM teacher_notifications WHERE pushed_at IS NULL AND kind = 'navigate' AND created_at >= ${t - RECENT}`)
+    if (!nav?.n) return 0
+  }
   const subs = await db.select().from(teacherPushSubscriptions).limit(TEACHER_PUSH_PER_RUN)
   const gone: string[] = []
   if (subs.length) {

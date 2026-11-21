@@ -11,6 +11,8 @@ export const schools = sqliteTable('schools', {
   /** นับคาบของโรงเรียนนี้ในภาระสอน / นับการเดินทางไปโรงเรียนนี้ */
   countPeriods: integer('count_periods', { mode: 'boolean' }).notNull().default(true),
   countTrips: integer('count_trips', { mode: 'boolean' }).notNull().default(true),
+  /** แจ้งเตือนนำทางไปโรงเรียนนี้ก่อนเริ่มสอนกี่นาที (null = ไม่เตือน) */
+  navLeadMinutes: integer('nav_lead_minutes').default(60),
   createdAt: integer('created_at').notNull(),
 })
 

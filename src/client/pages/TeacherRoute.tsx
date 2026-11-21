@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { api } from '../api'
 import { WEEKDAY_LABEL } from '../../shared/timetable'
-import { CLOSURE_LABEL, CLOSURE_REASONS, slotPeriods, type Appointment, type Closure, type ClosureReason, type DayPlan, type MakeupItem, type SchoolPlace } from '../../shared/workload'
+import { CLOSURE_LABEL, CLOSURE_REASONS, NAV_LEAD_OPTIONS, navLeadLabel, slotPeriods, type Appointment, type Closure, type ClosureReason, type DayPlan, type MakeupItem, type SchoolPlace } from '../../shared/workload'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -706,6 +706,14 @@ function PlaceRow({ p, onSaved, onError }: { p: SchoolPlace; onSaved: (p: School
       setBusy(false)
     }
   }
+  async function saveLead(navLeadMinutes: number | null) {
+    try {
+      await api(`/api/teacher/schools/${p.id}/nav-lead`, { method: 'PUT', body: { navLeadMinutes } })
+      onSaved({ ...p, navLeadMinutes })
+    } catch (e) {
+      onError(e)
+    }
+  }
   return (
     <div className="border-t border-stone-100 pt-2 text-sm">
       <div className="flex items-center gap-2">
@@ -713,6 +721,17 @@ function PlaceRow({ p, onSaved, onError }: { p: SchoolPlace; onSaved: (p: School
         {busy ? <span className="text-xs">กำลังบันทึก…</span> : p.lat !== null ? <span className="text-xs text-green-700" data-testid={`place-ok-${p.name}`}><Icon n="location" /> พิกัดพร้อม</span> : p.mapUrl ? <span className="text-xs text-amber-700">อ่านพิกัดไม่ได้ (นำทางด้วยชื่อ)</span> : <span className="text-xs text-stone-400">ยังไม่ใส่</span>}
       </div>
       <input aria-label={`ลิงก์แผนที่ ${p.name}`} className={`${input} w-full mt-1`} placeholder="วางลิงก์ Google/Apple Maps" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => void save()} onKeyDown={(e) => e.key === 'Enter' && void save()} />
+      <label className="mt-1 flex items-center gap-2 text-xs text-stone-600">
+        <Icon n="car" /> แจ้งเตือนนำทางก่อนเข้าสอน
+        <select aria-label={`แจ้งเตือนนำทาง ${p.name}`} className={input} value={p.navLeadMinutes ?? ''} onChange={(e) => void saveLead(e.target.value === '' ? null : Number(e.target.value))}>
+          <option value="">ไม่เตือน</option>
+          {NAV_LEAD_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {navLeadLabel(m)}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   )
 }

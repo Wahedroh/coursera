@@ -13,7 +13,9 @@ const titles = async (cookie: string) => (await json(await getJson('/api/teacher
 
 async function setup() {
   const cookie = await loginTeacher()
-  const { classId } = await seedClass(db(), { name: 'ห้องทดสอบ ชั้น 5' })
+  const { classId, schoolId } = await seedClass(db(), { name: 'ห้องทดสอบ ชั้น 5' })
+  // เทสต์ชุดนี้ไม่เกี่ยวกับนำทางไปสอน
+  await putJson(`/api/teacher/schools/${schoolId}/nav-lead`, { navLeadMinutes: null }, cookie)
   const s = await seedStudent(db(), classId)
   const { id: slotId } = await json(await postJson('/api/teacher/timetable', { classId, weekday: 3, start: '08:30', end: '09:20' }, { cookie }))
   return { cookie, classId, s, slotId }
@@ -112,4 +114,52 @@ it('ช่วงห้ามรบกวน: ไม่ส่ง push แต่�
   const left = (await env.DB.prepare('SELECT endpoint FROM teacher_push_subscriptions').all<{ endpoint: string }>()).results
   expect(left.map((r) => r.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/abc'])
   expect((await getJson('/api/teacher/notifications', await studentCookie((await seedStudent(db(), (await seedClass(db())).classId)).id))).status).toBe(401)
+})
+
+it('นำทางไปสอน: ก่อนถึงโรงเรียนแต่ละแห่งล่วงหน้าตามที่ตั้ง (ค่าเริ่มต้น 1 ชม.) · แตะแล้วเปิด Google Maps · ปิดรายโรงเรียนได้ · ส่งได้แม้ช่วงห้ามรบกวน', async () => {
+  const cookie = await loginTeacher()
+  const a = await seedClass(db(), { schoolName: 'ดรุณทดสอบ', name: 'ดรุณ ชั้น 5' })
+  const b = await seedClass(db(), { schoolName: 'ประทีปทดสอบ', name: 'ประทีป ชั้น 2' })
+  await putJson(`/api/teacher/places/${a.schoolId}`, { mapUrl: '6.8696, 101.2501' }, cookie)
+  await postJson('/api/teacher/timetable', { classId: a.classId, weekday: 3, start: '08:30', end: '10:10' }, { cookie })
+  await postJson('/api/teacher/timetable', { classId: b.classId, weekday: 3, start: '13:00', end: '14:40' }, { cookie })
+  expect((await putJson(`/api/teacher/schools/${b.schoolId}/nav-lead`, { navLeadMinutes: 30 }, cookie)).status).toBe(200)
+  const nav = async () => (await json(await getJson('/api/teacher/notifications', cookie))).items.filter((n: { title: string }) => n.title.startsWith('🚗'))
+
+  await generateTeacherNotifications(db(), at('07:25'))
+  expect(await nav()).toEqual([])
+  await generateTeacherNotifications(db(), at('07:31'))
+  await generateTeacherNotifications(db(), at('07:36'))
+  const [first] = await nav()
+  expect(first).toMatchObject({ title: '🚗 ออกเดินทางไป ดรุณทดสอบ', url: 'https://www.google.com/maps/dir/?api=1&destination=6.8696,101.2501&travelmode=driving' })
+  expect(first.body).toMatch(/^เริ่มสอน 08:30 น\. \(อีก 59 นาที\) · 2 คาบ/)
+  expect(await nav()).toHaveLength(1)
+  // ประทีป 30 นาที · ไม่มีพิกัด → ค้นหาด้วยชื่อ
+  await generateTeacherNotifications(db(), at('12:20'))
+  expect(await nav()).toHaveLength(1)
+  await generateTeacherNotifications(db(), at('12:31'))
+  expect((await nav())[0].url).toBe(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent('ประทีปทดสอบ')}&travelmode=driving`)
+
+  // ปิดรายโรงเรียน · ปิดทั้งเรื่องในตั้งค่า
+  await putJson(`/api/teacher/schools/${a.schoolId}/nav-lead`, { navLeadMinutes: null }, cookie)
+  await generateTeacherNotifications(db(), Date.parse('2026-11-25T07:40:00+07:00'))
+  expect(await nav()).toHaveLength(2)
+  const s = await json(await getJson('/api/teacher/notify-settings', cookie))
+  expect(s.navigate).toEqual({ on: true })
+  await putJson('/api/teacher/notify-settings', { ...s, navigate: { on: false } }, cookie)
+  await generateTeacherNotifications(db(), Date.parse('2026-11-25T12:40:00+07:00'))
+  expect(await nav()).toHaveLength(2)
+})
+
+it('นำทางไปสอนตอนเช้าตรู่ (ช่วงห้ามรบกวน) ยังส่ง push · แจ้งเตือนอื่นเก็บไว้', async () => {
+  const cookie = await loginTeacher()
+  const { classId, schoolId } = await seedClass(db(), { schoolName: 'ดารุลทดสอบ' })
+  await putJson(`/api/teacher/schools/${schoolId}/nav-lead`, { navLeadMinutes: 90 }, cookie)
+  await postJson('/api/teacher/timetable', { classId, weekday: 3, start: '07:30', end: '08:20' }, { cookie })
+  await postJson('/api/teacher/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/nav' }, { cookie })
+  const sent: string[] = []
+  const sender = async (e: string) => (sent.push(e), 201)
+  await generateTeacherNotifications(db(), at('06:01'))
+  expect(await drainTeacher(db(), at('06:02'), sender)).toBe(1)
+  expect(sent).toHaveLength(1)
 })

@@ -155,6 +155,11 @@ export default function TeacherNotifications() {
               {row('undo', 'นักเรียนส่งแก้แล้ว', 'งานที่ครูส่งกลับให้แก้ ถูกส่งใหม่', s.resubmitted.on, (on) => void save({ ...s, resubmitted: { on } }))}
               {row('inbox', 'ครบกำหนดแล้วยังค้าง', 'สรุปจำนวนคนค้างเมื่อถึงกำหนดส่ง', s.overdue.on, (on) => void save({ ...s, overdue: { on } }))}
               {row('megaphone', 'เผยแพร่ตามเวลาแล้ว', 'งาน/คลิป/เอกสาร/ประกาศที่ตั้งเวลาไว้ ขึ้นให้นักเรียนแล้ว', s.released.on, (on) => void save({ ...s, released: { on } }))}
+              {row('car', 'นำทางไปสอน', 'ก่อนถึงแต่ละโรงเรียน (ตั้งเวลาล่วงหน้ารายโรงเรียนที่หน้าเส้นทาง) · แตะแล้วเปิด Google Maps · ส่งได้แม้ช่วงห้ามรบกวน', s.navigate.on, (on) => void save({ ...s, navigate: { on } }),
+                <Link to="/teacher/route" className="text-xs text-board underline whitespace-nowrap">
+                  ตั้งรายโรงเรียน
+                </Link>,
+              )}
               {row('moon', 'ช่วงห้ามรบกวน', 'ไม่ส่งช่วงนี้ เก็บไว้ส่งเมื่อพ้นช่วง', s.quiet.on, (on) => void save({ ...s, quiet: { ...s.quiet, on } }),
                 <span className="flex items-center gap-1 text-xs">
                   <input type="time" aria-label="ห้ามรบกวนตั้งแต่" className={input} value={s.quiet.from} onChange={(e) => e.target.value && void save({ ...s, quiet: { ...s.quiet, from: e.target.value } })} />–

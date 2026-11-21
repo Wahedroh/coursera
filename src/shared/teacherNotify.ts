@@ -13,6 +13,8 @@ export const teacherNotifySchema = z.object({
   overdue: z.object({ on: z.boolean() }),
   released: z.object({ on: z.boolean() }),
   quiet: z.object({ on: z.boolean(), from: HHMM, to: HHMM }),
+  /** แจ้งเตือนนำทางไปสอน (ล่วงหน้าตามที่ตั้งรายโรงเรียน · แตะแล้วเปิด Google Maps) — ส่งได้แม้ช่วงห้ามรบกวน */
+  navigate: z.object({ on: z.boolean() }).default({ on: true }),
 })
 export type TeacherNotifySettings = z.infer<typeof teacherNotifySchema>
 
@@ -25,6 +27,7 @@ export const DEFAULT_TEACHER_NOTIFY: TeacherNotifySettings = {
   overdue: { on: true },
   released: { on: false },
   quiet: { on: true, from: '21:00', to: '06:30' },
+  navigate: { on: true },
 }
 
 export type TeacherNotification = { id: string; kind: string; title: string; body: string; url: string; createdAt: number; read: boolean }
