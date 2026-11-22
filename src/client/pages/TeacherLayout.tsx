@@ -23,7 +23,7 @@ const NAV: { to: string; label: string; icon: IconName; end: boolean }[] = [
 
 /** จำนวนแจ้งเตือนที่ยังไม่อ่าน + ใบลารออนุมัติ (โหลดซ้ำทุก 2 นาที) */
 function useBadges() {
-  const [b, setB] = useState({ unread: 0, leaves: 0 })
+  const [b, setB] = useState({ unread: 0, leaves: 0, makeups: 0 })
   useEffect(() => {
     const load = () => {
       api<{ unread: number }>('/api/teacher/notifications')
@@ -31,6 +31,9 @@ function useBadges() {
         .catch(() => {})
       api<{ pending: number }>('/api/teacher/leaves/count')
         .then((r) => setB((x) => ({ ...x, leaves: r.pending })))
+        .catch(() => {})
+      api<{ pending: number }>('/api/teacher/makeup-exams/count')
+        .then((r) => setB((x) => ({ ...x, makeups: r.pending })))
         .catch(() => {})
     }
     load()
@@ -62,6 +65,10 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
         <Icon n="doc" /> ใบลา
         <Count n={badges.leaves} tone="amber" />
       </NavLink>
+      <NavLink to="/teacher/makeup-exams" aria-label={badges.makeups ? `สอบย้อนหลัง ${badges.makeups} รายการรอครู` : 'สอบย้อนหลัง'} className={side}>
+        <Icon n="exam" /> สอบย้อนหลัง
+        <Count n={badges.makeups} tone="amber" />
+      </NavLink>
       {NAV.map((n) => (
         <NavLink key={n.to} to={n.to} end={n.end} className={side}>
           <Icon n={n.icon} /> {n.label}
@@ -90,7 +97,7 @@ export default function TeacherLayout({ children }: { children: ReactNode }) {
         <IconCredit className="hidden md:block px-3 text-green-100/60" />
       </aside>
       <main className="flex-1 p-4 pb-28 md:p-7 flex flex-col gap-4 min-w-0">{children}</main>
-      <BottomBar unread={badges.unread} leaves={badges.leaves} onMenu={() => setMenu(true)} />
+      <BottomBar unread={badges.unread} leaves={badges.leaves + badges.makeups} onMenu={() => setMenu(true)} />
       {menu && (
         <div className="no-print md:hidden fixed inset-0 z-40 bg-black/40" onClick={() => setMenu(false)}>
           <div role="dialog" aria-label="เมนูทั้งหมด" className="absolute inset-x-0 bottom-0 max-h-[80vh] overflow-y-auto rounded-t-3xl bg-board p-4 pb-8 text-green-50" onClick={(e) => e.stopPropagation()}>

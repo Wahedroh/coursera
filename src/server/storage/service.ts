@@ -151,7 +151,12 @@ export async function purgeOrphans(db: Db, bucket: R2Bucket, t: number): Promise
   const extra = await db.all<{ k: string }>(sql`
     SELECT image_key AS k FROM leave_requests WHERE image_key IS NOT NULL
     UNION SELECT j.value FROM remedials r, json_each(r.image_keys) j`)
-  const used = new Set([...refs, ...quiz, ...extra].map((r) => r.k))
+  // สอบย้อนหลัง: รูปหน้าข้อสอบ · รูปโจทย์ · หลักฐานที่นักเรียนแนบ
+  const exams = await db.all<{ k: string }>(sql`
+    SELECT j.value AS k FROM exam_sets e, json_each(e.page_keys) j
+    UNION SELECT (j.value ->> 'image') FROM exam_sets e, json_each(e.questions) j WHERE (j.value ->> 'image') IS NOT NULL
+    UNION SELECT image_key FROM makeup_exams WHERE image_key IS NOT NULL`)
+  const used = new Set([...refs, ...quiz, ...extra, ...exams].map((r) => r.k))
   const orphans: { key: string; size: number }[] = []
   let cursor: string | undefined
   do {

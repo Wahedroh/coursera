@@ -6,6 +6,7 @@ import { formatDate } from '../lib/format'
 import type { StudentGrade } from '../../shared/grades'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import ReportReadyCard from '../components/ReportReadyCard'
+import StudentMakeupCards from '../components/StudentMakeupCards'
 
 export default function StudentScores() {
   const navigate = useNavigate()
@@ -32,6 +33,7 @@ export default function StudentScores() {
       <section className="p-5 flex flex-col gap-3">
         <ErrorBox message={error} />
         <ReportReadyCard />
+        <StudentMakeupCards />
         {grade?.visible && (
           <Card className="p-4 flex items-center justify-between gap-3 bg-amber-50 border-amber-200" >
             <div>

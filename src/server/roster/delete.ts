@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import type { Db } from '../db/client'
-import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers, studentNotes, videoProgress, assignmentClosed, leaveRequests, remedials } from '../db/schema'
+import { announcementReads, attendanceRecords, eggs, feeCharges, pointEvents, scores, sessions, studentAvatars, students, submissions, notifications, pushSubscriptions, cardAnswers, studentNotes, videoProgress, assignmentClosed, leaveRequests, remedials, makeupExams, makeupEvents } from '../db/schema'
 import { apiError } from '../http'
 import { removeFiles } from '../storage/service'
 
@@ -11,7 +11,8 @@ export async function deleteStudent(db: Db, bucket: R2Bucket, id: string): Promi
   const subs = await db.select({ imageKeys: submissions.imageKeys, annotatedKeys: submissions.annotatedKeys }).from(submissions).where(eq(submissions.studentId, id))
   const leaves = await db.select({ k: leaveRequests.imageKey }).from(leaveRequests).where(eq(leaveRequests.studentId, id))
   const rems = await db.select({ keys: remedials.imageKeys }).from(remedials).where(eq(remedials.studentId, id))
-  const keys = [...subs.flatMap((x) => [...x.imageKeys, ...x.annotatedKeys]), ...leaves.flatMap((x) => (x.k ? [x.k] : [])), ...rems.flatMap((x) => x.keys)]
+  const mks = await db.select({ id: makeupExams.id, k: makeupExams.imageKey }).from(makeupExams).where(eq(makeupExams.studentId, id))
+  const keys = [...subs.flatMap((x) => [...x.imageKeys, ...x.annotatedKeys]), ...leaves.flatMap((x) => (x.k ? [x.k] : [])), ...rems.flatMap((x) => x.keys), ...mks.flatMap((x) => (x.k ? [x.k] : []))]
   await db.batch([
     db.delete(sessions).where(eq(sessions.studentId, id)),
     db.delete(submissions).where(eq(submissions.studentId, id)),
@@ -30,6 +31,8 @@ export async function deleteStudent(db: Db, bucket: R2Bucket, id: string): Promi
     db.delete(assignmentClosed).where(eq(assignmentClosed.studentId, id)),
     db.delete(leaveRequests).where(eq(leaveRequests.studentId, id)),
     db.delete(remedials).where(eq(remedials.studentId, id)),
+    ...(mks.length ? [db.delete(makeupEvents).where(inArray(makeupEvents.examId, mks.map((m) => m.id)))] : []),
+    db.delete(makeupExams).where(eq(makeupExams.studentId, id)),
     db.delete(students).where(eq(students.id, id)),
   ])
   // รูปงานที่ส่ง/รูปที่ครูเขียนทับ — ลบหลังลบข้อมูลแล้ว (ถ้าพลาด "ลบไฟล์ค้าง" จะเก็บให้ภายหลัง)

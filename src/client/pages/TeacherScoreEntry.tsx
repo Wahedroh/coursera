@@ -157,7 +157,7 @@ export default function TeacherScoreEntry() {
   async function saveDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
-    const body = { title: String(f.get('title')), category: String(f.get('category')), maxScore: Number(f.get('maxScore')), takenOn: String(f.get('takenOn')) }
+    const body = { title: String(f.get('title')), category: String(f.get('category')), maxScore: Number(f.get('maxScore')), takenOn: String(f.get('takenOn')), makeupDays: Number(f.get('makeupDays')) }
     try {
       await api(`/api/teacher/score-items/${id}`, { method: 'PUT', body })
       setEditing(false)
@@ -183,7 +183,7 @@ export default function TeacherScoreEntry() {
         <div>
           <h1 className="text-2xl font-extrabold">{it.title}</h1>
           <p className="text-sm text-stone-500">
-            {CATEGORY_LABEL[it.category]} · {formatDate(it.takenOn)} · คะแนนเต็ม {it.maxScore}
+            {CATEGORY_LABEL[it.category]} · {formatDate(it.takenOn)} · คะแนนเต็ม {it.maxScore} · {it.makeupDays > 0 ? `สอบย้อนหลังได้ ${it.makeupDays} วัน` : 'ไม่เปิดสอบย้อนหลัง'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
@@ -232,6 +232,10 @@ export default function TeacherScoreEntry() {
             <label className="text-sm font-semibold">
               วันที่สอบ
               <input name="takenOn" type="date" required className={input} defaultValue={it.takenOn} />
+            </label>
+            <label className="text-sm font-semibold">
+              สอบย้อนหลังได้ภายใน (วัน · 0 = ไม่เปิด)
+              <input name="makeupDays" aria-label="สอบย้อนหลังได้ภายใน (วัน)" type="number" min={0} max={120} required className={input} defaultValue={it.makeupDays} />
             </label>
             <Button type="submit">บันทึก</Button>
           </form>

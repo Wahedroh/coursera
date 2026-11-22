@@ -6,6 +6,7 @@ import type { Env } from '../env'
 import { termWindow } from '../terms/service'
 import { drain, type PushSender } from './service'
 import { enqueueEventReminders } from '../calendar/service'
+import { remindMakeupDeadlines, sweepMakeups } from '../makeupExam/service'
 
 const DAY = 86400_000
 
@@ -29,7 +30,10 @@ export async function runCron(env: Pick<Env, 'DB'>, t: number, send?: PushSender
   const released = await releaseDue(getDb(env), t, true)
   const reminders = await enqueueDueReminders(env, t)
   const events = await enqueueEventReminders(getDb(env), t)
+  // สอบย้อนหลัง: หมดเวลาส่งให้ · หมดสิทธิ์ได้ 0 · เตือนก่อนหมดสิทธิ์
+  const makeups = await sweepMakeups(getDb(env), t)
+  const makeupReminders = await remindMakeupDeadlines(getDb(env), t)
   const teacher = await generateTeacherNotifications(getDb(env), t)
   const teacherPushed = await drainTeacher(getDb(env), t, send)
-  return { released, reminders, events, teacher, teacherPushed, ...(await drain(getDb(env), t, send)) }
+  return { released, reminders, events, makeups, makeupReminders, teacher, teacherPushed, ...(await drain(getDb(env), t, send)) }
 }

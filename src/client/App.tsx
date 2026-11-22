@@ -54,6 +54,9 @@ import TeacherImport from './pages/TeacherImport'
 import TeacherStorage from './pages/TeacherStorage'
 import TeacherGrades from './pages/TeacherGrades'
 import TeacherLogin from './pages/TeacherLogin'
+import TeacherMakeupExams, { TeacherMakeupExamDetail } from './pages/TeacherMakeupExams'
+import TeacherExamSets from './pages/TeacherExamSets'
+import StudentMakeupExam from './pages/StudentMakeupExam'
 
 export default function App() {
   return (
@@ -75,6 +78,7 @@ export default function App() {
         <Route path="/me/leave" element={<StudentLeave />} />
         <Route path="/me/remedial/:id" element={<StudentRemedial />} />
         <Route path="/me/avatar" element={<StudentAvatar />} />
+        <Route path="/me/makeup/:id" element={<StudentMakeupExam />} />
         <Route path="/checkin" element={<StudentCheckin />} />
         <Route path="/teacher/login" element={<TeacherLogin />} />
         <Route path="/teacher" element={<TeacherHome />} />
@@ -85,6 +89,9 @@ export default function App() {
         <Route path="/teacher/route" element={<TeacherRoute />} />
         <Route path="/teacher/scheduled" element={<TeacherScheduled />} />
         <Route path="/teacher/leaves" element={<TeacherLeaves />} />
+        <Route path="/teacher/makeup-exams" element={<TeacherMakeupExams />} />
+        <Route path="/teacher/makeup-exams/:id" element={<TeacherMakeupExamDetail />} />
+        <Route path="/teacher/exam-sets" element={<TeacherExamSets />} />
         <Route path="/teacher/library" element={<TeacherLibrary />} />
         <Route path="/teacher/notifications" element={<TeacherNotifications />} />
         <Route path="/teacher/classes/:id" element={<TeacherClass />} />

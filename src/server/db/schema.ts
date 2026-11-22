@@ -220,6 +220,8 @@ export const scoreItems = sqliteTable('score_items', {
   takenOn: text('taken_on').notNull(),
   published: integer('published', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
+  /** สอบย้อนหลังได้ภายในกี่วันหลังวันสอบ (หมดแล้วคนที่ขาดสอบได้ 0) · 0 = ไม่เปิดสอบย้อนหลัง */
+  makeupDays: integer('makeup_days').notNull().default(14),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => [index('score_items_class_idx').on(t.classId)])
@@ -680,4 +682,75 @@ export const remedials = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [index('remedials_class_idx').on(t.classId), index('remedials_student_idx').on(t.studentId)],
+)
+
+/** ชุดข้อสอบปรนัย (สอบย้อนหลังออนไลน์): พิมพ์ในระบบ (สลับข้อได้) หรือรูปหน้าข้อสอบ + เฉลย */
+export const examSets = sqliteTable('exam_sets', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  kind: text('kind', { enum: ['typed', 'pages'] }).notNull(),
+  /** typed: [{ q, image?, choices, answer }] */
+  questions: text('questions', { mode: 'json' }).$type<{ q: string; image?: string; choices: string[]; answer: number }[]>().notNull().default(sql`'[]'`),
+  /** pages: รูปหน้าข้อสอบ (แปลงจาก PDF) · เฉลยต่อข้อ · จำนวนตัวเลือก */
+  pageKeys: text('page_keys', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+  answers: text('answers', { mode: 'json' }).$type<number[]>().notNull().default(sql`'[]'`),
+  choiceCount: integer('choice_count').notNull().default(4),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+/** คำขอ/การสอบย้อนหลังของนักเรียน 1 คน 1 รายการสอบ */
+export const makeupExams = sqliteTable(
+  'makeup_exams',
+  {
+    id: text('id').primaryKey(),
+    scoreItemId: text('score_item_id')
+      .notNull()
+      .references(() => scoreItems.id),
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id),
+    reason: text('reason').notNull().default(''),
+    imageKey: text('image_key'),
+    status: text('status', { enum: ['pending', 'approved', 'rejected', 'in_progress', 'submitted', 'graded', 'expired'] }).notNull().default('pending'),
+    mode: text('mode', { enum: ['online', 'paper'] }),
+    opensAt: integer('opens_at'),
+    closesAt: integer('closes_at'),
+    durationMin: integer('duration_min'),
+    /** เพดานคะแนน (% ของคะแนนเต็ม) */
+    capPct: integer('cap_pct').notNull().default(100),
+    examSetId: text('exam_set_id').references(() => examSets.id),
+    /** รหัสเริ่มสอบ (ครูบอกนักเรียน · ไม่ส่งให้นักเรียนทางระบบ) */
+    code: text('code'),
+    /** สลับข้อ/ตัวเลือก (ข้อสอบที่พิมพ์ในระบบ) */
+    seed: integer('seed'),
+    deviceId: text('device_id'),
+    startedAt: integer('started_at'),
+    submittedAt: integer('submitted_at'),
+    /** คำตอบตามลำดับข้อของชุดต้นฉบับ (-1 = ไม่ตอบ) */
+    answers: text('answers', { mode: 'json' }).$type<number[]>().notNull().default(sql`'[]'`),
+    leaves: integer('leaves').notNull().default(0),
+    autoScore: real('auto_score'),
+    finalScore: real('final_score'),
+    teacherNote: text('teacher_note').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('makeup_exams_student_idx').on(t.studentId), index('makeup_exams_item_idx').on(t.scoreItemId), index('makeup_exams_status_idx').on(t.status)],
+)
+
+/** บันทึกระหว่างสอบย้อนหลัง (เริ่ม · ออกจากหน้าจอ · เครื่องอื่น · ส่ง) */
+export const makeupEvents = sqliteTable(
+  'makeup_events',
+  {
+    id: text('id').primaryKey(),
+    examId: text('exam_id')
+      .notNull()
+      .references(() => makeupExams.id),
+    at: integer('at').notNull(),
+    kind: text('kind', { enum: ['start', 'leave', 'return', 'device', 'submit', 'auto-submit', 'timeout'] }).notNull(),
+    /** ระยะที่ออกจากหน้าจอ (ms) */
+    ms: integer('ms'),
+  },
+  (t) => [index('makeup_events_exam_idx').on(t.examId)],
 )

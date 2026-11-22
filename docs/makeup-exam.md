@@ -1,6 +1,10 @@
 # สอบย้อนหลังในระบบ — แผนที่ตกลงกับครูแล้ว
 
-> ตกลงเมื่อ 22 พ.ย. 2569 · ยังไม่ได้ลงมือทำ
+> ตกลงเมื่อ 22 พ.ย. 2569 · **ทำแล้ว** (ออกจากหน้าจอครบ 3 ครั้งส่งอัตโนมัติ · ปรนัยอย่างเดียว)
+>
+> โค้ด: `src/shared/makeupExam.ts` · `src/server/makeupExam/` · หน้า `TeacherMakeupExams.tsx` `TeacherExamSets.tsx` `StudentMakeupExam.tsx` · การ์ด `StudentMakeupCards.tsx` · กระดาษ `ZipgradeSheet.tsx` · ทดสอบ `tests/makeup-exam.test.ts` `tests/e2e/my-makeup-exam.spec.ts`
+>
+> หมายเหตุ: กระดาษ ZipGrade ที่ระบบฝนให้เป็นแบบพิมพ์/เก็บหลักฐาน ยังไม่ได้ทดสอบว่าแอป ZipGrade สแกนได้จริง (คะแนนลงสมุดคะแนนในระบบโดยตรงอยู่แล้ว)
 
 ## กำหนดเวลาสอบย้อนหลัง (นับถอยหลัง)
 
