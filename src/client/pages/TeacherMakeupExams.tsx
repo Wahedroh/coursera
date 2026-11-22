@@ -83,7 +83,7 @@ export default function TeacherMakeupExams() {
                     </span>
                   )}
                   <span>
-                    {r.mode === 'online' ? 'ออนไลน์' : 'กระดาษ'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที · เพดาน {r.capPct}%
+                    {r.mode === 'online' ? 'ออนไลน์' : 'ออนไซต์ (กระดาษ)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที · เพดาน {r.capPct}%
                   </span>
                   <Link to={`/teacher/makeup-exams/${r.id}`} className="underline text-board">
                     {r.mode === 'paper' ? 'ใส่คะแนน' : 'ดูรายละเอียด'}
@@ -92,7 +92,7 @@ export default function TeacherMakeupExams() {
               </Row>
             ))}
           </Section>
-          <Section title={`ขาดสอบ ยังไม่ได้ขอ (${d.absent.length})`} empty="ไม่มี">
+          <Section title={`ขาดสอบ/ยังไม่มีคะแนน ยังไม่ได้ขอ (${d.absent.length})`} empty="ไม่มี">
             {d.absent.map((a) => (
               <Card key={`${a.item.id}-${a.student.id}`} className="p-3 flex flex-col gap-2 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
@@ -100,9 +100,9 @@ export default function TeacherMakeupExams() {
                   <span className="text-stone-500">
                     {a.className} · {a.item.title} ({dayFmt.format(Date.parse(`${a.item.takenOn}T00:00:00Z`))})
                   </span>
-                  <span className="ml-auto">{a.zeroed ? <Chip tone="red">หมดสิทธิ์ → ได้ 0</Chip> : a.deadline ? <Chip tone={a.deadline - now < 3 * 86400_000 ? 'red' : 'amber'}>เหลือ {leftText(a.deadline - now)}</Chip> : <Chip>ไม่เปิดสอบย้อนหลัง</Chip>}</span>
+                  <span className="ml-auto">{a.blank && <Chip tone="blue">ยังไม่มีคะแนน</Chip>} {a.zeroed ? <Chip tone="red">หมดสิทธิ์ → ได้ 0</Chip> : a.deadline ? <Chip tone={a.deadline - now < 3 * 86400_000 ? 'red' : 'amber'}>เหลือ {leftText(a.deadline - now)}</Chip> : <Chip>ไม่เปิดสอบย้อนหลัง</Chip>}</span>
                 </div>
-                <ApproveForm grant={{ scoreItemId: a.item.id, studentId: a.student.id }} deadline={a.deadline} sets={sets} onDone={done} onError={(e) => setError(handle(e))} label={a.zeroed ? 'คืนสิทธิ์สอบ' : 'ให้สิทธิ์สอบ'} />
+                <ApproveForm grant={{ scoreItemId: a.item.id, studentId: a.student.id }} itemSetId={a.item.examSetId} deadline={a.deadline} sets={sets} onDone={done} onError={(e) => setError(handle(e))} label={a.zeroed ? 'คืนสิทธิ์สอบ' : 'ให้สิทธิ์สอบ'} />
               </Card>
             ))}
           </Section>
@@ -156,7 +156,7 @@ function Row({ r, now, children }: { r: TeacherMakeupRow; now: number; children:
         </div>
         {r.status === 'pending' && (
           <p className="text-sm">
-            “{r.reason}”{r.deadline && <span className="text-xs text-stone-500"> · สิทธิ์หมด {fmt.format(r.deadline)} (อีก {leftText(r.deadline - now)})</span>}
+            <b>{r.mode === 'paper' ? 'ขอสอบออนไซต์' : 'ขอสอบออนไลน์'}</b> · “{r.reason}”{r.deadline && <span className="text-xs text-stone-500"> · สิทธิ์หมด {fmt.format(r.deadline)} (อีก {leftText(r.deadline - now)})</span>}
           </p>
         )}
         {r.imageKey && r.status === 'pending' && (
@@ -173,6 +173,7 @@ function Row({ r, now, children }: { r: TeacherMakeupRow; now: number; children:
 function ApproveForm({
   r,
   grant,
+  itemSetId,
   deadline,
   sets,
   onDone,
@@ -181,6 +182,8 @@ function ApproveForm({
 }: {
   r?: TeacherMakeupRow
   grant?: { scoreItemId: string; studentId: string }
+  /** ชุดข้อสอบที่ครูเลือกไว้ในรายการสอบ (เลือกให้อัตโนมัติ) */
+  itemSetId?: string | null
   deadline?: number | null
   sets: ExamSetSummary[]
   onDone: (msg: string) => void
@@ -190,18 +193,19 @@ function ApproveForm({
   const [open, setOpen] = useState(!!r)
   const end = deadline ?? r?.deadline ?? null
   const now = Date.now()
-  const [mode, setMode] = useState<'online' | 'paper'>('online')
+  const [mode, setMode] = useState<'online' | 'paper'>(r?.mode ?? 'online')
   const [opensAt, setOpensAt] = useState(epochToLocal(now))
   const [closesAt, setClosesAt] = useState(epochToLocal(end && end > now ? Math.min(end, now + 3 * 86400_000) : now + 3 * 86400_000))
   const [duration, setDuration] = useState(30)
   const [cap, setCap] = useState(100)
-  const [setId, setSetId] = useState(sets[0]?.id ?? '')
+  const preferred = r?.item.examSetId ?? itemSetId ?? null
+  const [setId, setSetId] = useState(preferred ?? sets[0]?.id ?? '')
   const [shuffle, setShuffle] = useState(true)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => {
-    if (!setId && sets[0]) setSetId(sets[0].id)
-  }, [sets, setId])
+    if (!setId && sets[0]) setSetId(sets.find((x) => x.id === preferred)?.id ?? sets[0].id)
+  }, [sets, setId, preferred])
   if (!open)
     return (
       <button type="button" onClick={() => setOpen(true)} className="self-start rounded-xl border-2 border-board px-3 py-1 text-sm font-bold text-board">
@@ -214,7 +218,7 @@ function ApproveForm({
     try {
       const body = { mode, opensAt: localToEpoch(opensAt), closesAt: localToEpoch(closesAt), durationMin: duration, capPct: cap, examSetId: mode === 'online' ? setId || null : null, shuffle }
       const res = r ? await api<{ code: string }>(`/api/teacher/makeup-exams/${r.id}/approve`, { method: 'PUT', body }) : await api<{ code: string }>('/api/teacher/makeup-exams', { body: { ...body, ...grant } })
-      onDone(mode === 'online' ? `อนุมัติแล้ว · รหัสเริ่มสอบ ${res.code} (บอกนักเรียนตอนนัดสอบ)` : 'อนุมัติแล้ว (สอบกระดาษ) · ใส่คะแนนหลังสอบ')
+      onDone(mode === 'online' ? `อนุมัติแล้ว · รหัสเริ่มสอบ ${res.code} (บอกนักเรียนตอนนัดสอบ)` : 'อนุมัติแล้ว (สอบออนไซต์) · ใส่คะแนนหลังสอบ')
     } catch (e) {
       onError(e)
     } finally {
@@ -238,7 +242,7 @@ function ApproveForm({
       <div className="flex gap-2 sm:col-span-2" role="radiogroup" aria-label="รูปแบบสอบ">
         {(['online', 'paper'] as const).map((m) => (
           <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} className={`flex-1 rounded-xl border-2 py-1.5 font-bold ${mode === m ? 'border-board bg-board-soft text-board' : 'border-line bg-white'}`}>
-            {m === 'online' ? 'ออนไลน์ (ระบบตรวจ)' : 'กระดาษ (ต่อหน้าครู)'}
+            {m === 'online' ? 'ออนไลน์ (ระบบตรวจ)' : 'ออนไซต์ (กระดาษต่อหน้าครู)'}
           </button>
         ))}
       </div>
@@ -366,7 +370,7 @@ export function TeacherMakeupExamDetail() {
             <Chip tone={TONE[d.status]}>{MAKEUP_STATUS_LABEL[d.status]}</Chip>
           </div>
           <p className="text-sm text-stone-500">
-            {d.className} · {d.mode === 'online' ? `ออนไลน์ · ${d.examSet?.title ?? ''}` : 'กระดาษ'} · เพดาน {d.capPct}% · “{d.reason}”
+            {d.className} · {d.mode === 'online' ? `ออนไลน์ · ${d.examSet?.title ?? ''}` : 'ออนไซต์ (กระดาษ)'} · เพดาน {d.capPct}% · “{d.reason}”
           </p>
           <div className="grid gap-4 lg:grid-cols-2 items-start [&>*]:min-w-0">
             <Card className="p-4 flex flex-col gap-3">

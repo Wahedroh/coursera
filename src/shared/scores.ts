@@ -15,6 +15,8 @@ export const scoreItemInputSchema = z.object({
   takenOn: dateSchema,
   /** สอบย้อนหลังได้ภายในกี่วันหลังวันสอบ (0 = ไม่เปิด) */
   makeupDays: z.number().int().min(0).max(120).default(14),
+  /** ชุดข้อสอบสอบย้อนหลัง · ไม่ส่ง = คงเดิม · null = ไม่ระบุ */
+  examSetId: z.string().min(1).max(40).nullable().optional(),
 })
 export type ScoreItemInput = z.infer<typeof scoreItemInputSchema>
 
@@ -80,7 +82,7 @@ export type ScoreRow = {
 }
 
 export type ScoreSheet = {
-  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean; makeupDays: number }
+  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean; makeupDays: number; examSetId: string | null }
   class: { id: string; name: string }
   students: ScoreRow[]
 }

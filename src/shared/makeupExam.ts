@@ -105,6 +105,8 @@ export const makeupRequestSchema = z.object({
   scoreItemId: z.string().min(1),
   reason: z.string().trim().min(1, 'กรุณาเขียนเหตุผล').max(300),
   imageKey: z.string().max(200).nullable().default(null),
+  /** นักเรียนเลือก: ออนไลน์ หรือ ออนไซต์ (สอบกระดาษต่อหน้าครู) — ครูเปลี่ยนได้ตอนอนุมัติ */
+  mode: z.enum(['online', 'paper']).default('online'),
 })
 const approveBase = z.object({
   mode: z.enum(['online', 'paper']),
@@ -138,6 +140,8 @@ export type StudentMakeup = {
   title: string
   maxScore: number
   takenOn: string
+  /** ขาดสอบ (ครูบันทึก) · false = ยังไม่มีคะแนน */
+  absent: boolean
   /** กำหนดสุดท้าย (ms) · null = ไม่เปิดสอบย้อนหลัง */
   deadline: number | null
   request: {
@@ -175,7 +179,7 @@ export type TeacherMakeupRow = {
   status: MakeupStatus
   student: { id: string; name: string; zipgradeId: string }
   className: string
-  item: { id: string; title: string; maxScore: number; takenOn: string }
+  item: { id: string; title: string; maxScore: number; takenOn: string; examSetId: string | null }
   deadline: number | null
   reason: string
   imageKey: string | null
@@ -199,8 +203,8 @@ export type TeacherMakeups = {
   active: TeacherMakeupRow[]
   toReview: TeacherMakeupRow[]
   recent: TeacherMakeupRow[]
-  /** ขาดสอบแต่ยังไม่มีคำขอ (ยังไม่หมดสิทธิ์ หรือหมดแล้วได้ 0 — ครูให้สิทธิ์ใหม่ได้) */
-  absent: { student: { id: string; name: string; zipgradeId: string }; className: string; item: { id: string; title: string; maxScore: number; takenOn: string }; deadline: number | null; zeroed: boolean }[]
+  /** ขาดสอบ/ยังไม่มีคะแนน แต่ยังไม่มีคำขอ (ยังไม่หมดสิทธิ์ หรือหมดแล้วได้ 0 — ครูให้สิทธิ์ใหม่ได้) */
+  absent: { student: { id: string; name: string; zipgradeId: string }; className: string; item: { id: string; title: string; maxScore: number; takenOn: string; examSetId: string | null }; deadline: number | null; zeroed: boolean; blank: boolean }[]
 }
 export type TeacherMakeupDetail = TeacherMakeupRow & {
   examSet: ExamSet | null

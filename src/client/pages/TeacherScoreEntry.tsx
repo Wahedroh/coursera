@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { api, fullName } from '../api'
 import { CATEGORY_LABEL, SCORE_CATEGORIES, parsePastedColumn, parseScore, scoreStats, type ScoreCategory, type ScoreRow, type ScoreSheet } from '../../shared/scores'
 import { formatDate } from '../lib/format'
+import type { ExamSetSummary } from '../../shared/makeupExam'
 import ZipgradeImport from '../components/ZipgradeImport'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
@@ -27,6 +28,7 @@ export default function TeacherScoreEntry() {
   const queues = useRef(new Map<string, Promise<void>>())
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const [sets, setSets] = useState<ExamSetSummary[] | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
 
   const setRows = useCallback((f: (rs: Row[]) => Row[]) => {
@@ -154,10 +156,22 @@ export default function TeacherScoreEntry() {
     }
   }
 
+  // ชุดข้อสอบสอบย้อนหลัง: โหลดตอนเปิดฟอร์มแก้ (หน้าแรกก็แสดงชื่อชุดที่เลือก)
+  useEffect(() => {
+    if (sets || (!editing && !sheet?.item.examSetId)) return
+    let live = true
+    api<ExamSetSummary[]>('/api/teacher/exam-sets')
+      .then((x) => live && setSets(x))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [editing, sheet?.item.examSetId, sets])
+
   async function saveDetails(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
-    const body = { title: String(f.get('title')), category: String(f.get('category')), maxScore: Number(f.get('maxScore')), takenOn: String(f.get('takenOn')), makeupDays: Number(f.get('makeupDays')) }
+    const body = { title: String(f.get('title')), category: String(f.get('category')), maxScore: Number(f.get('maxScore')), takenOn: String(f.get('takenOn')), makeupDays: Number(f.get('makeupDays')), ...(f.has('examSetId') ? { examSetId: String(f.get('examSetId')) || null } : {}) }
     try {
       await api(`/api/teacher/score-items/${id}`, { method: 'PUT', body })
       setEditing(false)
@@ -184,6 +198,7 @@ export default function TeacherScoreEntry() {
           <h1 className="text-2xl font-extrabold">{it.title}</h1>
           <p className="text-sm text-stone-500">
             {CATEGORY_LABEL[it.category]} · {formatDate(it.takenOn)} · คะแนนเต็ม {it.maxScore} · {it.makeupDays > 0 ? `สอบย้อนหลังได้ ${it.makeupDays} วัน` : 'ไม่เปิดสอบย้อนหลัง'}
+            {it.makeupDays > 0 && it.examSetId && sets && ` · ชุด: ${sets.find((s) => s.id === it.examSetId)?.title ?? '—'}`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 items-center">
@@ -210,7 +225,7 @@ export default function TeacherScoreEntry() {
       {flash && <Card className="p-3 bg-board-soft border-green-200 text-board font-semibold">{flash}</Card>}
       {editing && (
         <Card className="p-4">
-          <form onSubmit={saveDetails} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] items-end">
+          <form onSubmit={saveDetails} className="grid gap-3 sm:grid-cols-3 items-end [&>*]:min-w-0">
             <label className="text-sm font-semibold">
               ชื่อรายการ
               <input name="title" className={input} required maxLength={200} defaultValue={it.title} />
@@ -231,11 +246,29 @@ export default function TeacherScoreEntry() {
             </label>
             <label className="text-sm font-semibold">
               วันที่สอบ
-              <input name="takenOn" type="date" required className={input} defaultValue={it.takenOn} />
+              <input name="takenOn" type="date" required className={`${input} min-w-0 appearance-none`} defaultValue={it.takenOn} />
             </label>
             <label className="text-sm font-semibold">
               สอบย้อนหลังได้ภายใน (วัน · 0 = ไม่เปิด)
               <input name="makeupDays" aria-label="สอบย้อนหลังได้ภายใน (วัน)" type="number" min={0} max={120} required className={input} defaultValue={it.makeupDays} />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              ชุดข้อสอบสอบย้อนหลัง{' '}
+              <Link to="/teacher/exam-sets" className="text-xs font-normal text-board underline">
+                จัดการชุดข้อสอบ
+              </Link>
+              {sets ? (
+                <select name="examSetId" aria-label="ชุดข้อสอบสอบย้อนหลัง" className={input} defaultValue={it.examSetId ?? ''}>
+                  <option value="">— ยังไม่เลือก (เลือกตอนอนุมัติ) —</option>
+                  {sets.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title} ({s.count} ข้อ)
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs font-normal text-stone-500">กำลังโหลดชุดข้อสอบ…</p>
+              )}
             </label>
             <Button type="submit">บันทึก</Button>
           </form>
