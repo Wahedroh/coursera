@@ -424,7 +424,7 @@ export function TeacherMakeupExamDetail() {
                 </div>
                 <div className="overflow-auto border border-line" style={{ maxHeight: '70vh' }}>
                   <div ref={sheet} style={{ zoom: 0.6 }}>
-                    <ZipgradeSheet title={`${d.item.title} (สอบย้อนหลัง)`} name={d.student.name} zipgradeId={d.student.zipgradeId} answers={d.answers} choiceCount={d.examSet.choiceCount} note={d.submittedAt ? `ส่งเมื่อ ${fmt.format(d.submittedAt)}` : undefined} />
+                    <ZipgradeSheet title={`${d.item.title} (สอบย้อนหลัง)`} name={d.student.name} className={d.className} zipgradeId={d.student.zipgradeId} answers={d.answers} choiceCount={d.examSet.choiceCount} note={d.submittedAt ? `ส่งเมื่อ ${fmt.format(d.submittedAt)}` : undefined} />
                   </div>
                 </div>
               </Card>

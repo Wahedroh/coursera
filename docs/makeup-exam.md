@@ -4,7 +4,7 @@
 >
 > โค้ด: `src/shared/makeupExam.ts` · `src/server/makeupExam/` · หน้า `TeacherMakeupExams.tsx` `TeacherExamSets.tsx` `StudentMakeupExam.tsx` · การ์ด `StudentMakeupCards.tsx` · กระดาษ `ZipgradeSheet.tsx` · ทดสอบ `tests/makeup-exam.test.ts` `tests/e2e/my-makeup-exam.spec.ts`
 >
-> หมายเหตุ: กระดาษ ZipGrade ที่ระบบฝนให้เป็นแบบพิมพ์/เก็บหลักฐาน ยังไม่ได้ทดสอบว่าแอป ZipGrade สแกนได้จริง (คะแนนลงสมุดคะแนนในระบบโดยตรงอยู่แล้ว)
+> กระดาษ ZipGrade: ≤ 40 ข้อ วาดตามแบบฟอร์มจริง `40-ABCDE (9467)` (พิกัดวัดจากต้นฉบับ ซ้อนทับตรงกัน) · พิมพ์ A4 ที่ 100% แล้วสแกนด้วยแอปได้ (ยังต้องลองสแกนจริง) · เกิน 40 ข้อใช้แบบทั่วไป (เก็บหลักฐาน)
 
 ## กำหนดเวลาสอบย้อนหลัง (นับถอยหลัง)
 
