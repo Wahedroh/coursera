@@ -21,6 +21,7 @@ import { Button, Card, Loading } from '../ui'
 import Icon from '../components/Icon'
 import IconCredit from '../components/IconCredit'
 import StudentHomeCards from '../components/StudentHomeCards'
+import StudentMakeupCards from '../components/StudentMakeupCards'
 
 type StudentMe = Extract<Me, { kind: 'student' }>
 
@@ -171,6 +172,7 @@ export default function StudentHome() {
       <section className="p-5 flex flex-col gap-3">
         <StudentAnnouncements />
         <ReportReadyCard />
+        <StudentMakeupCards actionable />
         <StudentHomeCards />
         <WeeklyQuests onClaimed={loadExp} />
         <AppSetupCard />

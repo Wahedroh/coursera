@@ -13,6 +13,8 @@ export const scoreItemInputSchema = z.object({
   category: z.enum(SCORE_CATEGORIES),
   maxScore: z.number().positive().max(1000).refine(twoDecimals),
   takenOn: dateSchema,
+  /** สอบย้อนหลังได้ภายในกี่วันหลังวันสอบ (0 = ไม่เปิด) */
+  makeupDays: z.number().int().min(0).max(120).default(14),
 })
 export type ScoreItemInput = z.infer<typeof scoreItemInputSchema>
 
@@ -78,7 +80,7 @@ export type ScoreRow = {
 }
 
 export type ScoreSheet = {
-  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean }
+  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean; makeupDays: number }
   class: { id: string; name: string }
   students: ScoreRow[]
 }

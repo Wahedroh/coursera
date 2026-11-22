@@ -32,6 +32,12 @@ export async function canRead(db: Db, session: SessionInfo, key: string): Promis
       OR EXISTS (SELECT 1 FROM materials m WHERE m.class_id = ${session.classId} AND m.published = 1 AND m.file_key = ${key})
       OR EXISTS (SELECT 1 FROM settings st WHERE st.key = 'payment_info' AND (st.value ->> 'qrKey') = ${key})
       OR EXISTS (SELECT 1 FROM videos v, json_each(v.questions) j WHERE v.class_id = ${session.classId} AND v.published = 1 AND (j.value ->> 'image') = ${key})
-      OR EXISTS (SELECT 1 FROM card_games g, json_each(g.questions) j WHERE g.class_id = ${session.classId} AND j.key = g.current AND (j.value ->> 'image') = ${key})`)
-  return !!row
+      OR EXISTS (SELECT 1 FROM card_games g, json_each(g.questions) j WHERE g.class_id = ${session.classId} AND j.key = g.current AND (j.value ->> 'image') = ${key})
+      OR EXISTS (SELECT 1 FROM makeup_exams m JOIN exam_sets e ON e.id = m.exam_set_id, json_each(e.page_keys) j WHERE m.student_id = ${session.studentId} AND m.status = 'in_progress' AND j.value = ${key})`)
+  if (row) return true
+  // รูปประกอบโจทย์ของข้อสอบที่กำลังทำ (D1 จำกัด UNION/OR ซ้อน จึงแยกคำสั่ง)
+  const exam = await db.get<{ ok: number }>(sql`
+    SELECT 1 AS ok FROM makeup_exams m JOIN exam_sets e ON e.id = m.exam_set_id, json_each(e.questions) j
+    WHERE m.student_id = ${session.studentId} AND m.status = 'in_progress' AND (j.value ->> 'image') = ${key}`)
+  return !!exam
 }

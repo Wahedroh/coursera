@@ -79,7 +79,7 @@ export async function getScoreSheet(db: Db, id: string): Promise<ScoreSheet> {
     .where(activeIn(item.classId))
     .orderBy(students.sortOrder, students.zipgradeId)
   return {
-    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published },
+    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published, makeupDays: item.makeupDays },
     class: cls,
     students: rows.map((r) => ({ ...r, score: r.score ?? null, absent: r.absent ?? false, note: r.note ?? '' })),
   }
@@ -90,10 +90,10 @@ export async function updateScoreItem(db: Db, id: string, input: ScoreItemInput)
   // ตรวจและแก้ในคำสั่งเดียว: คะแนนที่บันทึกพร้อมกันจะไม่หลุดเกินคะแนนเต็มใหม่
   const r = await db.$client
     .prepare(
-      `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, updated_at = ?
+      `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, makeup_days = ?, updated_at = ?
        WHERE id = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE item_id = ? AND score > ?)`,
     )
-    .bind(input.title, input.category, input.maxScore, input.takenOn, now(), id, id, input.maxScore)
+    .bind(input.title, input.category, input.maxScore, input.takenOn, input.makeupDays, now(), id, id, input.maxScore)
     .run()
   if (r.meta.changes === 0) throw apiError('scores_exceed_max', 'มีคะแนนที่กรอกแล้วเกินคะแนนเต็มใหม่ กรุณาแก้คะแนนก่อน', 409)
 }
@@ -105,6 +105,9 @@ export async function setPublished(db: Db, id: string, published: boolean): Prom
 
 export async function deleteScoreItem(db: Db, id: string): Promise<void> {
   await getItem(db, id)
+  // สอบย้อนหลังของรายการนี้หายไปด้วย
+  await db.run(sql`DELETE FROM makeup_events WHERE exam_id IN (SELECT id FROM makeup_exams WHERE score_item_id = ${id})`)
+  await db.run(sql`DELETE FROM makeup_exams WHERE score_item_id = ${id}`)
   await db.batch([db.delete(scores).where(eq(scores.itemId, id)), db.delete(scoreItems).where(eq(scoreItems.id, id))])
 }
 

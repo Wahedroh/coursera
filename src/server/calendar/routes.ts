@@ -23,7 +23,7 @@ teacherCalendarRoutes.post('/events', async (c) => {
   const { classIds, scoreItem, ...input } = await parseBody(c, createEventsSchema)
   const db = getDb(c.env)
   const ids = await createEvents(db, classIds, input, now())
-  if (input.kind === 'exam' && scoreItem) await createScoreItems(db, classIds, { title: input.title, category: scoreItem.category, maxScore: scoreItem.maxScore, takenOn: input.date })
+  if (input.kind === 'exam' && scoreItem) await createScoreItems(db, classIds, { title: input.title, category: scoreItem.category, maxScore: scoreItem.maxScore, takenOn: input.date, makeupDays: 14 })
   if (input.date >= todayBangkok()) await pushInBackground(c, (d) => enqueueForClasses(d, classIds, { title: eventNoticeTitle(input.kind, input.title, input.date), body: [input.period, input.detail].filter(Boolean).join(' · '), url: '/me/calendar' }, now()))
   return c.json({ ids })
 })

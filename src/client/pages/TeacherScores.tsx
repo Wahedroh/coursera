@@ -39,6 +39,7 @@ export default function TeacherScores() {
   const [category, setCategory] = useState<ScoreCategory>("quiz");
   const [maxScore, setMaxScore] = useState("20");
   const [takenOn, setTakenOn] = useState(todayBangkok());
+  const [makeupDays, setMakeupDays] = useState("14");
   const [classIds, setClassIds] = useState<string[]>([id]);
 
   const load = useCallback(() => {
@@ -70,6 +71,7 @@ export default function TeacherScores() {
           category,
           maxScore: Number(maxScore),
           takenOn,
+          makeupDays: Number(makeupDays) || 0,
           classIds,
         },
       });
@@ -220,6 +222,21 @@ export default function TeacherScores() {
                 value={takenOn}
                 onChange={(e) => setTakenOn(e.target.value)}
               />
+            </label>
+            <label className="text-sm font-semibold">
+              สอบย้อนหลังได้ภายใน (วัน)
+              <input
+                type="number"
+                min={0}
+                max={120}
+                aria-label="สอบย้อนหลังได้ภายใน (วัน)"
+                className={input}
+                value={makeupDays}
+                onChange={(e) => setMakeupDays(e.target.value)}
+              />
+              <span className="block text-xs font-normal text-stone-500">
+                นับจากวันสอบ · เลยแล้วคนขาดสอบได้ 0 · 0 = ไม่เปิด
+              </span>
             </label>
           </div>
         </Card>
