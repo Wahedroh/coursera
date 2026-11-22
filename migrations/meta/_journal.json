@@ -267,6 +267,13 @@
       "when": 1795342620666,
       "tag": "0037_makeup_exams",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1795347348458,
+      "tag": "0038_cardgame_no_makeup",
+      "breakpoints": true
     }
   ]
 }

@@ -52,7 +52,7 @@ export async function copyItems(db: Db, input: CopyInput, t: number): Promise<{ 
     for (const s of src)
       for (const classId of classIds) {
         const id = newId()
-        await db.insert(scoreItems).values({ id, classId, title: s.title, category: s.category, maxScore: s.maxScore, takenOn: s.takenOn, published: false, sortOrder: s.sortOrder, createdAt: t, updatedAt: t })
+        await db.insert(scoreItems).values({ id, classId, title: s.title, category: s.category, maxScore: s.maxScore, takenOn: s.takenOn, makeupDays: s.makeupDays, published: false, sortOrder: s.sortOrder, createdAt: t, updatedAt: t })
         created.push({ id, classId, title: s.title, published: false })
       }
   } else if (input.type === 'video') {

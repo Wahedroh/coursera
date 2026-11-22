@@ -98,7 +98,7 @@ export async function studentMakeups(db: Db, studentId: string, classId: string)
     SELECT i.id, i.title, i.max_score AS maxScore, i.taken_on AS takenOn, i.makeup_days AS makeupDays, coalesce(s.absent, 0) AS absent
     FROM score_items i LEFT JOIN scores s ON s.item_id = i.id AND s.student_id = ${studentId}
     WHERE i.class_id = ${classId} AND i.published = 1 AND i.created_at >= ${start}
-      AND (s.absent = 1 OR EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = ${studentId}))
+      AND ((s.absent = 1 AND i.makeup_days > 0) OR EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = ${studentId}))
     ORDER BY i.taken_on`)
   const reqs = rows.length
     ? await db
@@ -279,7 +279,7 @@ export async function teacherMakeups(db: Db, t: number): Promise<TeacherMakeups>
     SELECT st.id AS studentId, st.zipgrade_id AS zipgradeId, st.title, st.first_name AS firstName, st.last_name AS lastName, c.name AS className,
       i.id AS itemId, i.title AS itemTitle, i.max_score AS maxScore, i.taken_on AS takenOn, i.makeup_days AS makeupDays, s.absent
     FROM scores s JOIN score_items i ON i.id = s.item_id JOIN students st ON st.id = s.student_id JOIN classes c ON c.id = i.class_id
-    WHERE st.active = 1 AND c.archived = 0 AND i.created_at >= ${start} AND (s.absent = 1 OR s.note = ${EXPIRED_NOTE})
+    WHERE st.active = 1 AND c.archived = 0 AND i.created_at >= ${start} AND i.makeup_days > 0 AND (s.absent = 1 OR s.note = ${EXPIRED_NOTE})
       AND NOT EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = st.id AND m.status IN ('pending', 'approved', 'in_progress', 'submitted', 'graded'))
     ORDER BY i.taken_on DESC, st.sort_order`)
   return {

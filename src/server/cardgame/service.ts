@@ -254,7 +254,7 @@ export async function endGame(db: Db, id: string, opts: { saveScore: boolean; at
   let scoreItemId: string | null = null
   if (opts.saveScore) {
     scoreItemId = newId()
-    await db.insert(scoreItems).values({ id: scoreItemId, classId: g.classId, title, category: 'other', maxScore: res.total, takenOn: todayBangkok(t), createdAt: t, updatedAt: t })
+    await db.insert(scoreItems).values({ id: scoreItemId, classId: g.classId, title, category: 'other', maxScore: res.total, takenOn: todayBangkok(t), makeupDays: 0, createdAt: t, updatedAt: t })
     const vals = res.players.map((p) => ({ id: newId(), itemId: scoreItemId!, studentId: p.id, score: p.answered ? p.correct : null, absent: p.answered === 0, note: '', updatedAt: t }))
     for (let i = 0; i < vals.length; i += 10) await db.insert(scores).values(vals.slice(i, i + 10))
     await db.update(cardGames).set({ scoreItemId }).where(eq(cardGames.id, id))
