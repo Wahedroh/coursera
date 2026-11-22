@@ -56,7 +56,7 @@ test('สอบย้อนหลังออนไลน์: ขาดสอบ
   await expect(card).toContainText('สอบย่อยเวกเตอร์')
   await expect(card.getByTestId('makeup-countdown')).toContainText(/เหลือเวลาขอสอบ\/สอบ 14 วัน/)
   await card.getByRole('button', { name: 'ขอสอบย้อนหลัง' }).click()
-  await card.getByLabel('เหตุผลที่ขาดสอบ').fill('ป่วย ไปโรงพยาบาล')
+  await card.getByLabel('เหตุผลที่ขอสอบย้อนหลัง').fill('ป่วย ไปโรงพยาบาล')
   await card.getByRole('button', { name: 'ส่งคำขอให้ครู' }).click()
   await expect(card.getByText('รอครูอนุมัติ', { exact: true })).toBeVisible()
 

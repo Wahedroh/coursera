@@ -49,6 +49,7 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [imageKey, setImageKey] = useState<string | null>(null)
+  const [mode, setMode] = useState<'online' | 'paper'>('online')
   const [busy, setBusy] = useState<string | null>(null)
   const r = m.request
   const left = m.deadline === null ? null : m.deadline - now
@@ -69,7 +70,7 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
     setBusy('กำลังส่ง…')
     onError(null)
     try {
-      await api('/api/student/makeups', { body: { scoreItemId: m.scoreItemId, reason, imageKey } })
+      await api('/api/student/makeups', { body: { scoreItemId: m.scoreItemId, reason, imageKey, mode } })
       setOpen(false)
       onDone()
     } catch (e) {
@@ -85,7 +86,9 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="font-bold">{m.title}</h3>
-          <p className="text-xs text-stone-500">ขาดสอบวันที่ {formatDate(m.takenOn)} · เต็ม {m.maxScore}</p>
+          <p className="text-xs text-stone-500">
+            {r?.status === 'graded' ? 'สอบย้อนหลังแล้ว' : m.absent ? 'ขาดสอบ' : 'ยังไม่มีคะแนน'} · สอบวันที่ {formatDate(m.takenOn)} · เต็ม {m.maxScore}
+          </p>
         </div>
         {r && r.status !== 'expired' ? <Chip tone={r.status === 'rejected' ? 'red' : r.status === 'graded' ? 'green' : 'amber'}>{MAKEUP_STATUS_LABEL[r.status]}</Chip> : null}
       </div>
@@ -94,7 +97,7 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
           <p className="text-sm text-stone-500">รายการนี้ครูไม่เปิดสอบย้อนหลัง</p>
         ) : left! > 0 ? (
           <p className={`text-sm font-bold ${left! < 3 * 86400_000 ? 'text-red-700' : 'text-amber-700'}`} data-testid="makeup-countdown">
-            ⏳ เหลือเวลาขอสอบ/สอบ {leftText(left!)} (ถึง {fmt.format(m.deadline)}) · เลยกำหนดได้ 0
+            ⏳ เหลือเวลาขอสอบ/สอบ {leftText(left!)} (ถึง {fmt.format(m.deadline)}){m.absent ? ' · เลยกำหนดได้ 0' : ''}
           </p>
         ) : (
           <p className="text-sm font-bold text-red-700">หมดสิทธิ์สอบย้อนหลังแล้ว</p>
@@ -103,7 +106,7 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
       {r?.status === 'approved' && (
         <div className="rounded-xl bg-board-soft p-3 text-sm">
           <p>
-            {r.mode === 'online' ? 'สอบออนไลน์' : 'สอบกระดาษต่อหน้าครู'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที
+            {r.mode === 'online' ? 'สอบออนไลน์' : 'สอบออนไซต์ (กระดาษต่อหน้าครู)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที
           </p>
           {r.mode === 'online' &&
             (now >= (r.opensAt ?? 0) ? (
@@ -123,7 +126,15 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
       {canRequest &&
         (open ? (
           <div className="flex flex-col gap-2">
-            <textarea aria-label="เหตุผลที่ขาดสอบ" className="rounded-xl border-2 border-line bg-white px-3 py-2" rows={2} maxLength={300} placeholder="เหตุผลที่ขาดสอบ เช่น ป่วย มีใบรับรองแพทย์" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="flex gap-2" role="radiogroup" aria-label="รูปแบบสอบย้อนหลัง">
+              {(['online', 'paper'] as const).map((k) => (
+                <button key={k} type="button" role="radio" aria-checked={mode === k} onClick={() => setMode(k)} className={`flex-1 rounded-xl border-2 px-2 py-2 text-sm font-bold ${mode === k ? 'border-board bg-board-soft text-board' : 'border-line bg-white'}`}>
+                  {k === 'online' ? '💻 ออนไลน์' : '🏫 ออนไซต์'}
+                  <span className="block text-xs font-normal text-stone-500">{k === 'online' ? 'สอบในแอป (ต้องมีรหัสจากครู)' : 'สอบกระดาษต่อหน้าครู'}</span>
+                </button>
+              ))}
+            </div>
+            <textarea aria-label="เหตุผลที่ขอสอบย้อนหลัง" className="rounded-xl border-2 border-line bg-white px-3 py-2" rows={2} maxLength={300} placeholder="เหตุผล เช่น ป่วย มีใบรับรองแพทย์" value={reason} onChange={(e) => setReason(e.target.value)} />
             <label className="self-start rounded-xl border-2 border-line bg-white px-3 py-1.5 text-sm cursor-pointer">
               {imageKey ? '✓ แนบรูปแล้ว' : '📎 แนบหลักฐาน (ไม่บังคับ)'}
               <input type="file" accept="image/*" className="sr-only" aria-label="หลักฐาน" onChange={(e) => void attach(e.target.files?.[0])} />

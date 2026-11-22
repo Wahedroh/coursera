@@ -222,6 +222,8 @@ export const scoreItems = sqliteTable('score_items', {
   sortOrder: integer('sort_order').notNull().default(0),
   /** สอบย้อนหลังได้ภายในกี่วันหลังวันสอบ (หมดแล้วคนที่ขาดสอบได้ 0) · 0 = ไม่เปิดสอบย้อนหลัง */
   makeupDays: integer('makeup_days').notNull().default(14),
+  /** ชุดข้อสอบที่ใช้สอบย้อนหลังของรายการนี้ (ครูเลือกตอนกรอกคะแนน · ตั้งเป็นค่าเริ่มต้นตอนอนุมัติ) */
+  examSetId: text('exam_set_id'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => [index('score_items_class_idx').on(t.classId)])

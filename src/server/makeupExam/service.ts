@@ -59,6 +59,7 @@ export async function deleteExamSet(db: Db, id: string): Promise<void> {
   await assertSetEditable(db, id)
   const [used] = await db.select({ id: makeupExams.id }).from(makeupExams).where(eq(makeupExams.examSetId, id)).limit(1)
   if (used) throw apiError('exam_set_in_use', 'ชุดนี้ถูกเลือกให้นักเรียนสอบแล้ว ลบไม่ได้', 409)
+  await db.update(scoreItems).set({ examSetId: null }).where(eq(scoreItems.examSetId, id))
   await db.delete(examSets).where(eq(examSets.id, id))
 }
 /** ชุดที่มีคนเริ่มสอบแล้ว แก้/ลบไม่ได้ (เฉลยต้องคงเดิม) */
@@ -94,11 +95,12 @@ async function openRequest(db: Db, scoreItemId: string, studentId: string) {
 /** รายการสอบที่ขาดสอบ (เผยแพร่แล้ว · เทอมนี้) + คำขอล่าสุด */
 export async function studentMakeups(db: Db, studentId: string, classId: string): Promise<StudentMakeup[]> {
   const { start } = await termWindow(db)
+  // ขาดสอบ หรือ ยังไม่มีคะแนน (เผยแพร่แล้วแต่ช่องว่าง) → ขอสอบย้อนหลังได้
   const rows = await db.all<{ id: string; title: string; maxScore: number; takenOn: string; makeupDays: number; absent: number }>(sql`
     SELECT i.id, i.title, i.max_score AS maxScore, i.taken_on AS takenOn, i.makeup_days AS makeupDays, coalesce(s.absent, 0) AS absent
     FROM score_items i LEFT JOIN scores s ON s.item_id = i.id AND s.student_id = ${studentId}
     WHERE i.class_id = ${classId} AND i.published = 1 AND i.created_at >= ${start}
-      AND ((s.absent = 1 AND i.makeup_days > 0) OR EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = ${studentId}))
+      AND ((i.makeup_days > 0 AND (s.absent = 1 OR s.score IS NULL)) OR EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = ${studentId}))
     ORDER BY i.taken_on`)
   const reqs = rows.length
     ? await db
@@ -114,26 +116,27 @@ export async function studentMakeups(db: Db, studentId: string, classId: string)
       title: r.title,
       maxScore: r.maxScore,
       takenOn: r.takenOn,
+      absent: !!r.absent,
       deadline: makeupDeadline(r.takenOn, r.makeupDays),
       request: q ? { id: q.id, status: q.status, mode: q.mode, opensAt: q.opensAt, closesAt: q.closesAt, durationMin: q.durationMin, teacherNote: q.teacherNote } : null,
     }
   })
 }
 
-export async function requestMakeup(db: Db, p: { studentId: string; classId: string; scoreItemId: string; reason: string; imageKey: string | null; t: number }): Promise<string> {
+export async function requestMakeup(db: Db, p: { studentId: string; classId: string; scoreItemId: string; reason: string; imageKey: string | null; mode: 'online' | 'paper'; t: number }): Promise<string> {
   const item = await itemOf(db, p.scoreItemId)
   if (item.classId !== p.classId || !item.published) throw apiError('score_item_not_found', 'ไม่พบรายการสอบนี้', 404)
-  const [s] = await db.select({ absent: scores.absent }).from(scores).where(and(eq(scores.itemId, item.id), eq(scores.studentId, p.studentId)))
-  if (!s?.absent) throw apiError('not_absent', 'ขอสอบย้อนหลังได้เฉพาะรายการที่ขาดสอบ', 400)
+  const [s] = await db.select({ absent: scores.absent, score: scores.score }).from(scores).where(and(eq(scores.itemId, item.id), eq(scores.studentId, p.studentId)))
+  if (s && !s.absent && s.score !== null) throw apiError('not_absent', 'ขอสอบย้อนหลังได้เฉพาะรายการที่ขาดสอบหรือยังไม่มีคะแนน', 400)
   const deadline = makeupDeadline(item.takenOn, item.makeupDays)
   if (deadline === null) throw apiError('makeup_closed', 'รายการนี้ครูไม่เปิดสอบย้อนหลัง', 400)
   if (p.t > deadline) throw apiError('makeup_expired', 'หมดเวลาขอสอบย้อนหลังแล้ว', 409)
   if (p.imageKey && !p.imageKey.startsWith(`sub/${p.studentId}/`)) throw apiError('invalid_image', 'รูปไม่ถูกต้อง', 400)
   if (await openRequest(db, item.id, p.studentId)) throw apiError('makeup_exists', 'ส่งคำขอรายการนี้ไปแล้ว', 409)
   const id = newId()
-  await db.insert(makeupExams).values({ id, scoreItemId: item.id, studentId: p.studentId, reason: p.reason, imageKey: p.imageKey, createdAt: p.t, updatedAt: p.t })
+  await db.insert(makeupExams).values({ id, scoreItemId: item.id, studentId: p.studentId, reason: p.reason, imageKey: p.imageKey, mode: p.mode, createdAt: p.t, updatedAt: p.t })
   const [st] = await db.select().from(students).where(eq(students.id, p.studentId))
-  await notifyTeacher(db, { kind: 'makeup', title: `📝 ขอสอบย้อนหลัง: ${st ? fullName(st) : ''} · ${item.title}`, body: p.reason, url: '/teacher/makeup-exams', dedupeKey: `mkreq:${id}` }, p.t)
+  await notifyTeacher(db, { kind: 'makeup', title: `📝 ขอสอบย้อนหลัง${p.mode === 'online' ? 'ออนไลน์' : 'ออนไซต์'}: ${st ? fullName(st) : ''} · ${item.title}`, body: p.reason, url: '/teacher/makeup-exams', dedupeKey: `mkreq:${id}` }, p.t)
   return id
 }
 
@@ -235,6 +238,7 @@ const rowCols = {
   maxScore: scoreItems.maxScore,
   takenOn: scoreItems.takenOn,
   makeupDays: scoreItems.makeupDays,
+  itemExamSetId: scoreItems.examSetId,
 }
 type JoinedRow = Awaited<ReturnType<ReturnType<typeof joined>['execute']>>[number]
 function toRow(r: JoinedRow): TeacherMakeupRow {
@@ -243,7 +247,7 @@ function toRow(r: JoinedRow): TeacherMakeupRow {
     status: r.status as MakeupStatus,
     student: { id: r.studentId!, name: fullName({ title: r.sTitle as string | null, firstName: r.firstName!, lastName: r.lastName! }), zipgradeId: r.zipgradeId! },
     className: r.className!,
-    item: { id: r.itemId!, title: r.itemTitle!, maxScore: r.maxScore!, takenOn: r.takenOn! },
+    item: { id: r.itemId!, title: r.itemTitle!, maxScore: r.maxScore!, takenOn: r.takenOn!, examSetId: r.itemExamSetId as string | null },
     deadline: makeupDeadline(r.takenOn!, r.makeupDays!),
     reason: r.reason!,
     imageKey: r.imageKey as string | null,
@@ -275,11 +279,14 @@ export async function teacherMakeups(db: Db, t: number): Promise<TeacherMakeups>
   await sweepMakeups(db, t)
   const all = (await joined(db).orderBy(desc(makeupExams.updatedAt)).limit(300)).map((r) => toRow(r))
   const { start } = await termWindow(db)
-  const absentRows = await db.all<{ studentId: string; zipgradeId: string; title: string | null; firstName: string; lastName: string; className: string; itemId: string; itemTitle: string; maxScore: number; takenOn: string; makeupDays: number; absent: number }>(sql`
+  // ขาดสอบ · ได้ 0 เพราะหมดสิทธิ์ · ยังไม่มีคะแนน (เฉพาะรายการที่เผยแพร่แล้ว)
+  const absentRows = await db.all<{ studentId: string; zipgradeId: string; title: string | null; firstName: string; lastName: string; className: string; itemId: string; itemTitle: string; maxScore: number; takenOn: string; makeupDays: number; examSetId: string | null; absent: number | null; score: number | null }>(sql`
     SELECT st.id AS studentId, st.zipgrade_id AS zipgradeId, st.title, st.first_name AS firstName, st.last_name AS lastName, c.name AS className,
-      i.id AS itemId, i.title AS itemTitle, i.max_score AS maxScore, i.taken_on AS takenOn, i.makeup_days AS makeupDays, s.absent
-    FROM scores s JOIN score_items i ON i.id = s.item_id JOIN students st ON st.id = s.student_id JOIN classes c ON c.id = i.class_id
-    WHERE st.active = 1 AND c.archived = 0 AND i.created_at >= ${start} AND i.makeup_days > 0 AND (s.absent = 1 OR s.note = ${EXPIRED_NOTE})
+      i.id AS itemId, i.title AS itemTitle, i.max_score AS maxScore, i.taken_on AS takenOn, i.makeup_days AS makeupDays, i.exam_set_id AS examSetId, s.absent, s.score
+    FROM score_items i JOIN classes c ON c.id = i.class_id JOIN students st ON st.class_id = i.class_id
+      LEFT JOIN scores s ON s.item_id = i.id AND s.student_id = st.id
+    WHERE st.active = 1 AND c.archived = 0 AND i.created_at >= ${start} AND i.makeup_days > 0
+      AND (s.absent = 1 OR s.note = ${EXPIRED_NOTE} OR (i.published = 1 AND s.score IS NULL))
       AND NOT EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = i.id AND m.student_id = st.id AND m.status IN ('pending', 'approved', 'in_progress', 'submitted', 'graded'))
     ORDER BY i.taken_on DESC, st.sort_order`)
   return {
@@ -290,9 +297,10 @@ export async function teacherMakeups(db: Db, t: number): Promise<TeacherMakeups>
     absent: absentRows.map((r) => ({
       student: { id: r.studentId, name: fullName(r), zipgradeId: r.zipgradeId },
       className: r.className,
-      item: { id: r.itemId, title: r.itemTitle, maxScore: r.maxScore, takenOn: r.takenOn },
+      item: { id: r.itemId, title: r.itemTitle, maxScore: r.maxScore, takenOn: r.takenOn, examSetId: r.examSetId },
       deadline: makeupDeadline(r.takenOn, r.makeupDays),
-      zeroed: !r.absent,
+      zeroed: !r.absent && r.score !== null,
+      blank: !r.absent && r.score === null,
     })),
   }
 }

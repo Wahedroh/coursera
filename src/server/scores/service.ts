@@ -3,7 +3,7 @@ import type { ScoreImportInput, ScoreImportResult } from '../../shared/zipgrade-
 import { canonicalZipgradeId } from '../../shared/zipgrade'
 import { validScore, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
 import { newId, now, type Db } from '../db/client'
-import { classes, scoreItems, scores, students } from '../db/schema'
+import { classes, examSets, scoreItems, scores, students } from '../db/schema'
 import { apiError } from '../http'
 import { termWindow } from '../terms/service'
 import type { TermWindow } from '../../shared/terms'
@@ -79,7 +79,7 @@ export async function getScoreSheet(db: Db, id: string): Promise<ScoreSheet> {
     .where(activeIn(item.classId))
     .orderBy(students.sortOrder, students.zipgradeId)
   return {
-    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published, makeupDays: item.makeupDays },
+    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published, makeupDays: item.makeupDays, examSetId: item.examSetId },
     class: cls,
     students: rows.map((r) => ({ ...r, score: r.score ?? null, absent: r.absent ?? false, note: r.note ?? '' })),
   }
@@ -87,13 +87,17 @@ export async function getScoreSheet(db: Db, id: string): Promise<ScoreSheet> {
 
 export async function updateScoreItem(db: Db, id: string, input: ScoreItemInput): Promise<void> {
   await getItem(db, id)
+  if (input.examSetId) {
+    const [set] = await db.select({ id: examSets.id }).from(examSets).where(eq(examSets.id, input.examSetId))
+    if (!set) throw apiError('exam_set_not_found', 'ไม่พบชุดข้อสอบนี้', 400)
+  }
   // ตรวจและแก้ในคำสั่งเดียว: คะแนนที่บันทึกพร้อมกันจะไม่หลุดเกินคะแนนเต็มใหม่
   const r = await db.$client
     .prepare(
-      `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, makeup_days = ?, updated_at = ?
+      `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, makeup_days = ?, exam_set_id = iif(?, ?, exam_set_id), updated_at = ?
        WHERE id = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE item_id = ? AND score > ?)`,
     )
-    .bind(input.title, input.category, input.maxScore, input.takenOn, input.makeupDays, now(), id, id, input.maxScore)
+    .bind(input.title, input.category, input.maxScore, input.takenOn, input.makeupDays, input.examSetId === undefined ? 0 : 1, input.examSetId ?? null, now(), id, id, input.maxScore)
     .run()
   if (r.meta.changes === 0) throw apiError('scores_exceed_max', 'มีคะแนนที่กรอกแล้วเกินคะแนนเต็มใหม่ กรุณาแก้คะแนนก่อน', 409)
 }

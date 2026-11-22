@@ -1,0 +1,1 @@
+ALTER TABLE `score_items` ADD `exam_set_id` text;

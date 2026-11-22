@@ -68,7 +68,7 @@ it('ขอ → ครูอนุมัติ (ออนไลน์ · สล�
   const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย มีใบรับรองแพทย์', imageKey: key }, { cookie: sc }))
   expect((await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ซ้ำ' }, { cookie: sc })).status).toBe(409)
   const inbox = await json(await getJson('/api/teacher/notifications', teacher))
-  expect(inbox.items[0].title).toMatch(/^📝 ขอสอบย้อนหลัง: .*มานี มีนา · สอบย่อย 3/)
+  expect(inbox.items[0].title).toMatch(/^📝 ขอสอบย้อนหลังออนไลน์: .*มานี มีนา · สอบย่อย 3/)
 
   const t0 = await json(await getJson('/api/teacher/makeup-exams', teacher))
   expect(t0.pending).toEqual([expect.objectContaining({ id, reason: 'ป่วย มีใบรับรองแพทย์', student: expect.objectContaining({ name: expect.stringContaining('มานี มีนา') }) })])
@@ -175,4 +175,40 @@ it('ข้อสอบแบบรูปหน้า (จาก PDF): นัก�
   expect((await putJson(`/api/teacher/exam-sets/${setId}`, body, teacher)).status).toBe(409)
   await req('POST', `/api/student/makeups/${id}/submit`, {}, dev(sc))
   expect((await open(sc)).status).toBe(404)
+})
+
+it('ยังไม่มีคะแนน (เผยแพร่แล้วแต่ช่องว่าง) ขอสอบได้ · นักเรียนเลือกออนไซต์ · ชุดข้อสอบของรายการสอบเป็นค่าเริ่มต้น · ไม่ถูกให้ 0', async () => {
+  const { teacher, classId, itemId, setId } = await setup()
+  const blank = await seedStudent(db(), classId, { firstName: 'ว่าง', lastName: 'เปล่า', zipgradeId: '44' })
+  const bc = await studentCookie(blank.id)
+  // ครูเลือกชุดข้อสอบให้รายการสอบ (ไม่ส่ง = คงเดิม · ชุดที่ไม่มีอยู่ = 400)
+  const base = { title: 'สอบย่อย 3', category: 'quiz', maxScore: 20, takenOn: todayBangkok(), makeupDays: 14 }
+  expect((await putJson(`/api/teacher/score-items/${itemId}`, { ...base, examSetId: 'nope' }, teacher)).status).toBe(400)
+  await putJson(`/api/teacher/score-items/${itemId}`, { ...base, examSetId: setId }, teacher)
+  await putJson(`/api/teacher/score-items/${itemId}`, base, teacher)
+  expect((await json(await getJson(`/api/teacher/score-items/${itemId}`, teacher))).item.examSetId).toBe(setId)
+
+  const list = await json(await getJson('/api/student/makeups', bc))
+  expect(list).toEqual([expect.objectContaining({ scoreItemId: itemId, absent: false, request: null })])
+  const t0 = await json(await getJson('/api/teacher/makeup-exams', teacher))
+  expect(t0.absent.find((a: { student: { id: string } }) => a.student.id === blank.id)).toMatchObject({ blank: true, zeroed: false, item: { examSetId: setId } })
+
+  const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'วันนั้นไปแข่งกีฬา', mode: 'paper' }, { cookie: bc }))
+  const inbox = await json(await getJson('/api/teacher/notifications', teacher))
+  expect(inbox.items[0].title).toMatch(/^📝 ขอสอบย้อนหลังออนไซต์: /)
+  const t1 = await json(await getJson('/api/teacher/makeup-exams', teacher))
+  expect(t1.pending.find((r: { id: string }) => r.id === id)).toMatchObject({ mode: 'paper', item: { examSetId: setId } })
+
+  // เลยกำหนด: คนที่ "ยังไม่มีคะแนน" ไม่ถูกให้ 0 (ให้ 0 เฉพาะที่ครูบันทึกว่าขาด)
+  await env.DB.prepare("UPDATE score_items SET taken_on = '2020-01-01' WHERE id = ?").bind(itemId).run()
+  await sweepMakeups(db(), Date.now())
+  const sheet = await json(await getJson(`/api/teacher/score-items/${itemId}`, teacher))
+  expect(sheet.students.find((r: { id: string }) => r.id === blank.id)).toMatchObject({ score: null, absent: false })
+
+  // ลบชุดข้อสอบ → รายการสอบกลับเป็นไม่ระบุ
+  const { id: set2 } = await json(await postJson('/api/teacher/exam-sets', { kind: 'typed', title: 'ชุด C', questions: QUESTIONS }, { cookie: teacher }))
+  await putJson(`/api/teacher/score-items/${itemId}`, { ...base, takenOn: '2020-01-01', examSetId: set2 }, teacher)
+  const { SELF } = await import('cloudflare:test')
+  expect((await SELF.fetch(`http://x/api/teacher/exam-sets/${set2}`, { method: 'DELETE', headers: { cookie: teacher } })).status).toBe(200)
+  expect((await json(await getJson(`/api/teacher/score-items/${itemId}`, teacher))).item.examSetId).toBeNull()
 })
