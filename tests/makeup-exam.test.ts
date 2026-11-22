@@ -187,6 +187,10 @@ it('ยังไม่มีคะแนน (เผยแพร่แล้ว�
   await putJson(`/api/teacher/score-items/${itemId}`, { ...base, examSetId: setId }, teacher)
   await putJson(`/api/teacher/score-items/${itemId}`, base, teacher)
   expect((await json(await getJson(`/api/teacher/score-items/${itemId}`, teacher))).item.examSetId).toBe(setId)
+  // สร้างรายการใหม่พร้อมเลือกชุดข้อสอบได้เลย
+  const created = await json(await postJson('/api/teacher/score-items', { ...base, title: 'สอบย่อย 4', examSetId: setId, classIds: [classId] }, { cookie: teacher }))
+  expect((await json(await getJson(`/api/teacher/score-items/${created.ids[0]}`, teacher))).item.examSetId).toBe(setId)
+  expect((await postJson('/api/teacher/score-items', { ...base, examSetId: 'nope', classIds: [classId] }, { cookie: teacher })).status).toBe(400)
 
   const list = await json(await getJson('/api/student/makeups', bc))
   expect(list).toEqual([expect.objectContaining({ scoreItemId: itemId, absent: false, request: null })])

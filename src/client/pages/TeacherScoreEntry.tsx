@@ -246,7 +246,7 @@ export default function TeacherScoreEntry() {
             </label>
             <label className="text-sm font-semibold">
               วันที่สอบ
-              <input name="takenOn" type="date" required className={`${input} min-w-0 appearance-none`} defaultValue={it.takenOn} />
+              <input name="takenOn" type="date" required className={`${input} block min-w-0 appearance-none`} defaultValue={it.takenOn} />
             </label>
             <label className="text-sm font-semibold">
               สอบย้อนหลังได้ภายใน (วัน · 0 = ไม่เปิด)

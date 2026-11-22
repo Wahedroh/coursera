@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import type { StudentAnnouncement } from '../../shared/announcements'
 import { Card } from '../ui'
@@ -8,15 +8,25 @@ import Icon from './Icon'
 export default function StudentAnnouncements() {
   const [items, setItems] = useState<StudentAnnouncement[]>([])
   const [open, setOpen] = useState<string | null>(null)
+  // กดรับทราบแล้ว: ผลโหลดที่มาช้ากว่า (เน็ตช้า/โหลดซ้ำ) ต้องไม่ทำให้ปุ่มกลับมา
+  const acked = useRef(new Set<string>())
   useEffect(() => {
+    let live = true
     api<StudentAnnouncement[]>('/api/student/announcements')
-      .then(setItems)
+      .then((xs) => live && setItems(xs.map((x) => (acked.current.has(x.id) ? { ...x, read: true } : x))))
       .catch(() => {})
+    return () => {
+      live = false
+    }
   }, [])
 
   async function ack(id: string) {
+    acked.current.add(id)
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, read: true } : x)))
-    await api(`/api/student/announcements/${id}/read`, { body: {} }).catch(() => setItems((xs) => xs.map((x) => (x.id === id ? { ...x, read: false } : x))))
+    await api(`/api/student/announcements/${id}/read`, { body: {} }).catch(() => {
+      acked.current.delete(id)
+      setItems((xs) => xs.map((x) => (x.id === id ? { ...x, read: false } : x)))
+    })
   }
 
   if (!items.length) return null

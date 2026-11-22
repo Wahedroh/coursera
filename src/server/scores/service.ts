@@ -20,6 +20,10 @@ export async function createScoreItems(db: Db, classIds: string[], input: ScoreI
     const [c] = await db.select({ id: classes.id }).from(classes).where(eq(classes.id, id))
     if (!c) throw classNotFound()
   }
+  if (input.examSetId) {
+    const [set] = await db.select({ id: examSets.id }).from(examSets).where(eq(examSets.id, input.examSetId))
+    if (!set) throw apiError('exam_set_not_found', 'ไม่พบชุดข้อสอบนี้', 400)
+  }
   const t = now()
   const rows = unique.map((classId) => ({ id: newId(), classId, ...input, createdAt: t, updatedAt: t }))
   for (const r of rows) await db.insert(scoreItems).values(r)
