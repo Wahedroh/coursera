@@ -12,6 +12,7 @@ import {
 } from "../../shared/scores";
 import { exportGradebook } from "../lib/excel";
 import { formatDate } from "../lib/format";
+import type { ExamSetSummary } from "../../shared/makeupExam";
 import { Button, Card, Chip, ErrorBox, Loading } from "../ui";
 import CopyButton from "../components/CopyDialog";
 import TeacherLayout from "./TeacherLayout";
@@ -40,6 +41,8 @@ export default function TeacherScores() {
   const [maxScore, setMaxScore] = useState("20");
   const [takenOn, setTakenOn] = useState(todayBangkok());
   const [makeupDays, setMakeupDays] = useState("14");
+  const [examSetId, setExamSetId] = useState("");
+  const [examSets, setExamSets] = useState<ExamSetSummary[] | null>(null);
   const [classIds, setClassIds] = useState<string[]>([id]);
 
   const load = useCallback(() => {
@@ -48,6 +51,15 @@ export default function TeacherScores() {
       .catch((e) => setError(handle(e)));
   }, [id, handle]);
   useEffect(load, [load]);
+  useEffect(() => {
+    let live = true;
+    api<ExamSetSummary[]>("/api/teacher/exam-sets")
+      .then((x) => live && setExamSets(x))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   useEffect(() => {
     setClassIds([id]);
     api<School[]>("/api/teacher/classes")
@@ -72,6 +84,7 @@ export default function TeacherScores() {
           maxScore: Number(maxScore),
           takenOn,
           makeupDays: Number(makeupDays) || 0,
+          examSetId: examSetId || null,
           classIds,
         },
       });
@@ -185,7 +198,7 @@ export default function TeacherScores() {
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 [&>*]:min-w-0">
             <label className="text-sm font-semibold">
               หมวด
               <select
@@ -218,7 +231,7 @@ export default function TeacherScores() {
               <input
                 type="date"
                 required
-                className={input}
+                className={`${input} block min-w-0 appearance-none`}
                 value={takenOn}
                 onChange={(e) => setTakenOn(e.target.value)}
               />
@@ -237,6 +250,25 @@ export default function TeacherScores() {
               <span className="block text-xs font-normal text-stone-500">
                 นับจากวันสอบ · เลยแล้วคนขาดสอบได้ 0 · 0 = ไม่เปิด
               </span>
+            </label>
+            <label className="text-sm font-semibold sm:col-span-3">
+              ชุดข้อสอบสอบย้อนหลัง{" "}
+              <Link to="/teacher/exam-sets" className="text-xs font-normal text-board underline">
+                จัดการชุดข้อสอบ
+              </Link>
+              <select
+                aria-label="ชุดข้อสอบสอบย้อนหลัง"
+                className={input}
+                value={examSetId}
+                onChange={(e) => setExamSetId(e.target.value)}
+              >
+                <option value="">— ยังไม่เลือก (เลือกทีหลังได้) —</option>
+                {examSets?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} ({s.count} ข้อ)
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
         </Card>
