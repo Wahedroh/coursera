@@ -732,6 +732,8 @@ export const makeupExams = sqliteTable(
     /** คำตอบตามลำดับข้อของชุดต้นฉบับ (-1 = ไม่ตอบ) */
     answers: text('answers', { mode: 'json' }).$type<number[]>().notNull().default(sql`'[]'`),
     leaves: integer('leaves').notNull().default(0),
+    /** คุมสอบด้วยกล้อง: สแกนโต๊ะ (กล้องหลัง) ก่อนเริ่ม + ถ่ายหน้าสุ่ม (กล้องหน้า) ระหว่างสอบ */
+    proctor: integer('proctor', { mode: 'boolean' }).notNull().default(false),
     autoScore: real('auto_score'),
     finalScore: real('final_score'),
     teacherNote: text('teacher_note').notNull().default(''),
@@ -750,9 +752,25 @@ export const makeupEvents = sqliteTable(
       .notNull()
       .references(() => makeupExams.id),
     at: integer('at').notNull(),
-    kind: text('kind', { enum: ['start', 'leave', 'return', 'device', 'submit', 'auto-submit', 'timeout'] }).notNull(),
+    kind: text('kind', { enum: ['start', 'leave', 'return', 'device', 'camera-off', 'submit', 'auto-submit', 'timeout'] }).notNull(),
     /** ระยะที่ออกจากหน้าจอ (ms) */
     ms: integer('ms'),
   },
   (t) => [index('makeup_events_exam_idx').on(t.examId)],
+)
+
+/** ภาพคุมสอบ (เฉพาะครูดู) · ลบอัตโนมัติ 30 วันหลังครูให้คะแนน */
+export const makeupPhotos = sqliteTable(
+  'makeup_photos',
+  {
+    id: text('id').primaryKey(),
+    examId: text('exam_id')
+      .notNull()
+      .references(() => makeupExams.id),
+    at: integer('at').notNull(),
+    /** room = สแกนโต๊ะก่อนเริ่ม · face = กล้องหน้าระหว่างสอบ · recheck = สุ่มสแกนโต๊ะซ้ำ */
+    kind: text('kind', { enum: ['room', 'face', 'recheck'] }).notNull(),
+    key: text('key').notNull(),
+  },
+  (t) => [index('makeup_photos_exam_idx').on(t.examId)],
 )

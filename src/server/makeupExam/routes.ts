@@ -19,6 +19,7 @@ import {
   requestMakeup,
   resumeMakeup,
   saveMakeupAnswers,
+  saveProctorPhoto,
   startMakeup,
   studentMakeups,
   submitMakeup,
@@ -86,6 +87,13 @@ studentMakeupRoutes.put('/:id/answers', async (c) => {
 studentMakeupRoutes.post('/:id/event', async (c) => {
   const { kind, ms } = await parseBody(c, makeupEventSchema)
   return c.json(await makeupEvent(getDb(c.env), c.req.param('id'), me(c).studentId, device(c), kind, ms, now()))
+})
+studentMakeupRoutes.post('/:id/photo', async (c) => {
+  const kind = c.req.query('kind')
+  if (kind !== 'room' && kind !== 'face' && kind !== 'recheck') throw apiError('invalid_request', 'ข้อมูลไม่ถูกต้อง', 400)
+  if (Number(c.req.header('content-length') ?? 0) > 400 * 1024) throw apiError('invalid_image', 'รูปใหญ่เกินไป', 400)
+  const body = await c.req.arrayBuffer()
+  return c.json(await saveProctorPhoto(getDb(c.env), c.env.BUCKET, c.req.param('id'), me(c).studentId, device(c), kind, body, c.req.header('content-type') ?? '', now()), 201)
 })
 studentMakeupRoutes.post('/:id/submit', async (c) => {
   await submitMakeup(getDb(c.env), c.req.param('id'), me(c).studentId, device(c), now())

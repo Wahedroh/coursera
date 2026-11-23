@@ -4,7 +4,7 @@ import { api } from '../api'
 import { epochToLocal, localToEpoch } from '../lib/format'
 import { downloadA4Pdf } from '../lib/pdf'
 import { fileUrl } from '../lib/upload'
-import { EXAM_LETTERS, leftText, MAKEUP_STATUS_LABEL, type ExamSetSummary, type MakeupStatus, type TeacherMakeupDetail, type TeacherMakeupRow, type TeacherMakeups } from '../../shared/makeupExam'
+import { EXAM_LETTERS, leftText, MAKEUP_STATUS_LABEL, PROCTOR_KIND_LABEL, PROCTOR_RETENTION_DAYS, type ExamSetSummary, type MakeupStatus, type TeacherMakeupDetail, type TeacherMakeupRow, type TeacherMakeups } from '../../shared/makeupExam'
 import Icon from '../components/Icon'
 import ZipgradeSheet from '../components/ZipgradeSheet'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
@@ -83,7 +83,7 @@ export default function TeacherMakeupExams() {
                     </span>
                   )}
                   <span>
-                    {r.mode === 'online' ? 'ออนไลน์' : 'ออนไซต์ (กระดาษ)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที · เพดาน {r.capPct}%
+                    {r.mode === 'online' ? 'ออนไลน์' : 'ออนไซต์ (กระดาษ)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที · เพดาน {r.capPct}%{r.proctor ? ' · 📷 กล้อง' : ''}
                   </span>
                   <Link to={`/teacher/makeup-exams/${r.id}`} className="underline text-board">
                     {r.mode === 'paper' ? 'ใส่คะแนน' : 'ดูรายละเอียด'}
@@ -201,6 +201,7 @@ function ApproveForm({
   const preferred = r?.item.examSetId ?? itemSetId ?? null
   const [setId, setSetId] = useState(preferred ?? sets[0]?.id ?? '')
   const [shuffle, setShuffle] = useState(true)
+  const [proctor, setProctor] = useState(true)
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   useEffect(() => {
@@ -216,7 +217,7 @@ function ApproveForm({
   async function approve() {
     setBusy(true)
     try {
-      const body = { mode, opensAt: localToEpoch(opensAt), closesAt: localToEpoch(closesAt), durationMin: duration, capPct: cap, examSetId: mode === 'online' ? setId || null : null, shuffle }
+      const body = { mode, opensAt: localToEpoch(opensAt), closesAt: localToEpoch(closesAt), durationMin: duration, capPct: cap, examSetId: mode === 'online' ? setId || null : null, shuffle, proctor: mode === 'online' && proctor }
       const res = r ? await api<{ code: string }>(`/api/teacher/makeup-exams/${r.id}/approve`, { method: 'PUT', body }) : await api<{ code: string }>('/api/teacher/makeup-exams', { body: { ...body, ...grant } })
       onDone(mode === 'online' ? `อนุมัติแล้ว · รหัสเริ่มสอบ ${res.code} (บอกนักเรียนตอนนัดสอบ)` : 'อนุมัติแล้ว (สอบออนไซต์) · ใส่คะแนนหลังสอบ')
     } catch (e) {
@@ -291,6 +292,12 @@ function ApproveForm({
               <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} /> สลับลำดับข้อและตัวเลือกให้นักเรียนคนนี้
             </label>
           )}
+          <label className="flex items-start gap-2 sm:col-span-2">
+            <input type="checkbox" className="mt-1" checked={proctor} onChange={(e) => setProctor(e.target.checked)} aria-label="คุมสอบด้วยกล้อง" />
+            <span>
+              📷 คุมสอบด้วยกล้อง <span className="text-xs text-stone-500">— กล้องหลังสแกนโต๊ะก่อนเริ่ม · กล้องหน้าถ่ายสุ่มระหว่างสอบ · สุ่มสแกนซ้ำ 1 ครั้ง · ลบภาพเองหลังให้คะแนน {PROCTOR_RETENTION_DAYS} วัน</span>
+            </span>
+          </label>
         </>
       )}
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
@@ -315,7 +322,7 @@ function ApproveForm({
   )
 }
 
-const EVENT_LABEL: Record<string, string> = { start: 'เริ่มสอบ', leave: 'ออกจากหน้าสอบ', return: 'กลับมา', device: 'เปิดจากเครื่องอื่น', submit: 'ส่งคำตอบ', 'auto-submit': 'ส่งอัตโนมัติ (ออกจากหน้าจอครบ)', timeout: 'หมดเวลา ระบบส่งให้' }
+const EVENT_LABEL: Record<string, string> = { start: 'เริ่มสอบ', leave: 'ออกจากหน้าสอบ', return: 'กลับมา', device: 'เปิดจากเครื่องอื่น', 'camera-off': 'กล้องปิด (นับเป็นออกจากหน้าสอบ)', submit: 'ส่งคำตอบ', 'auto-submit': 'ส่งอัตโนมัติ (ออกจากหน้าจอครบ)', timeout: 'หมดเวลา ระบบส่งให้' }
 
 /** ตรวจรายคน: คำตอบเทียบเฉลย · บันทึกการสอบ · กระดาษ ZipGrade ที่ฝนแล้ว · ให้คะแนน */
 export function TeacherMakeupExamDetail() {
@@ -396,7 +403,7 @@ export function TeacherMakeupExamDetail() {
                 {!d.events.length && <p className="text-sm text-stone-500">ยังไม่ได้เริ่มสอบ</p>}
                 <ul className="text-sm" data-testid="exam-log">
                   {d.events.map((e, i) => (
-                    <li key={i} className={['leave', 'device', 'auto-submit'].includes(e.kind) ? 'text-red-700 font-semibold' : ''}>
+                    <li key={i} className={['leave', 'device', 'auto-submit', 'camera-off'].includes(e.kind) ? 'text-red-700 font-semibold' : ''}>
                       {fmt.format(e.at)} · {EVENT_LABEL[e.kind] ?? e.kind}
                       {e.ms ? ` (${Math.round(e.ms / 1000)} วินาที)` : ''}
                     </li>
@@ -418,6 +425,7 @@ export function TeacherMakeupExamDetail() {
                 </div>
               )}
             </Card>
+            {d.proctor && d.startedAt && <ProctorPhotos d={d} />}
             {d.startedAt && d.examSet && (
               <Card className="p-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -437,5 +445,37 @@ export function TeacherMakeupExamDetail() {
         </>
       )}
     </TeacherLayout>
+  )
+}
+
+/** ภาพคุมสอบเรียงตามเวลา · ภาพแรกหลังกลับมาจากการออกจากหน้าจอมีกรอบแดง */
+function ProctorPhotos({ d }: { d: TeacherMakeupDetail }) {
+  const [big, setBig] = useState<string | null>(null)
+  const returns = d.events.filter((e) => e.kind === 'return' || e.kind === 'camera-off').map((e) => e.at)
+  const flagged = new Set(returns.map((t) => d.photos.find((p) => p.at >= t)?.key).filter(Boolean))
+  const time = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return (
+    <Card className="p-3 flex flex-col gap-2 lg:col-span-2">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <b className="mr-auto">📷 ภาพคุมสอบ ({d.photos.length})</b>
+        <span className="text-xs text-stone-500">เฉพาะครูดูได้ · ลบอัตโนมัติ {PROCTOR_RETENTION_DAYS} วันหลังให้คะแนน · กรอบแดง = ภาพแรกหลังออกจากหน้าจอ/กล้องปิด</span>
+      </div>
+      {!d.photos.length && <p className="text-sm text-red-700">ไม่มีภาพจากกล้อง</p>}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8" data-testid="proctor-photos">
+        {d.photos.map((p) => (
+          <button key={p.key} type="button" onClick={() => setBig(p.key)} className={`flex flex-col overflow-hidden rounded-lg border-2 text-left text-[11px] ${flagged.has(p.key) ? 'border-red-500' : p.kind === 'face' ? 'border-line' : 'border-amber-400'}`}>
+            <img src={fileUrl(p.key)} alt={`${PROCTOR_KIND_LABEL[p.kind]} ${time.format(p.at)}`} loading="lazy" className="aspect-[3/4] w-full bg-stone-100 object-cover" />
+            <span className="px-1 py-0.5">
+              {time.format(p.at)} · {PROCTOR_KIND_LABEL[p.kind]}
+            </span>
+          </button>
+        ))}
+      </div>
+      {big && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setBig(null)} role="dialog" aria-label="ภาพคุมสอบ">
+          <img src={fileUrl(big)} alt="ภาพคุมสอบขนาดใหญ่" className="max-h-full max-w-full rounded-xl" />
+        </div>
+      )}
+    </Card>
   )
 }
