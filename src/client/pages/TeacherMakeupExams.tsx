@@ -458,6 +458,7 @@ function ProctorPhotos({ d }: { d: TeacherMakeupDetail }) {
     <Card className="p-3 flex flex-col gap-2 lg:col-span-2">
       <div className="flex flex-wrap items-baseline gap-2">
         <b className="mr-auto">📷 ภาพคุมสอบ ({d.photos.length})</b>
+        {d.consentAt && <span className="text-xs text-board" data-testid="pdpa-consent">🔒 นักเรียนยินยอม PDPA เมื่อ {time.format(d.consentAt)}</span>}
         <span className="text-xs text-stone-500">เฉพาะครูดูได้ · ลบอัตโนมัติ {PROCTOR_RETENTION_DAYS} วันหลังให้คะแนน · กรอบแดง = ภาพแรกหลังออกจากหน้าจอ/กล้องปิด</span>
       </div>
       {!d.photos.length && <p className="text-sm text-red-700">ไม่มีภาพจากกล้อง</p>}

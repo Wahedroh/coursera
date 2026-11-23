@@ -83,7 +83,7 @@ test('สอบย้อนหลังออนไลน์: ขาดสอบ
   const go = s.getByRole('button', { name: 'เปิดกล้องและเริ่มสอบ' })
   await s.getByLabel('รหัสเริ่มสอบ').fill(code === '000000' ? '111111' : '000000')
   await expect(go).toBeDisabled()
-  await s.getByLabel('ยินยอมให้ถ่ายภาพระหว่างสอบ').check()
+  await s.getByLabel('ยินยอมให้เก็บภาพตาม PDPA').check()
   await go.click()
   await expect(s.getByText('รหัสเริ่มสอบไม่ถูกต้อง — ขอรหัสจากครู')).toBeVisible()
   await s.getByLabel('รหัสเริ่มสอบ').fill(code)
@@ -132,6 +132,7 @@ test('สอบย้อนหลังออนไลน์: ขาดสอบ
   // ภาพคุมสอบ: สแกนโต๊ะ 3 ภาพ + กล้องหน้า
   const photos = t.getByTestId('proctor-photos')
   await expect(photos.getByRole('img', { name: /^สแกนโต๊ะ/ })).toHaveCount(3)
+  await expect(t.getByTestId('pdpa-consent')).toContainText('นักเรียนยินยอม PDPA')
   await expect(photos.getByRole('img', { name: /^กล้องหน้า/ }).first()).toBeVisible()
   await expect(t.getByTestId('zipgrade-sheet')).toBeVisible()
   await expect(t.getByLabel('คะแนนสอบย้อนหลัง')).toHaveValue('8')

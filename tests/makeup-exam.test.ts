@@ -81,7 +81,7 @@ it('ขอ → ครูอนุมัติ (ออนไลน์ · สล�
   // รหัสผิด · รหัสถูก → ข้อสอบไม่มีเฉลย
   const wrong = code === '000000' ? '111111' : '000000'
   expect((await postJson(`/api/student/makeups/${id}/start`, { code: wrong, deviceId: DEV }, { cookie: sc })).status).toBe(400)
-  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc }))
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
   expect(paper).toMatchObject({ count: 4, kind: 'typed', leaves: 0, leaveLimit: 3, status: 'in_progress', zipgradeId: '33' })
   expect(JSON.stringify(paper.questions)).not.toContain('answer')
   expect(paper.answers).toEqual([-1, -1, -1, -1])
@@ -119,7 +119,7 @@ it('ออกจากหน้าจอครบ 3 ครั้ง → ส่�
   const { teacher, sc, itemId, setId } = await setup()
   const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
   const { code } = await json(await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'online', ...window(), capPct: 100, examSetId: setId, shuffle: false }, teacher))
-  await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc })
+  await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc })
   for (const [i, want] of [[1, false], [2, false], [3, true]] as const) {
     const r = await json(await req('POST', `/api/student/makeups/${id}/event`, { kind: 'leave' }, dev(sc)))
     expect(r).toEqual({ leaves: i, submitted: want })
@@ -144,7 +144,7 @@ it('หมดเวลาทำ → cron ส่งให้ · เลยกำ�
 
   // ครูคืนสิทธิ์: ออนไลน์ แล้วปล่อยหมดเวลา
   const g = await json(await postJson('/api/teacher/makeup-exams', { scoreItemId: itemId, studentId: s.id, mode: 'online', ...window(), durationMin: 5, capPct: 100, examSetId: setId, shuffle: true }, { cookie: teacher }))
-  await postJson(`/api/student/makeups/${g.id}/start`, { code: g.code, deviceId: DEV }, { cookie: sc })
+  await postJson(`/api/student/makeups/${g.id}/start`, { code: g.code, deviceId: DEV, consent: true }, { cookie: sc })
   expect((await sweepMakeups(db(), Date.now() + 6 * 60_000)).submitted).toBe(1)
   expect((await json(await getJson(`/api/teacher/makeup-exams/${g.id}`, teacher))).events.at(-1).kind).toBe('timeout')
 
@@ -168,7 +168,7 @@ it('ข้อสอบแบบรูปหน้า (จาก PDF): นัก�
   expect((await open(sc)).status).toBe(404)
   const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
   const { code } = await json(await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'online', ...window(), capPct: 100, examSetId: setId, shuffle: true }, teacher))
-  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc }))
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
   expect(paper).toMatchObject({ kind: 'pages', pageKeys: [page], count: 5, choiceCount: 4, questions: [] })
   expect((await open(sc)).status).toBe(200)
   expect((await open(oc)).status).toBe(404)
@@ -227,7 +227,11 @@ it('คุมสอบด้วยกล้อง: สแกนโต๊ะ/ภ�
   expect((await json(await getJson('/api/student/makeups', sc)))[0].request.proctor).toBe(true)
   // ยังไม่เริ่มสอบ = อัปโหลดไม่ได้
   expect((await photo(id, 'room', sc)).status).toBe(409)
-  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc }))
+  // ไม่ติ๊กยินยอม PDPA = เริ่มไม่ได้ (ยังไม่เริ่มจับเวลา)
+  const noConsent = await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc })
+  expect(noConsent.status).toBe(400)
+  expect((await json(noConsent)).error.code).toBe('pdpa_required')
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
   expect(paper).toMatchObject({ proctor: true, roomDone: false, recheckDone: false, durationMin: 30 })
   expect(recheckAt(id, paper.startedAt, 30)).toBeGreaterThanOrEqual(paper.startedAt + 0.3 * 30 * 60_000)
   expect(recheckAt(id, paper.startedAt, 30)).toBeLessThanOrEqual(paper.startedAt + 0.7 * 30 * 60_000)
@@ -251,6 +255,7 @@ it('คุมสอบด้วยกล้อง: สแกนโต๊ะ/ภ�
   expect((await photo(id, 'face', sc)).status).toBe(409)
   const detail = await json(await getJson(`/api/teacher/makeup-exams/${id}`, teacher))
   expect(detail.proctor).toBe(true)
+  expect(detail.consentAt).toBeGreaterThan(0)
   expect(detail.photos.map((p: { kind: string }) => p.kind)).toEqual(['room', 'face'])
   expect(detail.events.map((e: { kind: string }) => e.kind)).toContain('camera-off')
 

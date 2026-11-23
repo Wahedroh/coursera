@@ -187,7 +187,7 @@ export default function StudentMakeupExam() {
     try {
       // คุมสอบด้วยกล้อง: ขออนุญาตกล้องก่อนเริ่มจับเวลา (ไม่ได้ = ยังไม่เริ่ม)
       if (needCam) stopCamera(await openCamera('environment'))
-      open(await api<StudentExamPaper>(`/api/student/makeups/${id}/start`, { body: { code, deviceId: deviceId() } }))
+      open(await api<StudentExamPaper>(`/api/student/makeups/${id}/start`, { body: { code, deviceId: deviceId(), consent: needCam && consent } }))
     } catch (e) {
       fail(e)
     } finally {
@@ -237,12 +237,30 @@ export default function StudentMakeupExam() {
             </ul>
           </Card>
           {needCam && (
-            <label className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm">
-              <input type="checkbox" className="mt-1" checked={consent} onChange={(e) => setConsent(e.target.checked)} aria-label="ยินยอมให้ถ่ายภาพระหว่างสอบ" />
-              <span>
-                ยินยอมให้ถ่ายภาพระหว่างสอบ — <b>ครูเท่านั้นที่ดูได้</b> และลบอัตโนมัติ {PROCTOR_RETENTION_DAYS} วันหลังครูให้คะแนน · ถ้าไม่สะดวกเปิดกล้อง ให้ขอครูเปลี่ยนเป็นสอบออนไซต์
-              </span>
-            </label>
+            <Card className="p-4 flex flex-col gap-2 border-amber-300 bg-amber-50 text-sm">
+              <b>🔒 ข้อตกลงการเก็บภาพจากกล้อง (PDPA)</b>
+              <ul className="list-disc pl-5 flex flex-col gap-1">
+                <li>
+                  <b>เก็บอะไร:</b> ภาพนิ่งจากกล้องหลัง (โต๊ะและรอบตัว) และกล้องหน้า (ใบหน้า) ระหว่างสอบนี้เท่านั้น — ไม่อัดวิดีโอ ไม่อัดเสียง
+                </li>
+                <li>
+                  <b>เพื่อ:</b> ยืนยันตัวตนและความโปร่งใสของการสอบย้อนหลังครั้งนี้
+                </li>
+                <li>
+                  <b>ใครดูได้:</b> ครูผู้สอนเท่านั้น ไม่เผยแพร่ ไม่ใช้เพื่อเรื่องอื่น
+                </li>
+                <li>
+                  <b>เก็บนานเท่าไร:</b> ลบอัตโนมัติ {PROCTOR_RETENTION_DAYS} วันหลังครูให้คะแนน
+                </li>
+                <li>
+                  <b>ไม่ยินยอมได้:</b> ขอครูเปลี่ยนเป็นสอบออนไซต์ (กระดาษต่อหน้าครู) แทน
+                </li>
+              </ul>
+              <label className="mt-1 flex items-start gap-2 rounded-xl bg-white p-2 font-semibold">
+                <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={consent} onChange={(e) => setConsent(e.target.checked)} aria-label="ยินยอมให้เก็บภาพตาม PDPA" />
+                <span>ฉันอ่านข้อตกลงแล้ว และยินยอมให้เก็บภาพจากกล้องตามข้างต้น</span>
+              </label>
+            </Card>
           )}
           <ErrorBox message={error} />
           <label className="text-sm font-semibold">

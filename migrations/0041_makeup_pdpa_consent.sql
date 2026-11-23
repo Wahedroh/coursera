@@ -1,0 +1,1 @@
+ALTER TABLE `makeup_exams` ADD `consent_at` integer;

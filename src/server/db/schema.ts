@@ -734,6 +734,8 @@ export const makeupExams = sqliteTable(
     leaves: integer('leaves').notNull().default(0),
     /** คุมสอบด้วยกล้อง: สแกนโต๊ะ (กล้องหลัง) ก่อนเริ่ม + ถ่ายหน้าสุ่ม (กล้องหน้า) ระหว่างสอบ */
     proctor: integer('proctor', { mode: 'boolean' }).notNull().default(false),
+    /** เวลาที่นักเรียนกดยินยอมให้เก็บภาพตาม PDPA (หลักฐาน) */
+    consentAt: integer('consent_at'),
     autoScore: real('auto_score'),
     finalScore: real('final_score'),
     teacherNote: text('teacher_note').notNull().default(''),

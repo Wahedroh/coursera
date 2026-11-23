@@ -226,6 +226,7 @@ const rowCols = {
   capPct: makeupExams.capPct,
   examSetId: makeupExams.examSetId,
   proctor: makeupExams.proctor,
+  consentAt: makeupExams.consentAt,
   code: makeupExams.code,
   startedAt: makeupExams.startedAt,
   submittedAt: makeupExams.submittedAt,
@@ -265,6 +266,7 @@ function toRow(r: JoinedRow): TeacherMakeupRow {
     capPct: r.capPct!,
     examSetId: r.examSetId as string | null,
     proctor: !!r.proctor,
+    consentAt: r.consentAt as number | null,
     code: r.code as string | null,
     startedAt: r.startedAt as number | null,
     submittedAt: r.submittedAt as number | null,
@@ -407,7 +409,7 @@ async function shotsDone(db: Db, examId: string): Promise<{ roomDone: boolean; r
   return { roomDone: n('room') > 0, recheckDone: n('recheck') > 0 }
 }
 
-export async function startMakeup(db: Db, id: string, studentId: string, code: string, deviceId: string, t: number): Promise<StudentExamPaper> {
+export async function startMakeup(db: Db, id: string, studentId: string, code: string, deviceId: string, t: number, consent = false): Promise<StudentExamPaper> {
   const r = await mine(db, id, studentId)
   if (r.status === 'in_progress') {
     if (r.deviceId !== deviceId) {
@@ -420,11 +422,12 @@ export async function startMakeup(db: Db, id: string, studentId: string, code: s
   if (t < (r.opensAt ?? 0)) throw apiError('not_open', 'ยังไม่ถึงเวลาสอบ', 409)
   if (t > (r.closesAt ?? 0)) throw apiError('makeup_expired', 'เลยเวลาเริ่มสอบแล้ว', 409)
   if (code !== r.code) throw apiError('wrong_code', 'รหัสเริ่มสอบไม่ถูกต้อง — ขอรหัสจากครู', 400)
+  if (r.proctor && !consent) throw apiError('pdpa_required', 'กรุณาอ่านและติ๊กยินยอมการเก็บภาพ (PDPA) ก่อนเริ่มสอบ — ถ้าไม่ยินยอม ให้ขอครูเปลี่ยนเป็นสอบออนไซต์', 400)
   const set = await getExamSet(db, r.examSetId!)
   const n = set.kind === 'typed' ? set.questions.length : set.answers.length
   const res = await db
     .update(makeupExams)
-    .set({ status: 'in_progress', startedAt: t, deviceId, answers: Array.from({ length: n }, () => -1), updatedAt: t })
+    .set({ status: 'in_progress', startedAt: t, deviceId, answers: Array.from({ length: n }, () => -1), consentAt: r.proctor ? t : null, updatedAt: t })
     .where(and(eq(makeupExams.id, id), eq(makeupExams.status, 'approved')))
     .returning({ id: makeupExams.id })
   if (!res.length) throw apiError('makeup_state', 'เริ่มสอบไปแล้ว', 409)

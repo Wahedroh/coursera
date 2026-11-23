@@ -151,7 +151,7 @@ export const makeupGrantSchema = approveBase
   .refine((x) => x.mode === 'paper' || !!x.examSetId, { message: 'กรุณาเลือกชุดข้อสอบ' })
 export const makeupRejectSchema = z.object({ note: z.string().trim().max(200).default('') })
 export const makeupGradeSchema = z.object({ score: z.number().min(0).max(1000), note: z.string().trim().max(200).default('') })
-export const makeupStartSchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'รหัส 6 หลัก'), deviceId: z.string().min(8).max(80) })
+export const makeupStartSchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'รหัส 6 หลัก'), deviceId: z.string().min(8).max(80), /** ยินยอมให้เก็บภาพตาม PDPA (จำเป็นเมื่อครูเปิดคุมสอบด้วยกล้อง) */ consent: z.boolean().default(false) })
 export const makeupAnswersSchema = z.object({ answers: z.array(z.number().int().min(-1).max(4)).max(MAX_EXAM_QUESTIONS) })
 export const makeupEventSchema = z.object({ kind: z.enum(['leave', 'return', 'camera-off']), ms: z.number().int().min(0).max(86_400_000).optional() })
 
@@ -218,6 +218,7 @@ export type TeacherMakeupRow = {
   capPct: number
   examSetId: string | null
   proctor: boolean
+  consentAt: number | null
   code: string | null
   startedAt: number | null
   submittedAt: number | null

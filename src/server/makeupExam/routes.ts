@@ -72,11 +72,11 @@ studentMakeupRoutes.post('/', async (c) => {
   return c.json({ id: await requestMakeup(getDb(c.env), { studentId: me(c).studentId, classId: me(c).classId, ...input, t: now() }) }, 201)
 })
 studentMakeupRoutes.post('/:id/start', async (c) => {
-  const { code, deviceId } = await parseBody(c, makeupStartSchema)
+  const { code, deviceId, consent } = await parseBody(c, makeupStartSchema)
   const db = getDb(c.env)
   // เดารหัสไม่ได้: 5 ครั้ง / 10 นาที ต่อคน
   if (await hitRateLimit(db, `mkcode:${me(c).studentId}`, 5, 10 * 60_000)) throw apiError('too_many_attempts', 'ใส่รหัสผิดหลายครั้ง กรุณารอ 10 นาทีแล้วขอรหัสจากครูอีกครั้ง', 429)
-  return c.json(await startMakeup(db, c.req.param('id'), me(c).studentId, code, deviceId, now()))
+  return c.json(await startMakeup(db, c.req.param('id'), me(c).studentId, code, deviceId, now(), consent))
 })
 studentMakeupRoutes.get('/:id/exam', async (c) => c.json(await resumeMakeup(getDb(c.env), c.req.param('id'), me(c).studentId, device(c), now())))
 studentMakeupRoutes.put('/:id/answers', async (c) => {
