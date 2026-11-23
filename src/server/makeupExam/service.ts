@@ -6,6 +6,9 @@ import {
   gradeMakeup,
   MAKEUP_LEAVE_LIMIT,
   makeupDeadline,
+  MAX_PROCTOR_PHOTOS,
+  PROCTOR_RETENTION_DAYS,
+  type ProctorKind,
   type ExamSet,
   type ExamSetInput,
   type ExamSetSummary,
@@ -18,7 +21,9 @@ import {
   type TeacherMakeups,
 } from '../../shared/makeupExam'
 import { newId, type Db } from '../db/client'
-import { classes, examSets, makeupEvents, makeupExams, scoreItems, scores, students } from '../db/schema'
+import { classes, examSets, makeupEvents, makeupExams, makeupPhotos, scoreItems, scores, students } from '../db/schema'
+import { checkImage, EXT, putImage } from '../files/service'
+import { assertRoom, recordFile, removeFiles } from '../storage/service'
 import { apiError } from '../http'
 import { enqueue } from '../push/service'
 import { saveScore } from '../scores/service'
@@ -118,7 +123,7 @@ export async function studentMakeups(db: Db, studentId: string, classId: string)
       takenOn: r.takenOn,
       absent: !!r.absent,
       deadline: makeupDeadline(r.takenOn, r.makeupDays),
-      request: q ? { id: q.id, status: q.status, mode: q.mode, opensAt: q.opensAt, closesAt: q.closesAt, durationMin: q.durationMin, teacherNote: q.teacherNote } : null,
+      request: q ? { id: q.id, status: q.status, mode: q.mode, opensAt: q.opensAt, closesAt: q.closesAt, durationMin: q.durationMin, proctor: q.proctor, teacherNote: q.teacherNote } : null,
     }
   })
 }
@@ -152,6 +157,7 @@ async function prepareApprove(db: Db, a: MakeupApprove, t: number) {
     durationMin: a.durationMin,
     capPct: a.capPct,
     examSetId: set?.id ?? null,
+    proctor: a.mode === 'online' && a.proctor,
     code: code6(),
     seed: a.shuffle && set?.kind === 'typed' ? seed32() : null,
     updatedAt: t,
@@ -219,6 +225,8 @@ const rowCols = {
   durationMin: makeupExams.durationMin,
   capPct: makeupExams.capPct,
   examSetId: makeupExams.examSetId,
+  proctor: makeupExams.proctor,
+  consentAt: makeupExams.consentAt,
   code: makeupExams.code,
   startedAt: makeupExams.startedAt,
   submittedAt: makeupExams.submittedAt,
@@ -257,6 +265,8 @@ function toRow(r: JoinedRow): TeacherMakeupRow {
     durationMin: r.durationMin as number | null,
     capPct: r.capPct!,
     examSetId: r.examSetId as string | null,
+    proctor: !!r.proctor,
+    consentAt: r.consentAt as number | null,
     code: r.code as string | null,
     startedAt: r.startedAt as number | null,
     submittedAt: r.submittedAt as number | null,
@@ -319,6 +329,7 @@ export async function teacherMakeupDetail(db: Db, id: string, t: number): Promis
   const set = full.examSetId ? await getExamSet(db, full.examSetId) : null
   const key = set ? answerKey(set) : []
   const events = await db.select({ at: makeupEvents.at, kind: makeupEvents.kind, ms: makeupEvents.ms }).from(makeupEvents).where(eq(makeupEvents.examId, id)).orderBy(makeupEvents.at)
+  const photos = await db.select({ at: makeupPhotos.at, kind: makeupPhotos.kind, key: makeupPhotos.key }).from(makeupPhotos).where(eq(makeupPhotos.examId, id)).orderBy(makeupPhotos.at)
   return {
     ...row,
     examSet: set,
@@ -326,6 +337,7 @@ export async function teacherMakeupDetail(db: Db, id: string, t: number): Promis
     answers: full.answers,
     graded: set && full.startedAt ? gradeMakeup(full.answers, key, row.item.maxScore, row.capPct) : null,
     events,
+    photos,
   }
 }
 
@@ -380,14 +392,24 @@ async function paper(db: Db, r: Row, t: number): Promise<StudentExamPaper> {
     count: layout.order.length,
     choiceCount: set.choiceCount,
     answers: shown,
+    startedAt: r.startedAt ?? t,
+    durationMin: r.durationMin ?? 0,
     endsAt: endsAt(r),
     leaves: r.leaves,
     leaveLimit: MAKEUP_LEAVE_LIMIT,
     status: r.status,
+    proctor: r.proctor,
+    ...(await shotsDone(db, r.id)),
   }
 }
 
-export async function startMakeup(db: Db, id: string, studentId: string, code: string, deviceId: string, t: number): Promise<StudentExamPaper> {
+async function shotsDone(db: Db, examId: string): Promise<{ roomDone: boolean; recheckDone: boolean }> {
+  const rows = await db.all<{ kind: ProctorKind; n: number }>(sql`SELECT kind, count(*) AS n FROM makeup_photos WHERE exam_id = ${examId} GROUP BY kind`)
+  const n = (k: ProctorKind) => rows.find((x) => x.kind === k)?.n ?? 0
+  return { roomDone: n('room') > 0, recheckDone: n('recheck') > 0 }
+}
+
+export async function startMakeup(db: Db, id: string, studentId: string, code: string, deviceId: string, t: number, consent = false): Promise<StudentExamPaper> {
   const r = await mine(db, id, studentId)
   if (r.status === 'in_progress') {
     if (r.deviceId !== deviceId) {
@@ -400,11 +422,12 @@ export async function startMakeup(db: Db, id: string, studentId: string, code: s
   if (t < (r.opensAt ?? 0)) throw apiError('not_open', 'ยังไม่ถึงเวลาสอบ', 409)
   if (t > (r.closesAt ?? 0)) throw apiError('makeup_expired', 'เลยเวลาเริ่มสอบแล้ว', 409)
   if (code !== r.code) throw apiError('wrong_code', 'รหัสเริ่มสอบไม่ถูกต้อง — ขอรหัสจากครู', 400)
+  if (r.proctor && !consent) throw apiError('pdpa_required', 'กรุณาอ่านและติ๊กยินยอมการเก็บภาพ (PDPA) ก่อนเริ่มสอบ — ถ้าไม่ยินยอม ให้ขอครูเปลี่ยนเป็นสอบออนไซต์', 400)
   const set = await getExamSet(db, r.examSetId!)
   const n = set.kind === 'typed' ? set.questions.length : set.answers.length
   const res = await db
     .update(makeupExams)
-    .set({ status: 'in_progress', startedAt: t, deviceId, answers: Array.from({ length: n }, () => -1), updatedAt: t })
+    .set({ status: 'in_progress', startedAt: t, deviceId, answers: Array.from({ length: n }, () => -1), consentAt: r.proctor ? t : null, updatedAt: t })
     .where(and(eq(makeupExams.id, id), eq(makeupExams.status, 'approved')))
     .returning({ id: makeupExams.id })
   if (!res.length) throw apiError('makeup_state', 'เริ่มสอบไปแล้ว', 409)
@@ -456,7 +479,7 @@ export async function saveMakeupAnswers(db: Db, id: string, studentId: string, d
 }
 
 /** ออกจากหน้าจอ/กลับมา · ครบ 3 ครั้งส่งอัตโนมัติ */
-export async function makeupEvent(db: Db, id: string, studentId: string, deviceId: string, kind: 'leave' | 'return', ms: number | undefined, t: number): Promise<{ leaves: number; submitted: boolean }> {
+export async function makeupEvent(db: Db, id: string, studentId: string, deviceId: string, kind: 'leave' | 'return' | 'camera-off', ms: number | undefined, t: number): Promise<{ leaves: number; submitted: boolean }> {
   const r = await active(db, id, studentId, deviceId, t)
   await event(db, id, kind, t, ms)
   if (kind === 'return') return { leaves: r.leaves, submitted: false }
@@ -467,6 +490,36 @@ export async function makeupEvent(db: Db, id: string, studentId: string, deviceI
     return { leaves, submitted: true }
   }
   return { leaves, submitted: false }
+}
+
+// ---------- คุมสอบด้วยกล้อง ----------
+const MAX_PROCTOR_BYTES = 400 * 1024
+/** ภาพคุมสอบจากเครื่องนักเรียน (เฉพาะตอนกำลังสอบ · เครื่องเดิม · การสอบที่ครูเปิดคุมด้วยกล้อง) */
+export async function saveProctorPhoto(db: Db, bucket: R2Bucket, id: string, studentId: string, deviceId: string, kind: ProctorKind, body: ArrayBuffer, contentType: string, t: number): Promise<{ key: string }> {
+  const r = await active(db, id, studentId, deviceId, t)
+  if (!r.proctor) throw apiError('proctor_off', 'การสอบนี้ไม่ได้เปิดกล้อง', 400)
+  if (body.byteLength > MAX_PROCTOR_BYTES) throw apiError('invalid_image', 'รูปใหญ่เกินไป', 400)
+  const type = checkImage(body, contentType)
+  const [{ n }] = await db.all<{ n: number }>(sql`SELECT count(*) AS n FROM makeup_photos WHERE exam_id = ${id}`)
+  if (n >= MAX_PROCTOR_PHOTOS) throw apiError('too_many_photos', 'ภาพคุมสอบครบจำนวนแล้ว', 429)
+  await assertRoom(db, body.byteLength, true)
+  const key = `proctor/${id}/${newId()}.${EXT[type]}`
+  await putImage(bucket, key, body, type)
+  await recordFile(db, key, body.byteLength, t)
+  await db.insert(makeupPhotos).values({ id: newId(), examId: id, at: t, kind, key })
+  return { key }
+}
+
+/** ลบภาพคุมสอบของการสอบที่ครูให้คะแนนแล้ว (หรือปิดไปแล้ว) เกิน 30 วัน */
+export async function purgeProctorPhotos(db: Db, bucket: R2Bucket, t: number): Promise<number> {
+  const before = t - PROCTOR_RETENTION_DAYS * 86400_000
+  const rows = await db.all<{ id: string; key: string }>(sql`
+    SELECT p.id, p.key FROM makeup_photos p JOIN makeup_exams m ON m.id = p.exam_id
+    WHERE m.status IN ('graded', 'expired', 'rejected') AND m.updated_at < ${before} LIMIT 500`)
+  if (!rows.length) return 0
+  await removeFiles(db, bucket, rows.map((r) => r.key))
+  for (let i = 0; i < rows.length; i += 50) await db.delete(makeupPhotos).where(inArray(makeupPhotos.id, rows.slice(i, i + 50).map((r) => r.id)))
+  return rows.length
 }
 
 export async function submitMakeup(db: Db, id: string, studentId: string, deviceId: string, t: number): Promise<void> {

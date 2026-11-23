@@ -1,10 +1,10 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { getDb } from '../src/server/db/client'
-import { sweepMakeups } from '../src/server/makeupExam/service'
+import { purgeProctorPhotos, sweepMakeups } from '../src/server/makeupExam/service'
 import { todayBangkok } from '../src/shared/attendance'
 import { addDays } from '../src/shared/leave'
-import { examLayout, gradeMakeup, makeupDeadline } from '../src/shared/makeupExam'
+import { examLayout, gradeMakeup, makeupDeadline, recheckAt } from '../src/shared/makeupExam'
 import { getJson, json, loginTeacher, postJson, putJson, resetDb, seedClass, seedStudent, studentCookie, TINY_JPEG, uploadFile } from './helpers'
 
 const db = () => getDb(env)
@@ -81,7 +81,7 @@ it('ขอ → ครูอนุมัติ (ออนไลน์ · สล�
   // รหัสผิด · รหัสถูก → ข้อสอบไม่มีเฉลย
   const wrong = code === '000000' ? '111111' : '000000'
   expect((await postJson(`/api/student/makeups/${id}/start`, { code: wrong, deviceId: DEV }, { cookie: sc })).status).toBe(400)
-  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc }))
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
   expect(paper).toMatchObject({ count: 4, kind: 'typed', leaves: 0, leaveLimit: 3, status: 'in_progress', zipgradeId: '33' })
   expect(JSON.stringify(paper.questions)).not.toContain('answer')
   expect(paper.answers).toEqual([-1, -1, -1, -1])
@@ -119,7 +119,7 @@ it('ออกจากหน้าจอครบ 3 ครั้ง → ส่�
   const { teacher, sc, itemId, setId } = await setup()
   const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
   const { code } = await json(await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'online', ...window(), capPct: 100, examSetId: setId, shuffle: false }, teacher))
-  await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc })
+  await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc })
   for (const [i, want] of [[1, false], [2, false], [3, true]] as const) {
     const r = await json(await req('POST', `/api/student/makeups/${id}/event`, { kind: 'leave' }, dev(sc)))
     expect(r).toEqual({ leaves: i, submitted: want })
@@ -144,7 +144,7 @@ it('หมดเวลาทำ → cron ส่งให้ · เลยกำ�
 
   // ครูคืนสิทธิ์: ออนไลน์ แล้วปล่อยหมดเวลา
   const g = await json(await postJson('/api/teacher/makeup-exams', { scoreItemId: itemId, studentId: s.id, mode: 'online', ...window(), durationMin: 5, capPct: 100, examSetId: setId, shuffle: true }, { cookie: teacher }))
-  await postJson(`/api/student/makeups/${g.id}/start`, { code: g.code, deviceId: DEV }, { cookie: sc })
+  await postJson(`/api/student/makeups/${g.id}/start`, { code: g.code, deviceId: DEV, consent: true }, { cookie: sc })
   expect((await sweepMakeups(db(), Date.now() + 6 * 60_000)).submitted).toBe(1)
   expect((await json(await getJson(`/api/teacher/makeup-exams/${g.id}`, teacher))).events.at(-1).kind).toBe('timeout')
 
@@ -168,7 +168,7 @@ it('ข้อสอบแบบรูปหน้า (จาก PDF): นัก�
   expect((await open(sc)).status).toBe(404)
   const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
   const { code } = await json(await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'online', ...window(), capPct: 100, examSetId: setId, shuffle: true }, teacher))
-  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc }))
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
   expect(paper).toMatchObject({ kind: 'pages', pageKeys: [page], count: 5, choiceCount: 4, questions: [] })
   expect((await open(sc)).status).toBe(200)
   expect((await open(oc)).status).toBe(404)
@@ -215,4 +215,67 @@ it('ยังไม่มีคะแนน (เผยแพร่แล้ว�
   const { SELF } = await import('cloudflare:test')
   expect((await SELF.fetch(`http://x/api/teacher/exam-sets/${set2}`, { method: 'DELETE', headers: { cookie: teacher } })).status).toBe(200)
   expect((await json(await getJson(`/api/teacher/score-items/${itemId}`, teacher))).item.examSetId).toBeNull()
+})
+
+it('คุมสอบด้วยกล้อง: สแกนโต๊ะ/ภาพหน้า อัปโหลดได้เฉพาะตอนสอบ เครื่องเดิม · กล้องดับนับเป็นออกจากหน้าจอ · ครูเห็นภาพ นักเรียนเปิดไม่ได้ · ลบเองหลังให้คะแนน 30 วัน', async () => {
+  const { teacher, sc, oc, itemId, setId } = await setup()
+  const { SELF } = await import('cloudflare:test')
+  const photo = (id: string, kind: string, cookie: string, d = DEV) =>
+    SELF.fetch(`http://x/api/student/makeups/${id}/photo?kind=${kind}`, { method: 'POST', headers: { cookie, 'content-type': 'image/jpeg', 'x-exam-device': d }, body: TINY_JPEG })
+  const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
+  const { code } = await json(await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'online', ...window(), capPct: 100, examSetId: setId, shuffle: false, proctor: true }, teacher))
+  expect((await json(await getJson('/api/student/makeups', sc)))[0].request.proctor).toBe(true)
+  // ยังไม่เริ่มสอบ = อัปโหลดไม่ได้
+  expect((await photo(id, 'room', sc)).status).toBe(409)
+  // ไม่ติ๊กยินยอม PDPA = เริ่มไม่ได้ (ยังไม่เริ่มจับเวลา)
+  const noConsent = await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV }, { cookie: sc })
+  expect(noConsent.status).toBe(400)
+  expect((await json(noConsent)).error.code).toBe('pdpa_required')
+  const paper = await json(await postJson(`/api/student/makeups/${id}/start`, { code, deviceId: DEV, consent: true }, { cookie: sc }))
+  expect(paper).toMatchObject({ proctor: true, roomDone: false, recheckDone: false, durationMin: 30 })
+  expect(recheckAt(id, paper.startedAt, 30)).toBeGreaterThanOrEqual(paper.startedAt + 0.3 * 30 * 60_000)
+  expect(recheckAt(id, paper.startedAt, 30)).toBeLessThanOrEqual(paper.startedAt + 0.7 * 30 * 60_000)
+
+  expect((await photo(id, 'selfie', sc)).status).toBe(400)
+  expect((await photo(id, 'room', sc, DEV2)).status).toBe(403)
+  expect((await photo(id, 'room', oc)).status).toBe(404)
+  const { key } = await json(await photo(id, 'room', sc))
+  expect(key).toMatch(new RegExp(`^proctor/${id}/`))
+  await photo(id, 'face', sc)
+  expect(await json(await req('GET', `/api/student/makeups/${id}/exam`, undefined, dev(sc)))).toMatchObject({ roomDone: true, recheckDone: false })
+
+  // กล้องดับ = ออกจากหน้าจอ 1 ครั้ง
+  expect(await json(await req('POST', `/api/student/makeups/${id}/event`, { kind: 'camera-off' }, dev(sc)))).toEqual({ leaves: 1, submitted: false })
+
+  // ภาพ: ครูเปิดได้ · นักเรียน (แม้เจ้าของ) เปิดไม่ได้
+  const open = (c: string) => SELF.fetch(`http://x/api/files/${key}`, { headers: { cookie: c } })
+  expect((await open(teacher)).status).toBe(200)
+  expect((await open(sc)).status).toBe(404)
+  await req('POST', `/api/student/makeups/${id}/submit`, {}, dev(sc))
+  expect((await photo(id, 'face', sc)).status).toBe(409)
+  const detail = await json(await getJson(`/api/teacher/makeup-exams/${id}`, teacher))
+  expect(detail.proctor).toBe(true)
+  expect(detail.consentAt).toBeGreaterThan(0)
+  expect(detail.photos.map((p: { kind: string }) => p.kind)).toEqual(['room', 'face'])
+  expect(detail.events.map((e: { kind: string }) => e.kind)).toContain('camera-off')
+
+  // ให้คะแนนแล้ว: ยังไม่ครบ 30 วันไม่ลบ · ครบแล้วลบทั้งแถวและไฟล์
+  await putJson(`/api/teacher/makeup-exams/${id}/grade`, { score: 15, note: '' }, teacher)
+  expect(await purgeProctorPhotos(db(), env.BUCKET, Date.now())).toBe(0)
+  expect(await purgeProctorPhotos(db(), env.BUCKET, Date.now() + 31 * 86400_000)).toBe(2)
+  expect((await json(await getJson(`/api/teacher/makeup-exams/${id}`, teacher))).photos).toEqual([])
+  expect(await env.BUCKET.get(key)).toBeNull()
+})
+
+it('คุมสอบด้วยกล้องใช้ได้เฉพาะออนไลน์ · ครูปิดได้', async () => {
+  const { teacher, sc, itemId, setId, s } = await setup()
+  const { id } = await json(await postJson('/api/student/makeups', { scoreItemId: itemId, reason: 'ป่วย' }, { cookie: sc }))
+  await putJson(`/api/teacher/makeup-exams/${id}/approve`, { mode: 'paper', ...window(), capPct: 100, examSetId: null, proctor: true }, teacher)
+  expect((await json(await getJson(`/api/teacher/makeup-exams/${id}`, teacher))).proctor).toBe(false)
+  const g = await json(await postJson('/api/teacher/makeup-exams', { scoreItemId: itemId, studentId: s.id, mode: 'online', ...window(), capPct: 100, examSetId: setId, proctor: false }, { cookie: teacher }))
+  const paper = await json(await postJson(`/api/student/makeups/${g.id}/start`, { code: g.code, deviceId: DEV }, { cookie: sc }))
+  expect(paper.proctor).toBe(false)
+  const { SELF } = await import('cloudflare:test')
+  const r = await SELF.fetch(`http://x/api/student/makeups/${g.id}/photo?kind=face`, { method: 'POST', headers: { cookie: sc, 'content-type': 'image/jpeg', 'x-exam-device': DEV }, body: TINY_JPEG })
+  expect(r.status).toBe(400)
 })

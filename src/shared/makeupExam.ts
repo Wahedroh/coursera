@@ -8,6 +8,25 @@ export const MAX_EXAM_QUESTIONS = 100
 export const ANSWER_GRACE_MS = 5_000
 export const EXAM_LETTERS = ['A', 'B', 'C', 'D', 'E'] as const
 
+// ---------- คุมสอบด้วยกล้อง ----------
+/** ภาพคุมสอบลบอัตโนมัติหลังครูให้คะแนนกี่วัน */
+export const PROCTOR_RETENTION_DAYS = 30
+/** ภาพต่อการสอบไม่เกิน (กันพื้นที่เต็ม) */
+export const MAX_PROCTOR_PHOTOS = 240
+/** สแกนโต๊ะก่อนเริ่มกี่ภาพ */
+export const ROOM_SHOTS = 3
+/** กล้องหน้าถ่ายสุ่มทุก 20–60 วินาที */
+export const FACE_GAP_MS: readonly [number, number] = [20_000, 60_000]
+export const PROCTOR_KINDS = ['room', 'face', 'recheck'] as const
+export type ProctorKind = (typeof PROCTOR_KINDS)[number]
+export const PROCTOR_KIND_LABEL: Record<ProctorKind, string> = { room: 'สแกนโต๊ะ', face: 'กล้องหน้า', recheck: 'สุ่มสแกนโต๊ะซ้ำ' }
+/** เวลาสุ่มสแกนโต๊ะซ้ำ: ช่วง 30–70% ของเวลาสอบ (คงที่ต่อการสอบ โหลดหน้าใหม่ไม่เปลี่ยน) */
+export function recheckAt(examId: string, startedAt: number, durationMin: number): number {
+  let h = 0
+  for (const ch of examId) h = (Math.imul(h, 31) + ch.charCodeAt(0)) >>> 0
+  return startedAt + Math.round((0.3 + (h % 1000) / 2500) * durationMin * 60_000)
+}
+
 export type MakeupStatus = 'pending' | 'approved' | 'rejected' | 'in_progress' | 'submitted' | 'graded' | 'expired'
 export const MAKEUP_STATUS_LABEL: Record<MakeupStatus, string> = {
   pending: 'รอครูอนุมัติ',
@@ -118,6 +137,8 @@ const approveBase = z.object({
   examSetId: z.string().min(1).nullable().default(null),
   /** สลับข้อ/ตัวเลือกรายคน (ข้อสอบที่พิมพ์ในระบบ) */
   shuffle: z.boolean().default(true),
+  /** คุมสอบด้วยกล้อง (เฉพาะออนไลน์) */
+  proctor: z.boolean().default(true),
 })
 export const makeupApproveSchema = approveBase
   .refine((x) => x.closesAt > x.opensAt, { message: 'เวลาปิดต้องหลังเวลาเปิด' })
@@ -130,9 +151,9 @@ export const makeupGrantSchema = approveBase
   .refine((x) => x.mode === 'paper' || !!x.examSetId, { message: 'กรุณาเลือกชุดข้อสอบ' })
 export const makeupRejectSchema = z.object({ note: z.string().trim().max(200).default('') })
 export const makeupGradeSchema = z.object({ score: z.number().min(0).max(1000), note: z.string().trim().max(200).default('') })
-export const makeupStartSchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'รหัส 6 หลัก'), deviceId: z.string().min(8).max(80) })
+export const makeupStartSchema = z.object({ code: z.string().trim().regex(/^\d{6}$/, 'รหัส 6 หลัก'), deviceId: z.string().min(8).max(80), /** ยินยอมให้เก็บภาพตาม PDPA (จำเป็นเมื่อครูเปิดคุมสอบด้วยกล้อง) */ consent: z.boolean().default(false) })
 export const makeupAnswersSchema = z.object({ answers: z.array(z.number().int().min(-1).max(4)).max(MAX_EXAM_QUESTIONS) })
-export const makeupEventSchema = z.object({ kind: z.enum(['leave', 'return']), ms: z.number().int().min(0).max(86_400_000).optional() })
+export const makeupEventSchema = z.object({ kind: z.enum(['leave', 'return', 'camera-off']), ms: z.number().int().min(0).max(86_400_000).optional() })
 
 // ---------- มุมมองนักเรียน ----------
 export type StudentMakeup = {
@@ -151,6 +172,7 @@ export type StudentMakeup = {
     opensAt: number | null
     closesAt: number | null
     durationMin: number | null
+    proctor: boolean
     teacherNote: string
   } | null
 }
@@ -167,10 +189,16 @@ export type StudentExamPaper = {
   choiceCount: number
   /** คำตอบที่บันทึกไว้ ตามลำดับที่นักเรียนเห็น */
   answers: number[]
+  startedAt: number
+  durationMin: number
   endsAt: number
   leaves: number
   leaveLimit: number
   status: MakeupStatus
+  /** คุมสอบด้วยกล้อง · สแกนโต๊ะก่อนเริ่มแล้วหรือยัง · สุ่มสแกนซ้ำแล้วหรือยัง */
+  proctor: boolean
+  roomDone: boolean
+  recheckDone: boolean
 }
 
 // ---------- มุมมองครู ----------
@@ -189,6 +217,8 @@ export type TeacherMakeupRow = {
   durationMin: number | null
   capPct: number
   examSetId: string | null
+  proctor: boolean
+  consentAt: number | null
   code: string | null
   startedAt: number | null
   submittedAt: number | null
@@ -213,5 +243,6 @@ export type TeacherMakeupDetail = TeacherMakeupRow & {
   answers: number[]
   graded: { correct: number; total: number; raw: number; capped: number } | null
   events: { at: number; kind: string; ms: number | null }[]
+  photos: { at: number; kind: ProctorKind; key: string }[]
 }
 

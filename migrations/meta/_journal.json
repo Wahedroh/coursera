@@ -281,6 +281,20 @@
       "when": 1795361389813,
       "tag": "0039_score_item_exam_set",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1795441215368,
+      "tag": "0040_makeup_proctor",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1795445471478,
+      "tag": "0041_makeup_pdpa_consent",
+      "breakpoints": true
     }
   ]
 }

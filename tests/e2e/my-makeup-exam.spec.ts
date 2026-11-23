@@ -1,6 +1,9 @@
 import { teacherNav } from './nav'
 import { expect, test, type Browser, type Page } from '@playwright/test'
 
+// กล้องปลอมของ Chromium (คุมสอบด้วยกล้อง) · อนุญาตกล้องอัตโนมัติ
+test.use({ launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }, permissions: ['camera'] })
+
 // ห้อง "โรงเรียนทดสอบ ชั้น 1": มานี (3, PIN 1357)
 async function teacherHome(browser: Browser) {
   const t = await (await browser.newContext()).newPage()
@@ -76,12 +79,23 @@ test('สอบย้อนหลังออนไลน์: ขาดสอบ
   // นักเรียน: เข้าห้องสอบ → รหัสผิดไม่ได้ → รหัสถูกเริ่มสอบ
   await s.reload()
   await s.getByRole('link', { name: /เข้าห้องสอบ/ }).click()
+  // คุมสอบด้วยกล้อง (ครูเปิดไว้เป็นค่าเริ่มต้น): ต้องกดยินยอมก่อน
+  const go = s.getByRole('button', { name: 'เปิดกล้องและเริ่มสอบ' })
   await s.getByLabel('รหัสเริ่มสอบ').fill(code === '000000' ? '111111' : '000000')
-  await s.getByRole('button', { name: 'เริ่มสอบ' }).click()
+  await expect(go).toBeDisabled()
+  await s.getByLabel('ยินยอมให้เก็บภาพตาม PDPA').check()
+  await go.click()
   await expect(s.getByText('รหัสเริ่มสอบไม่ถูกต้อง — ขอรหัสจากครู')).toBeVisible()
   await s.getByLabel('รหัสเริ่มสอบ').fill(code)
-  await s.getByRole('button', { name: 'เริ่มสอบ' }).click()
+  await go.click()
   await expect(s.getByTestId('exam-timer')).toBeVisible()
+  // สแกนโต๊ะ 3 ภาพก่อน ข้อสอบถูกบังจนกว่าจะเสร็จ → แล้วเหลือภาพกล้องหน้าเล็ก ๆ มุมจอ
+  const cam = s.getByTestId('proctor')
+  await expect(cam).toHaveAttribute('data-mode', 'room')
+  await cam.getByRole('button', { name: 'เริ่มสแกน (3 ภาพ)' }).click()
+  await expect(cam).toHaveAttribute('data-mode', 'face', { timeout: 20_000 })
+  await expect(cam.getByText('● REC')).toBeVisible()
+  await s.waitForResponse((r) => r.url().includes('/photo?kind=face') && r.ok())
   await expect(s.getByTestId('watermark').first()).toContainText('มานี')
 
   // ตอบตามข้อความ (ลำดับข้อ/ตัวเลือกถูกสลับ)
@@ -115,6 +129,11 @@ test('สอบย้อนหลังออนไลน์: ขาดสอบ
   await t.getByTestId('mk-3').getByRole('link', { name: /ตรวจ · ให้คะแนน/ }).click()
   await expect(t.getByTestId('auto-score')).toContainText('ถูก 2/2 ข้อ = 10 → เพดาน 80% = 8')
   await expect(t.getByTestId('exam-log')).toContainText('ออกจากหน้าสอบ')
+  // ภาพคุมสอบ: สแกนโต๊ะ 3 ภาพ + กล้องหน้า
+  const photos = t.getByTestId('proctor-photos')
+  await expect(photos.getByRole('img', { name: /^สแกนโต๊ะ/ })).toHaveCount(3)
+  await expect(t.getByTestId('pdpa-consent')).toContainText('นักเรียนยินยอม PDPA')
+  await expect(photos.getByRole('img', { name: /^กล้องหน้า/ }).first()).toBeVisible()
   await expect(t.getByTestId('zipgrade-sheet')).toBeVisible()
   await expect(t.getByLabel('คะแนนสอบย้อนหลัง')).toHaveValue('8')
   await t.getByRole('button', { name: 'บันทึกคะแนน' }).click()

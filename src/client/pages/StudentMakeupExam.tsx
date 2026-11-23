@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, ApiClientError } from '../api'
-import { EXAM_LETTERS, type StudentExamPaper } from '../../shared/makeupExam'
+import { EXAM_LETTERS, PROCTOR_RETENTION_DAYS, type StudentExamPaper, type StudentMakeup } from '../../shared/makeupExam'
+import ProctorCam from '../components/ProctorCam'
+import { openCamera, stopCamera } from '../lib/camera'
 import { fileUrl } from '../lib/upload'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
@@ -35,6 +37,10 @@ export default function StudentMakeupExam() {
   const [phase, setPhase] = useState<Phase>({ k: 'loading' })
   const [answers, setAnswers] = useState<number[]>([])
   const [code, setCode] = useState('')
+  /** การสอบนี้ครูเปิดคุมด้วยกล้อง (รู้ก่อนเริ่มจากรายการสอบย้อนหลัง) */
+  const [needCam, setNeedCam] = useState(false)
+  const [consent, setConsent] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warn, setWarn] = useState<string | null>(null)
   const [now, setNow] = useState(Date.now())
@@ -75,6 +81,36 @@ export default function StudentMakeupExam() {
       live = false
     }
   }, [id, open, fail])
+
+  useEffect(() => {
+    if (phase.k !== 'code') return
+    let live = true
+    api<StudentMakeup[]>('/api/student/makeups')
+      .then((xs) => live && setNeedCam(!!xs.find((m) => m.request?.id === id)?.request?.proctor))
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [phase.k, id])
+
+  const refresh = useCallback(
+    (msg: (p: StudentExamPaper) => string) =>
+      api<StudentExamPaper>(`/api/student/makeups/${id}/exam`, { headers: { 'x-exam-device': deviceId() } })
+        .then((p) => {
+          setPhase((ph) => (ph.k === 'exam' || ph.k === 'review' ? { ...ph, p } : ph))
+          setWarn(msg(p))
+        })
+        .catch(fail),
+    [id, fail],
+  )
+  const cameraOff = useCallback(() => {
+    api(`/api/student/makeups/${id}/event`, { body: { kind: 'camera-off' }, headers: { 'x-exam-device': deviceId() } })
+      .then(() => refresh((p) => `⚠️ กล้องปิด = ออกจากหน้าสอบ ${p.leaves}/${p.leaveLimit} ครั้ง — ครบ ${p.leaveLimit} ครั้งระบบส่งคำตอบให้ทันที`))
+      .catch(fail)
+  }, [id, refresh, fail])
+  const shot = useCallback((kind: 'room' | 'recheck') => {
+    setPhase((ph) => (ph.k === 'exam' || ph.k === 'review' ? { ...ph, p: { ...ph.p, ...(kind === 'room' ? { roomDone: true } : { recheckDone: true }) } } : ph))
+  }, [])
 
   // นาฬิกา
   useEffect(() => {
@@ -138,23 +174,24 @@ export default function StudentMakeupExam() {
       const ms = leftAt.current === null ? 0 : Date.now() - leftAt.current
       leftAt.current = null
       api<{ leaves: number; submitted: boolean }>(`/api/student/makeups/${id}/event`, { body: { kind: 'return', ms }, headers: { 'x-exam-device': deviceId() } })
-        .then(() => api<StudentExamPaper>(`/api/student/makeups/${id}/exam`, { headers: { 'x-exam-device': deviceId() } }))
-        .then((p) => {
-          setPhase((ph) => (ph.k === 'exam' || ph.k === 'review' ? { ...ph, p } : ph))
-          setWarn(`⚠️ ออกจากหน้าสอบ ${p.leaves}/${p.leaveLimit} ครั้ง — ครบ ${p.leaveLimit} ครั้งระบบส่งคำตอบให้ทันที และครูเห็นทุกครั้ง`)
-        })
+        .then(() => refresh((p) => `⚠️ ออกจากหน้าสอบ ${p.leaves}/${p.leaveLimit} ครั้ง — ครบ ${p.leaveLimit} ครั้งระบบส่งคำตอบให้ทันที และครูเห็นทุกครั้ง`))
         .catch(fail)
     }
     document.addEventListener('visibilitychange', onVis)
     return () => document.removeEventListener('visibilitychange', onVis)
-  }, [inExam, id, fail])
+  }, [inExam, id, fail, refresh])
 
   async function start() {
     setError(null)
+    setStarting(true)
     try {
-      open(await api<StudentExamPaper>(`/api/student/makeups/${id}/start`, { body: { code, deviceId: deviceId() } }))
+      // คุมสอบด้วยกล้อง: ขออนุญาตกล้องก่อนเริ่มจับเวลา (ไม่ได้ = ยังไม่เริ่ม)
+      if (needCam) stopCamera(await openCamera('environment'))
+      open(await api<StudentExamPaper>(`/api/student/makeups/${id}/start`, { body: { code, deviceId: deviceId(), consent: needCam && consent } }))
     } catch (e) {
       fail(e)
+    } finally {
+      setStarting(false)
     }
   }
 
@@ -189,8 +226,42 @@ export default function StudentMakeupExam() {
                 <b>ออกจากหน้าสอบ (สลับแอป/แท็บ/ล็อกจอ) ครบ 3 ครั้ง ระบบส่งคำตอบให้ทันที</b>
               </li>
               <li>ทุกหน้ามีชื่อของเราเป็นลายน้ำ ครูเห็นบันทึกการสอบทั้งหมด</li>
+              {needCam && (
+                <>
+                  <li>
+                    <b>📷 ครูเปิดคุมสอบด้วยกล้อง:</b> ก่อนทำข้อสอบให้ใช้กล้องหลังถ่ายโต๊ะและรอบตัว 3 ภาพ · ระหว่างสอบกล้องหน้าถ่ายภาพเป็นระยะแบบสุ่ม · อาจขอดูโต๊ะซ้ำ 1 ครั้ง
+                  </li>
+                  <li>กล้องปิดระหว่างสอบ = นับเป็นออกจากหน้าสอบ</li>
+                </>
+              )}
             </ul>
           </Card>
+          {needCam && (
+            <Card className="p-4 flex flex-col gap-2 border-amber-300 bg-amber-50 text-sm">
+              <b>🔒 ข้อตกลงการเก็บภาพจากกล้อง (PDPA)</b>
+              <ul className="list-disc pl-5 flex flex-col gap-1">
+                <li>
+                  <b>เก็บอะไร:</b> ภาพนิ่งจากกล้องหลัง (โต๊ะและรอบตัว) และกล้องหน้า (ใบหน้า) ระหว่างสอบนี้เท่านั้น — ไม่อัดวิดีโอ ไม่อัดเสียง
+                </li>
+                <li>
+                  <b>เพื่อ:</b> ยืนยันตัวตนและความโปร่งใสของการสอบย้อนหลังครั้งนี้
+                </li>
+                <li>
+                  <b>ใครดูได้:</b> ครูผู้สอนเท่านั้น ไม่เผยแพร่ ไม่ใช้เพื่อเรื่องอื่น
+                </li>
+                <li>
+                  <b>เก็บนานเท่าไร:</b> ลบอัตโนมัติ {PROCTOR_RETENTION_DAYS} วันหลังครูให้คะแนน
+                </li>
+                <li>
+                  <b>ไม่ยินยอมได้:</b> ขอครูเปลี่ยนเป็นสอบออนไซต์ (กระดาษต่อหน้าครู) แทน
+                </li>
+              </ul>
+              <label className="mt-1 flex items-start gap-2 rounded-xl bg-white p-2 font-semibold">
+                <input type="checkbox" className="mt-1 h-5 w-5 shrink-0" checked={consent} onChange={(e) => setConsent(e.target.checked)} aria-label="ยินยอมให้เก็บภาพตาม PDPA" />
+                <span>ฉันอ่านข้อตกลงแล้ว และยินยอมให้เก็บภาพจากกล้องตามข้างต้น</span>
+              </label>
+            </Card>
+          )}
           <ErrorBox message={error} />
           <label className="text-sm font-semibold">
             รหัสเริ่มสอบ (ขอจากครู)
@@ -204,8 +275,8 @@ export default function StudentMakeupExam() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             />
           </label>
-          <Button onClick={() => void start()} disabled={code.length !== 6}>
-            เริ่มสอบ
+          <Button onClick={() => void start()} disabled={code.length !== 6 || (needCam && !consent) || starting}>
+            {starting ? 'กำลังเริ่ม…' : needCam ? 'เปิดกล้องและเริ่มสอบ' : 'เริ่มสอบ'}
           </Button>
         </section>
       </main>
@@ -218,6 +289,7 @@ export default function StudentMakeupExam() {
   return (
     <main className="relative min-h-screen max-w-3xl mx-auto pb-24 select-none" onCopy={(e) => e.preventDefault()} onCut={(e) => e.preventDefault()} onContextMenu={(e) => e.preventDefault()} onDragStart={(e) => e.preventDefault()}>
       <Watermark text={`${p.studentName} · ${p.zipgradeId} · ${clock.format(now)}`} />
+      {p.proctor && <ProctorCam paper={p} now={now} deviceId={deviceId()} onCameraOff={cameraOff} onShot={shot} />}
       <header className="sticky top-0 z-20 flex items-center gap-2 bg-board px-4 py-2 text-white shadow">
         <div className="min-w-0 flex-1">
           <p className="truncate font-bold">{p.title}</p>

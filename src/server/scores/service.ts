@@ -115,6 +115,8 @@ export async function deleteScoreItem(db: Db, id: string): Promise<void> {
   await getItem(db, id)
   // สอบย้อนหลังของรายการนี้หายไปด้วย
   await db.run(sql`DELETE FROM makeup_events WHERE exam_id IN (SELECT id FROM makeup_exams WHERE score_item_id = ${id})`)
+  // ภาพคุมสอบ: ลบแถว (ไฟล์ที่ค้าง "ลบไฟล์ค้าง" เก็บให้)
+  await db.run(sql`DELETE FROM makeup_photos WHERE exam_id IN (SELECT id FROM makeup_exams WHERE score_item_id = ${id})`)
   await db.run(sql`DELETE FROM makeup_exams WHERE score_item_id = ${id}`)
   await db.batch([db.delete(scores).where(eq(scores.itemId, id)), db.delete(scoreItems).where(eq(scoreItems.id, id))])
 }

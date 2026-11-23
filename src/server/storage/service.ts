@@ -155,7 +155,8 @@ export async function purgeOrphans(db: Db, bucket: R2Bucket, t: number): Promise
   const exams = await db.all<{ k: string }>(sql`
     SELECT j.value AS k FROM exam_sets e, json_each(e.page_keys) j
     UNION SELECT (j.value ->> 'image') FROM exam_sets e, json_each(e.questions) j WHERE (j.value ->> 'image') IS NOT NULL
-    UNION SELECT image_key FROM makeup_exams WHERE image_key IS NOT NULL`)
+    UNION SELECT image_key FROM makeup_exams WHERE image_key IS NOT NULL
+    UNION SELECT key FROM makeup_photos`)
   const used = new Set([...refs, ...quiz, ...extra, ...exams].map((r) => r.k))
   const orphans: { key: string; size: number }[] = []
   let cursor: string | undefined
@@ -177,6 +178,8 @@ export const STORAGE_GROUPS = [
   { id: 'asg', label: 'ไฟล์แนบในงาน' },
   { id: 'quiz', label: 'รูปโจทย์ (เกมการ์ด/คำถามท้ายคลิป)' },
   { id: 'pay', label: 'QR รับเงินค่าเอกสาร' },
+  { id: 'exam', label: 'ข้อสอบย้อนหลัง (PDF/รูป)' },
+  { id: 'proctor', label: 'ภาพคุมสอบ (ลบเองหลังให้คะแนน 30 วัน)' },
   { id: 'other', label: 'อื่น ๆ' },
 ] as const
 export type StorageBreakdown = { id: string; label: string; files: number; bytes: number }[]
@@ -186,7 +189,7 @@ export async function storageBreakdown(db: Db): Promise<StorageBreakdown> {
   const rows = await db.all<{ g: string; files: number; bytes: number }>(sql`
     SELECT CASE
         WHEN f.key LIKE 'mat/%' THEN CASE WHEN EXISTS (SELECT 1 FROM materials m WHERE m.file_key = f.key AND m.kind = 'notes') THEN 'mat-notes' ELSE 'mat-blank' END
-        WHEN substr(f.key, 1, instr(f.key, '/') - 1) IN ('sub', 'ann', 'asg', 'quiz', 'pay') THEN substr(f.key, 1, instr(f.key, '/') - 1)
+        WHEN substr(f.key, 1, instr(f.key, '/') - 1) IN ('sub', 'ann', 'asg', 'quiz', 'pay', 'exam', 'proctor') THEN substr(f.key, 1, instr(f.key, '/') - 1)
         ELSE 'other' END AS g,
       count(*) AS files, coalesce(sum(f.size), 0) AS bytes
     FROM stored_files f GROUP BY g`)

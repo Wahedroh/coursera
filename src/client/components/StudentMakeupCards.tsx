@@ -106,7 +106,7 @@ function MakeupCard({ m, now, onDone, onError }: { m: StudentMakeup; now: number
       {r?.status === 'approved' && (
         <div className="rounded-xl bg-board-soft p-3 text-sm">
           <p>
-            {r.mode === 'online' ? 'สอบออนไลน์' : 'สอบออนไซต์ (กระดาษต่อหน้าครู)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที
+            {r.mode === 'online' ? 'สอบออนไลน์' : 'สอบออนไซต์ (กระดาษต่อหน้าครู)'} · เริ่มได้ {r.opensAt && fmt.format(r.opensAt)} – {r.closesAt && fmt.format(r.closesAt)} · {r.durationMin} นาที{r.mode === 'online' && r.proctor ? ' · 📷 ต้องเปิดกล้อง (สแกนโต๊ะ + กล้องหน้า)' : ''}
           </p>
           {r.mode === 'online' &&
             (now >= (r.opensAt ?? 0) ? (
