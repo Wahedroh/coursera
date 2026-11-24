@@ -5,6 +5,7 @@ import { localToEpoch } from '../lib/format'
 import { absencesLeft, MIN_ATTENDANCE_PCT, REMEDIAL_STATUS_LABEL, RISK_DESC, RISK_LABEL, RISK_REASONS, type AtRisk, type AtRiskStudent, type RemedialItem, type RiskReason } from '../../shared/remedial'
 import Icon from '../components/Icon'
 import { fileUrl } from '../lib/upload'
+import { useFileViewer } from '../components/FileViewer'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -151,6 +152,7 @@ function RemedialBox({ r, name, onChanged, onError }: { r: RemedialItem; name: s
   const [grade, setGrade] = useState(r.resultGrade ?? '1')
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
+  const fv = useFileViewer()
   async function decide(pass: boolean) {
     setBusy(true)
     try {
@@ -188,11 +190,12 @@ function RemedialBox({ r, name, onChanged, onError }: { r: RemedialItem; name: s
           {r.text && <p className="whitespace-pre-wrap">{r.text}</p>}
           <div className="flex flex-wrap gap-1.5 mt-1">
             {r.imageKeys.map((k) => (
-              <a key={k} href={fileUrl(k)} target="_blank" rel="noreferrer">
+              <button key={k} type="button" onClick={() => fv.open({ key: k, title: `งานซ่อม · ${name}` })} aria-label="ดูรูปงานซ่อม">
                 <img src={fileUrl(k)} alt="รูปงานซ่อม" className="h-20 rounded border border-line" />
-              </a>
+              </button>
             ))}
           </div>
+          {fv.viewer}
         </div>
       )}
       {r.status === 'submitted' && (
