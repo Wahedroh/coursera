@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api, ApiClientError } from '../api'
-import { fileUrl } from '../lib/upload'
+import { useFileViewer } from '../components/FileViewer'
 import { fileIcon, fmtSize, groupByDate, groupByTopic } from '../lib/materials'
 import { MATERIAL_KIND_LABEL, splitMaterials, type MaterialKind, type StudentMaterial } from '../../shared/materials'
 import { Card, ErrorBox, Loading } from '../ui'
@@ -13,6 +13,7 @@ export default function StudentMaterials() {
   const tab: MaterialKind = params.get('tab') === 'notes' ? 'notes' : 'blank'
   const [items, setItems] = useState<StudentMaterial[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const fv = useFileViewer()
 
   useEffect(() => {
     api<StudentMaterial[]>('/api/student/materials')
@@ -26,6 +27,7 @@ export default function StudentMaterials() {
 
   return (
     <main className="min-h-screen max-w-md mx-auto pb-8">
+      {fv.viewer}
       <header className="bg-board text-white px-5 pt-5 pb-6 rounded-b-3xl">
         <Link to="/me" className="text-sm opacity-85">
           ← งานของฉัน
@@ -62,7 +64,7 @@ export default function StudentMaterials() {
               {rows.map((m) => {
                 const icon = fileIcon(m.fileName)
                 return (
-                  <a key={m.id} href={fileUrl(m.fileKey)} target="_blank" rel="noreferrer" className="p-3 flex items-center gap-3">
+                  <button key={m.id} type="button" onClick={() => fv.open({ key: m.fileKey, title: m.title, fileName: m.fileName })} className="w-full p-3 flex items-center gap-3 text-left">
                     <span className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-xs font-extrabold ${icon.cls}`}>{icon.label}</span>
                     <span className="flex-1 min-w-0">
                       <span className="block font-bold">{m.title}</span>
@@ -72,7 +74,7 @@ export default function StudentMaterials() {
                       </span>
                     </span>
                     <span className="text-board text-sm font-semibold">เปิด</span>
-                  </a>
+                  </button>
                 )
               })}
             </Card>

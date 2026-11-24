@@ -7,6 +7,7 @@ import { fileUrl } from '../lib/upload'
 import { EXAM_LETTERS, leftText, MAKEUP_STATUS_LABEL, PROCTOR_KIND_LABEL, PROCTOR_RETENTION_DAYS, type ExamSetSummary, type MakeupStatus, type TeacherMakeupDetail, type TeacherMakeupRow, type TeacherMakeups } from '../../shared/makeupExam'
 import Icon from '../components/Icon'
 import ZipgradeSheet from '../components/ZipgradeSheet'
+import { useFileViewer } from '../components/FileViewer'
 import { Button, Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -141,6 +142,7 @@ function Section({ title, empty, children }: { title: string; empty: string; chi
 }
 
 function Row({ r, now, children }: { r: TeacherMakeupRow; now: number; children: React.ReactNode }) {
+  const fv = useFileViewer()
   return (
     <div data-testid={`mk-${r.student.zipgradeId}`}>
       <Card className="p-3 flex flex-col gap-2">
@@ -160,10 +162,11 @@ function Row({ r, now, children }: { r: TeacherMakeupRow; now: number; children:
           </p>
         )}
         {r.imageKey && r.status === 'pending' && (
-          <a href={fileUrl(r.imageKey)} target="_blank" rel="noreferrer" className="self-start">
+          <button type="button" onClick={() => fv.open({ key: r.imageKey!, title: `หลักฐานขอสอบย้อนหลัง · ${r.student.name}` })} className="self-start" aria-label="ดูหลักฐาน">
             <img src={fileUrl(r.imageKey)} alt="หลักฐาน" className="max-h-32 rounded border border-line" />
-          </a>
+          </button>
         )}
+        {fv.viewer}
         {children}
       </Card>
     </div>

@@ -3,6 +3,7 @@ import { api } from '../api'
 import { LEAVE_LABEL, LEAVE_STATUS_LABEL, leaveDays, type TeacherLeaveItem, type TeacherLeaves as Data } from '../../shared/leave'
 import Icon from '../components/Icon'
 import { fileUrl } from '../lib/upload'
+import { useFileViewer } from '../components/FileViewer'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import TeacherLayout from './TeacherLayout'
 import { useTeacherErrorHandler } from './useTeacherGuard'
@@ -84,6 +85,7 @@ export default function TeacherLeaves() {
 function PendingCard({ l, onDecide }: { l: TeacherLeaveItem; onDecide: (l: TeacherLeaveItem, approve: boolean, note: string) => Promise<void> }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  const fv = useFileViewer()
   const go = async (approve: boolean) => {
     setBusy(true)
     await onDecide(l, approve, note)
@@ -106,10 +108,11 @@ function PendingCard({ l, onDecide }: { l: TeacherLeaveItem; onDecide: (l: Teach
         </p>
         <p className="text-sm">“{l.reason}”</p>
         {l.imageKey && (
-          <a href={fileUrl(l.imageKey)} target="_blank" rel="noreferrer" className="self-start">
+          <button type="button" onClick={() => fv.open({ key: l.imageKey!, title: `ใบลา · ${l.studentName}` })} className="self-start" aria-label="ดูรูปแนบใบลา">
             <img src={fileUrl(l.imageKey)} alt="รูปแนบใบลา" className="max-h-40 rounded-lg border border-line" />
-          </a>
+          </button>
         )}
+        {fv.viewer}
         <p className="text-xs text-stone-400">ส่งเมื่อ {sent.format(l.createdAt)}</p>
         <div className="flex flex-wrap items-center gap-2">
           <input aria-label={`หมายเหตุถึง ${l.studentName}`} className="flex-1 min-w-40 rounded-xl border-2 border-line px-3 py-1.5 text-sm" placeholder="หมายเหตุถึงนักเรียน (ไม่บังคับ)" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />

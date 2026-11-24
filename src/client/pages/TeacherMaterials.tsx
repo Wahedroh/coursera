@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
-import { fileUrl } from '../lib/upload'
+import { useFileViewer } from '../components/FileViewer'
 import { fileIcon, fmtSize, groupByDate, groupByTopic, lessonDateLabel, uploadMaterial } from '../lib/materials'
 import { MATERIAL_ACCEPT, MATERIAL_KIND_LABEL, MAX_MATERIAL_BYTES, materialExt, splitMaterials, type MaterialKind, type TeacherMaterial } from '../../shared/materials'
 import { todayBangkok } from '../../shared/attendance'
@@ -21,6 +21,7 @@ const small = 'rounded-lg border border-line bg-white px-2 py-1 text-xs font-sem
 export default function TeacherMaterials() {
   const { id = '' } = useParams()
   const handle = useTeacherErrorHandler()
+  const fv = useFileViewer()
   const [items, setItems] = useState<TeacherMaterial[] | null>(null)
   const [schools, setSchools] = useState<School[]>([])
   const [className, setClassName] = useState('')
@@ -115,6 +116,7 @@ export default function TeacherMaterials() {
 
   return (
     <TeacherLayout>
+      {fv.viewer}
       <Link to={`/teacher/classes/${id}`} className="text-sm text-stone-500">
         ← {className || 'หน้าห้อง'}
       </Link>
@@ -163,9 +165,9 @@ export default function TeacherMaterials() {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         <CopyButton type="material" id={m.id} title={m.title} fromClass={id} onCopied={setFlash} />
-                        <a className={small} href={fileUrl(m.fileKey)} target="_blank" rel="noreferrer">
+                        <button type="button" className={small} onClick={() => fv.open({ key: m.fileKey, title: m.title, fileName: m.fileName })}>
                           เปิด
-                        </a>
+                        </button>
                         <button type="button" className={small} onClick={() => setEditing(editing === m.id ? null : m.id)}>
                           แก้
                         </button>
