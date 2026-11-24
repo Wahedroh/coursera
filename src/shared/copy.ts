@@ -20,3 +20,19 @@ export type CopyInput = z.infer<typeof copySchema>
 
 /** คลังของครู: ของที่เคยสร้าง จัดกลุ่มตามชื่อ (ใช้ชิ้นล่าสุดเป็นต้นแบบ) */
 export type LibraryItem = { title: string; latestId: string; classCount: number; lastUsed: number; detail: string }
+
+/** รายละเอียดของรายการในคลัง: เนื้อหา + เคยใช้ในห้องไหนบ้าง (ไว้เช็กก่อนคัดลอก) */
+export type LibraryPreview = {
+  type: CopyType
+  title: string
+  /** ข้อมูลสั้น ๆ เช่น คะแนนเต็ม กำหนดส่ง หมวด */
+  facts: { label: string; value: string }[]
+  /** คำสั่งงาน / รายละเอียดคลิป / ข้อความประกาศ */
+  text: string
+  images: string[]
+  file: { key: string; fileName: string } | null
+  youtubeId: string | null
+  questions: { q: string; choices: string[]; answer: number }[]
+  /** ห้องที่มีรายการชื่อนี้อยู่แล้ว (ใหม่สุดก่อน) */
+  usedIn: { classId: string; className: string; schoolName: string; createdAt: number; published: boolean }[]
+}

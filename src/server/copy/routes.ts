@@ -7,7 +7,7 @@ import { apiError, parseBody } from '../http'
 import { enqueueForClasses } from '../push/service'
 import { pushInBackground } from '../push/routes'
 import { invalidateRelease } from '../timetable/release'
-import { copyItems, library } from './service'
+import { copyItems, library, libraryPreview } from './service'
 
 export const teacherCopyRoutes = new Hono<AppEnv>()
 teacherCopyRoutes.use('*', requireTeacher)
@@ -36,4 +36,10 @@ teacherCopyRoutes.get('/library', async (c) => {
   const type = c.req.query('type') ?? ''
   if (!(COPY_TYPES as readonly string[]).includes(type)) throw apiError('invalid_request', 'ประเภทไม่ถูกต้อง', 400)
   return c.json(await library(getDb(c.env), type as CopyType))
+})
+
+teacherCopyRoutes.get('/library/:type/:id', async (c) => {
+  const type = c.req.param('type')
+  if (!(COPY_TYPES as readonly string[]).includes(type)) throw apiError('invalid_request', 'ประเภทไม่ถูกต้อง', 400)
+  return c.json(await libraryPreview(getDb(c.env), type as CopyType, c.req.param('id')))
 })
