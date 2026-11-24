@@ -22,7 +22,8 @@ export const AnnotateCanvas = forwardRef<AnnotateHandle, { src: string; label: s
   const imgRef = useRef<HTMLImageElement | null>(null)
   const [strokes, setStrokes] = useState<Stroke[]>([])
   const current = useRef<Stroke | null>(null)
-  const [tool, setTool] = useState<Tool>('pen')
+  // ยังไม่เลือกเครื่องมือ = ปัดเลื่อนหน้าได้ ไม่เผลอเขียนทับงานนักเรียน (แตะเครื่องมือก่อนจึงเขียนได้)
+  const [tool, setTool] = useState<Tool | null>(null)
   const [color, setColor] = useState(COLORS[0])
   const [size, setSize] = useState(4)
   const [ready, setReady] = useState(false)
@@ -99,7 +100,7 @@ export const AnnotateCanvas = forwardRef<AnnotateHandle, { src: string; label: s
             type="button"
             aria-label={t.label}
             aria-pressed={tool === t.id}
-            onClick={() => setTool(t.id)}
+            onClick={() => setTool(tool === t.id ? null : t.id)}
             className={`w-9 h-9 rounded-lg font-bold ${tool === t.id ? 'bg-board-soft ring-2 ring-board' : 'bg-stone-100'}`}
           >
             <Icon n={t.icon} />
@@ -124,13 +125,17 @@ export const AnnotateCanvas = forwardRef<AnnotateHandle, { src: string; label: s
         <button type="button" aria-label="ย้อนกลับ" onClick={() => setStrokes(strokes.slice(0, -1))} className="w-9 h-9 rounded-lg bg-stone-100 font-bold">
           ↶
         </button>
+        <span className={`basis-full text-xs ${tool ? 'text-board font-semibold' : 'text-stone-500'}`} role="status">
+          {tool ? `✏️ กำลังใช้ “${TOOLS.find((t) => t.id === tool)?.label}” — แตะซ้ำเพื่อหยุดเขียนและเลื่อนหน้าได้` : '👆 เลื่อนดูงานได้ตามปกติ · แตะเครื่องมือก่อนจึงเขียนบนงานได้'}
+        </span>
       </div>
       <canvas
         ref={canvasRef}
         data-testid="annotate-canvas"
         aria-label={label}
-        className="w-full h-auto rounded-xl border border-line bg-white touch-none cursor-crosshair"
+        className={`w-full h-auto rounded-xl border bg-white ${tool ? 'touch-none cursor-crosshair border-board' : 'touch-auto border-line'}`}
         onPointerDown={(e) => {
+          if (!tool) return
           const p = pos(e)
           if (tool === 'text') {
             const text = window.prompt('พิมพ์ข้อความ')
