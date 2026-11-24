@@ -1,7 +1,9 @@
 import { inArray, sql } from 'drizzle-orm'
-import type { CopyInput, CopyType, LibraryItem } from '../../shared/copy'
+import type { CopyInput, CopyType, LibraryItem, LibraryPreview } from '../../shared/copy'
 import { newId, type Db } from '../db/client'
-import { announcements, assignments, classes, materials, scoreItems, videos } from '../db/schema'
+import { announcements, assignments, classes, examSets, materials, scoreItems, videos } from '../db/schema'
+import { eq } from 'drizzle-orm'
+import { CATEGORY_LABEL } from '../../shared/scores'
 import { apiError } from '../http'
 import { listSlots, resolvePublish } from '../timetable/service'
 import { nextClassStart } from '../../shared/timetable'
@@ -111,4 +113,68 @@ export async function library(db: Db, type: CopyType): Promise<LibraryItem[]> {
     else by.set(r.title, { title: r.title, latestId: r.id, lastUsed: r.createdAt, classCount: 0, detail: r.detail ?? '', classes: new Set([r.classId]) })
   }
   return [...by.values()].slice(0, 300).map(({ classes: cs, ...g }) => ({ ...g, classCount: cs.size }))
+}
+
+const TABLE: Record<CopyType, string> = { assignment: 'assignments', 'score-item': 'score_items', video: 'videos', material: 'materials', announcement: 'announcements' }
+const thDate = (t: number) => new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(t)
+const thDay = (d: string) => new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric', month: 'short', year: '2-digit' }).format(Date.parse(`${d}T00:00:00Z`))
+const MODE: Record<string, string> = { text: 'พิมพ์ตอบ', image: 'ส่งรูป', both: 'พิมพ์ + รูป' }
+
+export async function libraryPreview(db: Db, type: CopyType, id: string): Promise<LibraryPreview> {
+  const base: Omit<LibraryPreview, 'title' | 'usedIn'> = { type, facts: [], text: '', images: [], file: null, youtubeId: null, questions: [] }
+  let title = ''
+  if (type === 'assignment') {
+    const [a] = await db.select().from(assignments).where(eq(assignments.id, id))
+    if (!a) throw apiError('not_found', 'ไม่พบรายการนี้', 404)
+    title = a.title
+    base.facts = [
+      { label: 'คะแนนเต็ม', value: String(a.maxScore) },
+      { label: 'ส่งแบบ', value: MODE[a.submitMode] ?? a.submitMode },
+      { label: 'กำหนดส่ง (ต้นแบบ)', value: a.dueAt ? thDate(a.dueAt) : 'ไม่มี' },
+      { label: 'EXP', value: String(a.expReward) },
+    ]
+    base.text = a.instructions
+    base.images = a.attachmentKeys
+  } else if (type === 'score-item') {
+    const [i] = await db.select().from(scoreItems).where(eq(scoreItems.id, id))
+    if (!i) throw apiError('not_found', 'ไม่พบรายการนี้', 404)
+    title = i.title
+    const [set] = i.examSetId ? await db.select({ title: examSets.title }).from(examSets).where(eq(examSets.id, i.examSetId)) : []
+    base.facts = [
+      { label: 'หมวด', value: CATEGORY_LABEL[i.category] },
+      { label: 'คะแนนเต็ม', value: String(i.maxScore) },
+      { label: 'วันที่สอบ (ต้นแบบ)', value: thDay(i.takenOn) },
+      { label: 'สอบย้อนหลัง', value: i.makeupDays > 0 ? `${i.makeupDays} วัน${set ? ` · ชุด ${set.title}` : ''}` : 'ไม่เปิด' },
+    ]
+  } else if (type === 'video') {
+    const [v] = await db.select().from(videos).where(eq(videos.id, id))
+    if (!v) throw apiError('not_found', 'ไม่พบรายการนี้', 404)
+    title = v.title
+    base.text = v.description
+    base.youtubeId = v.youtubeId
+    base.questions = v.questions
+    base.facts = [{ label: 'คำถามท้ายคลิป', value: v.questions.length ? `${v.questions.length} ข้อ` : 'ไม่มี' }]
+  } else if (type === 'material') {
+    const [m] = await db.select().from(materials).where(eq(materials.id, id))
+    if (!m) throw apiError('not_found', 'ไม่พบรายการนี้', 404)
+    title = m.title
+    base.file = { key: m.fileKey, fileName: m.fileName }
+    base.facts = [
+      { label: 'ประเภท', value: m.kind === 'notes' ? 'เอกสารที่จดในห้อง' : 'เอกสารเปล่า (ใบงาน/ใบความรู้)' },
+      ...(m.topic ? [{ label: 'หัวข้อ', value: m.topic }] : []),
+      ...(m.lessonDate ? [{ label: 'วันที่สอน', value: thDay(m.lessonDate) }] : []),
+      { label: 'ไฟล์', value: m.fileName },
+    ]
+  } else {
+    const [a] = await db.select().from(announcements).where(eq(announcements.id, id))
+    if (!a) throw apiError('not_found', 'ไม่พบรายการนี้', 404)
+    title = a.title
+    base.text = a.body
+    base.facts = [{ label: 'ปักหมุด', value: a.pinned ? 'ใช่' : 'ไม่' }, ...(a.expiresOn ? [{ label: 'หมดอายุ', value: thDay(a.expiresOn) }] : [])]
+  }
+  const usedIn = await db.all<{ classId: string; className: string; schoolName: string; createdAt: number; published: number }>(sql`
+    SELECT t.class_id AS classId, c.name AS className, s.name AS schoolName, t.created_at AS createdAt, t.published AS published
+    FROM ${sql.raw(TABLE[type])} t JOIN classes c ON c.id = t.class_id JOIN schools s ON s.id = c.school_id
+    WHERE t.title = ${title} ORDER BY t.created_at DESC LIMIT 100`)
+  return { ...base, title, usedIn: usedIn.map((u) => ({ ...u, published: !!u.published })) }
 }
