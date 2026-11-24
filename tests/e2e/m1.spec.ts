@@ -77,6 +77,13 @@ test('ครูสร้างงาน → นักเรียนส่ง �
   await expect(teacher.getByText('ข้อ 7 ไม่แน่ใจค่ะ')).toBeVisible()
   const canvas = teacher.getByTestId('annotate-canvas').first()
   await expect(canvas).toBeVisible()
+  // เปิดหน้ามายังไม่เลือกเครื่องมือ: ปัดเลื่อนหน้าได้ ไม่เผลอเขียนทับงาน
+  const pen = teacher.getByRole('button', { name: 'ปากกา' }).first()
+  await expect(pen).toHaveAttribute('aria-pressed', 'false')
+  await expect(canvas).not.toHaveClass(/touch-none/)
+  await pen.click()
+  await expect(pen).toHaveAttribute('aria-pressed', 'true')
+  await expect(canvas).toHaveClass(/touch-none/)
   const box = (await canvas.boundingBox())!
   await teacher.mouse.move(box.x + 10, box.y + 10)
   await teacher.mouse.down()
