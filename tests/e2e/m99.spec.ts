@@ -137,8 +137,10 @@ test('นักเรียน: ตัวละครเด่นบนหน้
     for (const d of pin) await s.getByRole('button', { name: d, exact: true }).click()
   }
   await login('1357')
-  const art = s.getByTestId('avatar-stage').locator('svg')
+  const art = s.getByTestId('avatar-stage').locator('svg[aria-label="ตัวละครของฉัน"]')
   await expect(art).toBeVisible()
+  // สัตว์วิเศษคู่ใจ (ตัวล่าสุดที่ฟักได้) ยืนข้างตัวละคร
+  await expect(s.getByTestId('home-pet').locator('svg')).toBeVisible()
   // คะแนนรวม + EXP บนหน้าแรก แตะดูที่มา
   const totals = s.getByTestId('student-totals')
   await totals.getByRole('button', { name: 'ดูที่มาของคะแนนรวม' }).click()

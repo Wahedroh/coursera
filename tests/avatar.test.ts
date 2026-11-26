@@ -1,7 +1,8 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, isSpecialJob, JOB_IDS, JOBS, OUTFIT_COLORS, SKINS } from '../src/shared/avatar'
-import { getDb } from '../src/server/db/client'
+import { AVATAR_H, AVATAR_W, avatarConfigSchema, avatarPixels, DEFAULT_AVATAR, HAIR_COLORS, shownPet, HAIR_STYLES, HEADWEAR, HEADWEAR_COLORS, isSpecialJob, JOB_IDS, JOBS, OUTFIT_COLORS, SKINS } from '../src/shared/avatar'
+import { getDb, newId, now } from '../src/server/db/client'
+import { eggs } from '../src/server/db/schema'
 import { getJson, json, loginTeacher, putJson, resetDb, seedClass, seedStudent, studentCookie } from './helpers'
 
 const at = (px: [number, number, string][], x: number, y: number) => px.find((p) => p[0] === x && p[1] === y)?.[2]
@@ -114,16 +115,36 @@ describe('API ตัวละคร', () => {
   it('ค่าเริ่มต้น → บันทึก → อ่านกลับ', async () => {
     const { classId } = await seedClass(db())
     const c = await studentCookie((await seedStudent(db(), classId)).id)
-    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: '', config: DEFAULT_AVATAR, isDefault: true, items: [] })
+    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: '', config: DEFAULT_AVATAR, isDefault: true, items: [], pets: [] })
     expect((await putJson('/api/student/avatar', { nickname: '  ฟ้าใส  ', config: CFG }, c)).status).toBe(200)
-    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: { ...SAVED, hand: 'none', offhand: 'none' }, isDefault: false, items: [] })
+    expect(await json(await getJson('/api/student/avatar', c))).toEqual({ nickname: 'ฟ้าใส', config: { ...SAVED, hand: 'none', offhand: 'none', pet: null }, isDefault: false, items: [], pets: [] })
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้า', config: { ...CFG, job: 'hacker' } }, c)).status).toBe(400)
     const hijab = { ...CFG, headwear: 'hijab_long', headwearColor: 4, longSkirt: true, job: 'nurse', shirtColor: 12, pantsColor: 2, shoesColor: -1 }
     expect((await putJson('/api/student/avatar', { nickname: 'ฟ้าใส', config: hijab }, c)).status).toBe(200)
-    expect((await json(await getJson('/api/student/avatar', c))).config).toEqual({ ...hijab, hand: 'none', offhand: 'none' })
+    expect((await json(await getJson('/api/student/avatar', c))).config).toEqual({ ...hijab, hand: 'none', offhand: 'none', pet: null })
     expect((await putJson('/api/student/avatar', { nickname: 'ก'.repeat(21), config: CFG }, c)).status).toBe(400)
     expect((await getJson('/api/student/avatar')).status).toBe(401)
     expect((await putJson('/api/student/avatar', { nickname: '', config: CFG }, await loginTeacher())).status).toBe(401)
+  })
+
+  it('สัตว์วิเศษคู่ใจ: ค่าเริ่มต้น = ตัวล่าสุดที่ฟักได้ · เลือกได้เฉพาะตัวที่มี · ซ่อนได้', async () => {
+    const { classId } = await seedClass(db())
+    const s = await seedStudent(db(), classId)
+    const c = await studentCookie(s.id)
+    await db().insert(eggs).values([
+      { id: newId(), studentId: s.id, level: 1, characterId: 'owl-green', openedAt: now() - 2000, createdAt: now() - 3000 },
+      { id: newId(), studentId: s.id, level: 2, characterId: 'cat-gray', openedAt: now() - 1000, createdAt: now() - 3000 },
+      { id: newId(), studentId: s.id, level: 3, createdAt: now() },
+    ])
+    const a = await json(await getJson('/api/student/avatar', c))
+    expect(a.pets).toEqual(['cat-gray', 'owl-green'])
+    expect(shownPet(a.config, a.pets)).toBe('cat-gray')
+    expect((await putJson('/api/student/avatar', { nickname: '', config: { ...CFG, pet: 'dragon-blue' } }, c)).status).toBe(400)
+    expect((await putJson('/api/student/avatar', { nickname: '', config: { ...CFG, pet: 'owl-green' } }, c)).status).toBe(200)
+    expect(shownPet((await json(await getJson('/api/student/avatar', c))).config, a.pets)).toBe('owl-green')
+    expect((await putJson('/api/student/avatar', { nickname: '', config: { ...CFG, pet: 'none' } }, c)).status).toBe(200)
+    expect(shownPet((await json(await getJson('/api/student/avatar', c))).config, a.pets)).toBeNull()
+    expect(shownPet({ pet: null }, [])).toBeNull()
   })
 
   it('กระดานจัดอันดับแสดงตัวละครของแต่ละคน (ไม่แสดงชื่อในเกม)', async () => {
@@ -135,7 +156,7 @@ describe('API ตัวละคร', () => {
     const ca = await studentCookie(a.id)
     await putJson('/api/student/avatar', { nickname: 'เทพฟิสิกส์', config: CFG }, ca)
     const board = await json(await getJson('/api/student/leaderboard', await studentCookie(b.id)))
-    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual({ ...SAVED, hand: 'none', offhand: 'none' })
+    expect(board.find((r: { firstName: string }) => r.firstName === 'มานี').avatar).toEqual({ ...SAVED, hand: 'none', offhand: 'none', pet: null })
     expect(board.find((r: { firstName: string }) => r.firstName === 'ปิติ').avatar).toEqual(DEFAULT_AVATAR)
     expect(JSON.stringify(board)).not.toContain('เทพฟิสิกส์')
   })

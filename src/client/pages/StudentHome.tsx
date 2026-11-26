@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router'
 import { api, type Me } from '../api'
 import type { StudentAssignment } from '../../shared/assignments'
 import { baht, type StudentFee } from '../../shared/fees'
-import type { AvatarConfig } from '../../shared/avatar'
-import { AvatarArt } from '../components/PixelArt'
+import { shownPet, type AvatarConfig } from '../../shared/avatar'
+import { AvatarArt, CharacterArt } from '../components/PixelArt'
 import { EXP_PER_LEVEL } from '../../shared/points'
 import StudentAnnouncements from '../components/StudentAnnouncements'
 import WeeklyQuests from '../components/WeeklyQuests'
@@ -33,7 +33,7 @@ export default function StudentHome() {
   const [exp, setExp] = useState<{ exp: number; level: number; nextLevelAt: number } | null>(null)
   const [badges, setBadges] = useState<StudentBadge[]>([])
   const [streak, setStreak] = useState<Streak | null>(null)
-  const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean } | null>(null)
+  const [avatar, setAvatar] = useState<{ nickname: string; config: AvatarConfig; isDefault: boolean; pets: string[] } | null>(null)
 
   useEffect(() => {
     api<Me>('/api/me')
@@ -42,7 +42,7 @@ export default function StudentHome() {
     api<StudentAssignment[]>('/api/student/assignments')
       .then(setItems)
       .catch(() => setItems([]))
-    api<{ nickname: string; config: AvatarConfig; isDefault: boolean }>('/api/student/avatar')
+    api<{ nickname: string; config: AvatarConfig; isDefault: boolean; pets: string[] }>('/api/student/avatar')
       .then(setAvatar)
       .catch(() => {})
     loadExp()
@@ -92,8 +92,19 @@ export default function StudentHome() {
           <span className="absolute right-[24%] top-16 text-amber-200 animate-pulse [animation-delay:600ms]">✧</span>
           <span className="absolute left-[30%] top-32 text-amber-100/70">·</span>
           {avatar ? (
-            <span className="relative drop-shadow-[0_4px_0_rgba(0,0,0,0.15)] animate-hop-slow">
-              <AvatarArt config={avatar.config} size={11} label="ตัวละครของฉัน" />
+            <span className="relative flex items-end gap-1">
+              <span className="relative drop-shadow-[0_4px_0_rgba(0,0,0,0.15)] animate-hop-slow">
+                <AvatarArt config={avatar.config} size={11} label="ตัวละครของฉัน" />
+              </span>
+              {/* สัตว์วิเศษคู่ใจยืนข้าง ๆ (กระโดดสลับจังหวะกับตัวละคร) */}
+              {(() => {
+                const pet = shownPet(avatar.config, avatar.pets ?? [])
+                return pet ? (
+                  <span className="relative mb-1 drop-shadow-[0_3px_0_rgba(0,0,0,0.15)] animate-hop-slow [animation-delay:1.2s]" data-testid="home-pet">
+                    <CharacterArt id={pet} size={6} />
+                  </span>
+                ) : null
+              })()}
             </span>
           ) : (
             <span className="h-48" />

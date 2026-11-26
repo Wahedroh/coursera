@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api, ApiClientError } from '../api'
-import { AvatarArt } from '../components/PixelArt'
-import { DEFAULT_AVATAR, OUTFIT_COLORS, OUTFIT_COLOR_NAMES, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HAND_IDS, HAND_ITEMS, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, isSpecialJob, JOB_IDS, JOBS, OFFHAND_IDS, OFFHAND_ITEMS, SKINS, SPECIAL_JOBS, type AvatarConfig } from '../../shared/avatar'
+import { AvatarArt, CharacterArt } from '../components/PixelArt'
+import { characterById } from '../../shared/characters'
+import { DEFAULT_AVATAR, OUTFIT_COLORS, OUTFIT_COLOR_NAMES, HAIR_COLORS, HAIR_LABEL, HAIR_STYLES, HAND_IDS, HAND_ITEMS, HEADWEAR, HEADWEAR_COLORS, HEADWEAR_LABEL, isSpecialJob, JOB_IDS, JOBS, OFFHAND_IDS, OFFHAND_ITEMS, SKINS, SPECIAL_JOBS, shownPet, type AvatarConfig } from '../../shared/avatar'
 import { Button, Card, ErrorBox, Loading } from '../ui'
 
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)]
@@ -36,16 +37,18 @@ export default function StudentAvatar() {
   const [saved, setSaved] = useState(false)
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState<Set<string>>(new Set())
+  const [pets, setPets] = useState<string[]>([])
 
   useEffect(() => {
     // คำตอบที่มาช้าจากรอบที่ยกเลิกแล้ว ห้ามทับสิ่งที่นักเรียนกำลังแก้
     let live = true
-    api<{ nickname: string; config: AvatarConfig; items: string[] }>('/api/student/avatar')
+    api<{ nickname: string; config: AvatarConfig; items: string[]; pets: string[] }>('/api/student/avatar')
       .then((a) => {
         if (!live) return
         setCfg(a.config)
         setNickname(a.nickname)
         setItems(new Set(a.items))
+        setPets(a.pets ?? [])
       })
       .catch((e) => live && (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
     return () => {
@@ -100,7 +103,14 @@ export default function StudentAvatar() {
       <section className="p-5 flex flex-col gap-5">
         <Card className="p-4 flex flex-col gap-5 bg-[#FDFBF3]">
           <div className="bg-[#E8DFC4] border-4 border-[#D2C9AE] flex flex-col items-center justify-center py-6 gap-2" data-testid="avatar-preview">
-            <AvatarArt config={cfg} size={14} />
+            <div className="flex items-end gap-1">
+              <AvatarArt config={cfg} size={14} />
+              {shownPet(cfg, pets) && (
+                <span className="mb-1">
+                  <CharacterArt id={shownPet(cfg, pets)!} size={7} />
+                </span>
+              )}
+            </div>
             <span className="font-bold text-lg min-h-7">{nickname.trim()}</span>
           </div>
           <label className="font-bold flex flex-col gap-2">
@@ -193,6 +203,21 @@ export default function StudentAvatar() {
                 <Locked key={h} label={HAND_ITEMS[h].label} />
               ),
             )}
+          </Group>
+          <Group label="สัตว์วิเศษคู่ใจ (ยืนข้างตัวละครที่หน้าแรก)">
+            <button type="button" aria-pressed={cfg.pet === null} className={chip(cfg.pet === null)} onClick={() => set({ pet: null })}>
+              ตัวล่าสุดที่ฟักได้
+            </button>
+            <button type="button" aria-pressed={cfg.pet === 'none'} className={chip(cfg.pet === 'none')} onClick={() => set({ pet: 'none' })}>
+              ไม่แสดง
+            </button>
+            {pets.map((id) => (
+              <button key={id} type="button" aria-pressed={cfg.pet === id} aria-label={characterById(id)?.name ?? id} className={`${chip(cfg.pet === id)} flex items-center gap-1`} onClick={() => set({ pet: id })}>
+                <CharacterArt id={id} size={3} />
+                {characterById(id)?.name}
+              </button>
+            ))}
+            {!pets.length && <span className="text-sm text-stone-500">ยังไม่มีสัตว์วิเศษ — ขึ้นเลเวลได้ไข่ เปิดไข่เพื่อสะสม</span>}
           </Group>
           <Group label="อุปกรณ์มือซ้าย (ได้จากการเปิดไข่)">
             <button type="button" aria-pressed={cfg.offhand === 'none'} className={chip(cfg.offhand === 'none')} onClick={() => set({ offhand: 'none' })}>
