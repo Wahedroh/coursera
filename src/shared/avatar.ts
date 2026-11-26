@@ -192,11 +192,13 @@ export const avatarConfigSchema = z.object({
   /** อุปกรณ์มือขวา/มือซ้าย (ได้จากการเปิดไข่) */
   hand: z.enum(['none', ...HAND_IDS] as [string, ...string[]]).default('none'),
   offhand: z.enum(['none', ...OFFHAND_IDS] as [string, ...string[]]).default('none'),
+  /** สัตว์วิเศษคู่ใจที่ยืนข้างตัวละคร: null = ตัวล่าสุดที่ฟักได้ · 'none' = ไม่แสดง · หรือรหัสสัตว์ที่มี */
+  pet: z.string().max(40).nullable().default(null),
 })
 export type AvatarConfig = z.infer<typeof avatarConfigSchema>
 export const avatarInputSchema = z.object({ nickname: z.string().trim().max(20), config: avatarConfigSchema })
 
-export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1, hand: 'none', offhand: 'none' }
+export const DEFAULT_AVATAR: AvatarConfig = { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false, headwear: 'none', headwearColor: 0, longSkirt: false, shirtColor: -1, pantsColor: -1, shoesColor: -1, hand: 'none', offhand: 'none', pet: null }
 
 function headwearPixels(h: Headwear, c: string): Px[] {
   switch (h) {
@@ -307,4 +309,10 @@ export function avatarBounds(px: readonly Px[]): { x: number; y: number; w: numb
   // ล้นข้างเดียวก็ขยายสองข้างเท่ากัน ตัวละครจะได้อยู่กลาง
   const side = Math.max(-x0, x1 - AVATAR_W)
   return { x: side ? -side : 0, y: y0, w: AVATAR_W + 2 * side, h: AVATAR_H - y0 }
+}
+
+/** สัตว์คู่ใจที่จะแสดง (pets = ที่มีอยู่ ใหม่สุดก่อน) */
+export function shownPet(cfg: Pick<AvatarConfig, 'pet'>, pets: readonly string[]): string | null {
+  if (cfg.pet === 'none') return null
+  return cfg.pet && pets.includes(cfg.pet) ? cfg.pet : (pets[0] ?? null)
 }

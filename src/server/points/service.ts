@@ -258,15 +258,27 @@ const parseAvatar = (v: unknown): AvatarConfig => {
   return r.success ? r.data : DEFAULT_AVATAR
 }
 
-export async function getAvatar(db: Db, studentId: string): Promise<{ nickname: string; config: AvatarConfig; isDefault: boolean; items: string[] }> {
+/** สัตว์วิเศษที่ฟักได้แล้ว (ทุกเทอม · ใหม่สุดก่อน · ไม่ซ้ำ) */
+async function ownedPets(db: Db, studentId: string): Promise<string[]> {
+  const rows = await db
+    .select({ c: eggs.characterId })
+    .from(eggs)
+    .where(and(eq(eggs.studentId, studentId), isNotNull(eggs.characterId)))
+    .orderBy(desc(eggs.openedAt))
+  return [...new Set(rows.map((r) => r.c!))]
+}
+
+export async function getAvatar(db: Db, studentId: string): Promise<{ nickname: string; config: AvatarConfig; isDefault: boolean; items: string[]; pets: string[] }> {
   const [row] = await db.select().from(studentAvatars).where(eq(studentAvatars.studentId, studentId))
   const items = await ownedItems(db, studentId)
-  return row ? { nickname: row.nickname, config: parseAvatar(row.config), isDefault: false, items } : { nickname: '', config: DEFAULT_AVATAR, isDefault: true, items }
+  const pets = await ownedPets(db, studentId)
+  return row ? { nickname: row.nickname, config: parseAvatar(row.config), isDefault: false, items, pets } : { nickname: '', config: DEFAULT_AVATAR, isDefault: true, items, pets }
 }
 
 export async function saveAvatar(db: Db, studentId: string, nickname: string, config: AvatarConfig, t: number): Promise<void> {
   const missing = missingItems(config, new Set(await ownedItems(db, studentId)))
   if (missing.length) throw apiError('item_locked', `ยังไม่มี ${missing.join(', ')} — เปิดไข่เพื่อปลดล็อก`, 400)
+  if (config.pet && config.pet !== 'none' && !(await ownedPets(db, studentId)).includes(config.pet)) throw apiError('pet_locked', 'ยังไม่มีสัตว์วิเศษตัวนี้ — เปิดไข่เพื่อสะสม', 400)
   const values = { nickname, config, updatedAt: t }
   await db.insert(studentAvatars).values({ studentId, ...values }).onConflictDoUpdate({ target: studentAvatars.studentId, set: values })
 }
