@@ -1,3 +1,4 @@
+import { planSummary } from '../teacherWeek/service'
 import { and, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import { DEFAULT_TEACHER_NOTIFY, inQuietHours, teacherNotifySchema, type TeacherInbox, type TeacherNotification, type TeacherNotifySettings } from '../../shared/teacherNotify'
@@ -164,6 +165,17 @@ export async function generateTeacherNotifications(db: Db, t: number): Promise<n
         url: '/teacher/menu/gradebook',
         dedupeKey: `grade:${date}`,
       })
+  }
+
+  // ปฏิทินครู: เช้า (เวลาเดียวกับสรุปงานรอตรวจ) = สอบ/สอบย้อนหลังออนไซต์/สิ่งที่ต้องทำวันนี้ · 17:00 = ของพรุ่งนี้ (เตรียม/ปริ้นเอกสาร)
+  if (minute >= at) {
+    const p = await planSummary(db, date)
+    if (p) await add({ kind: 'plan', title: `📅 วันนี้มี ${p.count} เรื่อง`, body: p.body, url: '/teacher', dedupeKey: `plan:${date}` })
+  }
+  if (minute >= 17 * 60) {
+    const tomorrow = new Date(Date.parse(`${date}T00:00:00Z`) + 86400_000).toISOString().slice(0, 10)
+    const p = await planSummary(db, tomorrow)
+    if (p) await add({ kind: 'plan', title: `🗓️ พรุ่งนี้มี ${p.count} เรื่อง — เตรียม/ปริ้นเอกสารวันนี้`, body: p.body, url: '/teacher', dedupeKey: `plan:${tomorrow}:eve` })
   }
 
   // ครบกำหนดแล้วยังมีคนค้าง (งานที่เพิ่งครบกำหนดใน 1 วันที่ผ่านมา)

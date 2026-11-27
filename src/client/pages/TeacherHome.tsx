@@ -4,6 +4,7 @@ import { api } from '../api'
 import { Card, ErrorBox, Loading } from '../ui'
 import { OverviewMenu } from '../components/ClassMenu'
 import TeacherToday from '../components/TeacherToday'
+import TeacherWeek from '../components/TeacherWeek'
 import TermCard from '../components/TermCard'
 import NowCard from '../components/NowCard'
 import TeacherInsightRows from '../components/TeacherInsightRows'
@@ -60,6 +61,7 @@ export default function TeacherHome() {
         </Link>
       )}
       {classCount > 0 && <NowCard classes={schools!.flatMap((s) => s.classes)} />}
+      {classCount > 0 && <TeacherWeek />}
       {classCount > 0 && <TeacherInsightRows />}
       {classCount > 0 && <TeacherToday />}
       {classCount > 0 && (
