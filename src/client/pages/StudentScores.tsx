@@ -7,11 +7,14 @@ import type { StudentGrade } from '../../shared/grades'
 import { Card, Chip, ErrorBox, Loading } from '../ui'
 import ReportReadyCard from '../components/ReportReadyCard'
 import StudentMakeupCards from '../components/StudentMakeupCards'
+import ExamBattleCard from '../components/ExamBattleCard'
+import type { ExamBattle } from '../../shared/battle'
 
 export default function StudentScores() {
   const navigate = useNavigate()
   const [items, setItems] = useState<StudentScore[] | null>(null)
   const [grade, setGrade] = useState<StudentGrade | null>(null)
+  const [battles, setBattles] = useState<ExamBattle[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -19,6 +22,7 @@ export default function StudentScores() {
       .then(setItems)
       .catch((e) => (e instanceof ApiClientError && e.status === 401 ? navigate('/', { replace: true }) : setError(e.message)))
     api<StudentGrade>('/api/student/grade').then(setGrade).catch(() => {})
+    api<ExamBattle[]>('/api/student/battles').then(setBattles).catch(() => {})
   }, [navigate])
 
   return (
@@ -34,6 +38,14 @@ export default function StudentScores() {
         <ErrorBox message={error} />
         <ReportReadyCard />
         <StudentMakeupCards />
+        {battles.length > 0 && (
+          <section className="flex flex-col gap-2" aria-label="ศึกสอบ">
+            <h2 className="font-bold">⚔️ ศึกสอบ — ห้องเราเทียบกับห้องอื่น</h2>
+            {battles.slice(0, 5).map((b) => (
+              <ExamBattleCard key={b.key} b={b} />
+            ))}
+          </section>
+        )}
         {grade?.visible && (
           <Card className="p-4 flex items-center justify-between gap-3 bg-amber-50 border-amber-200" >
             <div>

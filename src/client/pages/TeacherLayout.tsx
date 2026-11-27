@@ -12,6 +12,7 @@ const NAV: { to: string; label: string; icon: IconName; end: boolean }[] = [
   { to: '/teacher/assignments/new', label: 'สร้างงาน', icon: 'task', end: false },
   { to: '/teacher/scheduled', label: 'รอเผยแพร่', icon: 'alarm', end: false },
   { to: '/teacher/library', label: 'คลังของครู', icon: 'books', end: false },
+  { to: '/teacher/battles', label: 'ศึกสอบ', icon: 'target', end: false },
   { to: '/teacher/watchlist', label: 'ติดตามนักเรียน', icon: 'watch', end: false },
   { to: '/teacher/calendar', label: 'ปฏิทิน', icon: 'calendar', end: false },
   { to: '/teacher/card-game', label: 'เกมการ์ด QR', icon: 'cards', end: false },
