@@ -22,8 +22,8 @@ export async function examBattles(db: Db, onlyClass?: string, studentId?: string
   // สถิติทุกรายการสอบที่เผยแพร่แล้วของเทอมนี้ (ไม่นับเกมการ์ด/อื่น ๆ · ห้องที่ไม่เก็บถาวร · ห้องที่ไม่ได้ปิดศึกสอบ)
   const items = await db.all<{ id: string; title: string; maxScore: number; takenOn: string; classId: string; className: string; schoolName: string; n: number; avg: number | null; pass: number }>(sql`
     SELECT i.id, i.title, i.max_score AS maxScore, i.taken_on AS takenOn, c.id AS classId, c.name AS className, sc.name AS schoolName,
-      count(s.score) AS n, avg(s.score * 100.0 / i.max_score) AS avg,
-      sum(CASE WHEN s.score * 100.0 / i.max_score >= ${BATTLE_PASS_PCT} THEN 1 ELSE 0 END) AS pass
+      count(s.score) AS n, avg((s.score - s.bonus) * 100.0 / i.max_score) AS avg,
+      sum(CASE WHEN (s.score - s.bonus) * 100.0 / i.max_score >= ${BATTLE_PASS_PCT} THEN 1 ELSE 0 END) AS pass
     FROM score_items i JOIN classes c ON c.id = i.class_id JOIN schools sc ON sc.id = c.school_id
       LEFT JOIN scores s ON s.item_id = i.id AND s.absent = 0 AND s.score IS NOT NULL
     WHERE i.published = 1 AND i.category != 'other' AND i.created_at >= ${start} AND c.archived = 0
@@ -59,7 +59,7 @@ export async function examBattles(db: Db, onlyClass?: string, studentId?: string
     const chunk = ids.slice(i, i + 80)
     people.push(
       ...(await db.all<P>(sql`
-        SELECT s.item_id AS itemId, s.student_id AS studentId, s.score, sc.name AS schoolName, a.nickname, a.config
+        SELECT s.item_id AS itemId, s.student_id AS studentId, s.score - s.bonus AS score, sc.name AS schoolName, a.nickname, a.config
         FROM scores s JOIN students st ON st.id = s.student_id JOIN score_items i ON i.id = s.item_id JOIN classes c ON c.id = i.class_id JOIN schools sc ON sc.id = c.school_id
           LEFT JOIN student_avatars a ON a.student_id = s.student_id
         WHERE s.item_id IN (${sql.join(chunk.map((x) => sql`${x}`), sql`, `)}) AND s.absent = 0 AND s.score IS NOT NULL AND st.active = 1`)),

@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { Hono } from 'hono'
 import { createScoreItemsSchema, publishInputSchema, scoreInputSchema, scoreItemInputSchema } from '../../shared/scores'
 import { requireTeacher } from '../auth/middleware'
@@ -5,7 +6,7 @@ import { getDb, now } from '../db/client'
 import type { AppEnv } from '../env'
 import { parseBody } from '../http'
 import { scoreImportSchema } from '../../shared/zipgrade-results'
-import { createScoreItems, importScores, deleteScoreItem, getScoreSheet, listScoreItems, saveScore, scoreBook, setPublished, updateScoreItem } from './service'
+import { createScoreItems, importScores, deleteScoreItem, getScoreSheet, listScoreItems, saveScore, scoreBook, setImprovementBonus, setPublished, updateScoreItem } from './service'
 
 export const teacherScoreRoutes = new Hono<AppEnv>()
 teacherScoreRoutes.use('*', requireTeacher)
@@ -26,6 +27,11 @@ teacherScoreRoutes.put('/score-items/:id', async (c) => {
   return c.json({ ok: true })
 })
 
+teacherScoreRoutes.put('/score-items/:id/bonus', async (c) => {
+  const { enabled } = await parseBody(c, z.object({ enabled: z.boolean() }))
+  await setImprovementBonus(getDb(c.env), c.req.param('id'), enabled)
+  return c.json({ ok: true })
+})
 teacherScoreRoutes.put('/score-items/:id/published', async (c) => {
   const { published } = await parseBody(c, publishInputSchema)
   await setPublished(getDb(c.env), c.req.param('id'), published)

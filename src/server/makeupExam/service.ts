@@ -552,7 +552,7 @@ export async function sweepMakeups(db: Db, t: number): Promise<{ submitted: numb
       AND ${t} > (unixepoch(i.taken_on || ' 23:59:59') - 7 * 3600 + i.makeup_days * 86400) * 1000)`)
   // ขาดสอบที่หมดกำหนดแล้ว → 0
   const zero = await db.run(sql`
-    UPDATE scores SET score = 0, absent = 0, note = ${EXPIRED_NOTE}, updated_at = ${t}
+    UPDATE scores SET score = 0, absent = 0, bonus = 0, note = ${EXPIRED_NOTE}, updated_at = ${t}
     WHERE absent = 1 AND EXISTS (SELECT 1 FROM score_items i WHERE i.id = scores.item_id AND i.makeup_days > 0
       AND ${t} > (unixepoch(i.taken_on || ' 23:59:59') - 7 * 3600 + i.makeup_days * 86400) * 1000)
       AND NOT EXISTS (SELECT 1 FROM makeup_exams m WHERE m.score_item_id = scores.item_id AND m.student_id = scores.student_id AND m.status IN ('approved', 'in_progress', 'submitted'))`)

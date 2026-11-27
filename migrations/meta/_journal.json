@@ -302,6 +302,13 @@
       "when": 1795738212842,
       "tag": "0042_teacher_todos",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1795774644790,
+      "tag": "0043_improvement_bonus",
+      "breakpoints": true
     }
   ]
 }

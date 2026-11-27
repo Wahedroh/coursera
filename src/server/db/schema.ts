@@ -224,6 +224,8 @@ export const scoreItems = sqliteTable('score_items', {
   makeupDays: integer('makeup_days').notNull().default(14),
   /** ชุดข้อสอบที่ใช้สอบย้อนหลังของรายการนี้ (ครูเลือกตอนกรอกคะแนน · ตั้งเป็นค่าเริ่มต้นตอนอนุมัติ) */
   examSetId: text('exam_set_id'),
+  /** โบนัสพัฒนาการ: คะแนนดีขึ้นจากสอบครั้งก่อน (หมวดเดียวกัน) ได้คะแนนเพิ่มตามสัดส่วน มีเพดาน */
+  improvementBonus: integer('improvement_bonus', { mode: 'boolean' }).notNull().default(false),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 }, (t) => [index('score_items_class_idx').on(t.classId)])
@@ -238,9 +240,12 @@ export const scores = sqliteTable(
     studentId: text('student_id')
       .notNull()
       .references(() => students.id),
+    /** คะแนนที่นับ (รวมโบนัสพัฒนาการแล้ว) · คะแนนสอบจริง = score − bonus */
     score: real('score'),
     absent: integer('absent', { mode: 'boolean' }).notNull().default(false),
     note: text('note').notNull().default(''),
+    /** โบนัสพัฒนาการที่บวกไว้ใน score (0 = ไม่มี) */
+    bonus: real('bonus').notNull().default(0),
     updatedAt: integer('updated_at').notNull(),
   },
   (t) => [index('scores_student_idx').on(t.studentId), uniqueIndex('scores_item_student_unique').on(t.itemId, t.studentId)],
