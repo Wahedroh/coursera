@@ -79,18 +79,38 @@ export type ScoreRow = {
   score: number | null
   absent: boolean
   note: string
+  /** โบนัสพัฒนาการที่รวมอยู่ใน score */
+  bonus: number
 }
 
 export type ScoreSheet = {
-  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean; makeupDays: number; examSetId: string | null }
+  item: { id: string; classId: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; published: boolean; makeupDays: number; examSetId: string | null; improvementBonus: boolean }
   class: { id: string; name: string }
   students: ScoreRow[]
+  /** โบนัสพัฒนาการรายคน (เมื่อเปิดไว้) · คนที่ไม่มีครั้งก่อนจะไม่อยู่ในนี้ */
+  bonusInfo?: Record<string, BonusInfo>
 }
 
 /** หมายเหตุเป็นของครูเท่านั้น ไม่ส่งให้นักเรียน */
-export type StudentScore = { id: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; score: number | null; absent: boolean }
+export type StudentScore = { id: string; title: string; category: ScoreCategory; maxScore: number; takenOn: string; score: number | null; absent: boolean; bonus: number }
 
 export type ScoreBook = {
   items: { id: string; title: string; maxScore: number; takenOn: string }[]
   cells: Record<string, Record<string, { score: number | null; absent: boolean }>>
 }
+
+// ---------- โบนัสพัฒนาการ ----------
+/** กติกา: ได้ 25% ของส่วนที่ขึ้น (จุด %) · ต้องขึ้นอย่างน้อย 10 จุด % · สูงสุด 10% ของคะแนนเต็ม · ได้ ≥ 80% ทั้งสองครั้ง (รักษาระดับ) ได้ 5% · ปัดลงทีละ 0.5 · รวมไม่เกินคะแนนเต็ม */
+export const IMPROVEMENT_BONUS = { share: 0.25, minGain: 10, capPct: 10, keepPct: 80, keepBonusPct: 5 } as const
+export function improvementBonus(prevPct: number | null, raw: number, max: number): number {
+  if (prevPct === null || max <= 0) return 0
+  const nowPct = (raw / max) * 100
+  const gain = nowPct - prevPct
+  const B = IMPROVEMENT_BONUS
+  let pct = gain >= B.minGain ? Math.min(B.capPct, gain * B.share) : 0
+  if (prevPct >= B.keepPct && nowPct >= B.keepPct) pct = Math.max(pct, B.keepBonusPct)
+  const pts = Math.floor(((pct / 100) * max + 1e-9) * 2) / 2
+  return Math.max(0, Math.min(pts, max - raw))
+}
+/** ข้อมูลโบนัสต่อคน (หน้ากรอกคะแนนของครู) */
+export type BonusInfo = { prevTitle: string; prevPct: number; nowPct: number; bonus: number }

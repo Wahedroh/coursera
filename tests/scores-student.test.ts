@@ -29,7 +29,7 @@ it('เผยแพร่แล้วเห็นเฉพาะคะแนน�
   const { cookie, a, b, itemId } = await setup()
   await publish(itemId, true, cookie)
   const mine = await json(await getJson('/api/student/scores', await studentCookie(a.id)))
-  expect(mine).toEqual([{ id: itemId, title: 'กลางภาค', category: 'midterm', maxScore: 30, takenOn: '2026-10-15', score: 25, absent: false }])
+  expect(mine).toEqual([{ id: itemId, title: 'กลางภาค', category: 'midterm', maxScore: 30, takenOn: '2026-10-15', score: 25, absent: false, bonus: 0 }])
   expect(JSON.stringify(mine)).not.toContain('ดีมาก')
   const theirs = await json(await getJson('/api/student/scores', await studentCookie(b.id)))
   expect(theirs[0]).toMatchObject({ score: 12 })

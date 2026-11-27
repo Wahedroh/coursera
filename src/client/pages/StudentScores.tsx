@@ -83,6 +83,7 @@ export default function StudentScores() {
                 <span className="text-2xl font-extrabold text-board">
                   {s.score}
                   <span className="text-sm font-semibold text-stone-500">/{s.maxScore}</span>
+                  {s.bonus > 0 && <span className="block text-xs font-bold text-violet-700" data-testid="my-bonus">รวมโบนัสพัฒนาการ +{s.bonus} 🚀</span>}
                 </span>
               )}
             </div>

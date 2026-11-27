@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { api, fullName } from '../api'
-import { CATEGORY_LABEL, SCORE_CATEGORIES, parsePastedColumn, parseScore, scoreStats, type ScoreCategory, type ScoreRow, type ScoreSheet } from '../../shared/scores'
+import { CATEGORY_LABEL, IMPROVEMENT_BONUS, improvementBonus, SCORE_CATEGORIES, parsePastedColumn, parseScore, scoreStats, type ScoreCategory, type ScoreRow, type ScoreSheet } from '../../shared/scores'
 import { formatDate } from '../lib/format'
 import type { ExamSetSummary } from '../../shared/makeupExam'
 import ZipgradeImport from '../components/ZipgradeImport'
@@ -13,7 +13,11 @@ type RowState = 'idle' | 'saving' | 'saved' | 'invalid' | 'error'
 /** score/absent/note = ค่าที่บันทึกในเซิร์ฟเวอร์แล้ว; text/noteText/absentDraft = ค่าบนหน้าจอ */
 type Row = ScoreRow & { text: string; noteText: string; absentDraft: boolean; state: RowState }
 
-const toRow = (s: ScoreRow): Row => ({ ...s, text: s.score === null ? '' : String(s.score), noteText: s.note, absentDraft: s.absent, state: 'idle' })
+// ช่องกรอก = คะแนนสอบจริง (ไม่รวมโบนัสพัฒนาการ)
+const toRow = (s: ScoreRow): Row => {
+  const score = s.score === null ? null : Math.round((s.score - (s.bonus ?? 0)) * 100) / 100
+  return { ...s, score, text: score === null ? '' : String(score), noteText: s.note, absentDraft: s.absent, state: 'idle' }
+}
 const input = 'w-full border-2 border-line rounded-xl px-3 py-2 bg-white'
 
 export default function TeacherScoreEntry() {
@@ -146,6 +150,23 @@ export default function TeacherScoreEntry() {
     }
   }
 
+  async function toggleBonus() {
+    if (!sheet) return
+    const enabled = !sheet.item.improvementBonus
+    try {
+      await api(`/api/teacher/score-items/${id}/bonus`, { method: 'PUT', body: { enabled } })
+      load()
+    } catch (e) {
+      setError(handle(e))
+    }
+  }
+  /** โบนัสของแถวนี้ (คิดในเครื่องด้วยกติกาเดียวกับเซิร์ฟเวอร์) */
+  const bonusOf = (r: Row) => {
+    const info = sheet?.bonusInfo?.[r.id]
+    if (!sheet?.item.improvementBonus || !info || r.absentDraft || r.score === null) return null
+    return { ...info, bonus: improvementBonus(info.prevPct, r.score, sheet.item.maxScore) }
+  }
+
   async function remove() {
     if (!sheet || !window.confirm(`ลบรายการ "${sheet.item.title}" และคะแนนทั้งหมดในรายการนี้?`)) return
     try {
@@ -209,8 +230,19 @@ export default function TeacherScoreEntry() {
           <button type="button" onClick={() => setEditing((v) => !v)} className="rounded-2xl border-2 border-line bg-white px-4 py-2 font-bold">
             แก้รายละเอียด
           </button>
+          {it.category !== 'other' && (
+            <button type="button" onClick={() => void toggleBonus()} aria-pressed={it.improvementBonus} className={`rounded-2xl px-4 py-2 font-bold ${it.improvementBonus ? 'bg-violet-600 text-white' : 'border-2 border-line bg-white'}`}>
+              🚀 โบนัสพัฒนาการ: {it.improvementBonus ? 'เปิด' : 'ปิด'}
+            </button>
+          )}
         </div>
       </div>
+      {it.improvementBonus && (
+        <Card className="p-3 bg-violet-50 border-violet-200 text-sm" >
+          <b>🚀 โบนัสพัฒนาการ</b> — เทียบกับสอบครั้งก่อนของแต่ละคน (หมวดเดียวกันก่อน) · ขึ้นตั้งแต่ {IMPROVEMENT_BONUS.minGain} จุด % ได้ {IMPROVEMENT_BONUS.share * 100}% ของส่วนที่ขึ้น · สูงสุด {IMPROVEMENT_BONUS.capPct}% ของคะแนนเต็ม ({(it.maxScore * IMPROVEMENT_BONUS.capPct) / 100} คะแนน) · ได้ ≥{IMPROVEMENT_BONUS.keepPct}% ทั้งสองครั้งได้ {IMPROVEMENT_BONUS.keepBonusPct}% · ปัดลงทีละ 0.5 · รวมไม่เกินคะแนนเต็ม
+          <span className="block text-xs text-stone-600">ช่องกรอก = คะแนนสอบจริง (ตรงกับกระดาษ) · คะแนนที่นับในสมุดคะแนน/เกรด = คะแนนจริง + โบนัส · ได้โบนัส {rows.filter((r) => (bonusOf(r)?.bonus ?? 0) > 0).length} คน</span>
+        </Card>
+      )}
       <div className="flex flex-wrap">
         <ZipgradeImport
           sheet={{ ...sheet, students: rows }}
@@ -335,6 +367,15 @@ export default function TeacherScoreEntry() {
                     </span>
                   </div>
                   {r.state === 'invalid' && <span className="block text-xs text-red-600">0–{it.maxScore} ทศนิยมไม่เกิน 2 ตำแหน่ง</span>}
+                  {(() => {
+                    const b = bonusOf(r)
+                    return b ? (
+                      <span className={`block text-xs ${b.bonus > 0 ? 'font-bold text-violet-700' : 'text-stone-400'}`} data-testid={`bonus-${r.zipgradeId}`} title={`ครั้งก่อน: ${b.prevTitle}`}>
+                        {b.bonus > 0 ? `+${b.bonus} 🚀 ` : ''}
+                        {b.prevPct}% → {Math.round((r.score! / it.maxScore) * 1000) / 10}%
+                      </span>
+                    ) : null
+                  })()}
                 </td>
                 <td className="p-2 text-center">
                   <input type="checkbox" aria-label={`ขาดสอบ ${r.firstName} ${r.lastName}`} checked={r.absentDraft} onChange={(e) => void commit(i, { absent: e.target.checked })} />

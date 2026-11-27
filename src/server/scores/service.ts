@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, isNotNull, lt, or, sql } from 'drizzle-orm'
 import type { ScoreImportInput, ScoreImportResult } from '../../shared/zipgrade-results'
 import { canonicalZipgradeId } from '../../shared/zipgrade'
-import { validScore, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
+import { improvementBonus, validScore, type BonusInfo, type ScoreBook, type ScoreInput, type ScoreItemInput, type ScoreItemSummary, type ScoreSheet, type StudentScore } from '../../shared/scores'
 import { newId, now, type Db } from '../db/client'
 import { classes, examSets, scoreItems, scores, students } from '../db/schema'
 import { apiError } from '../http'
@@ -77,15 +77,17 @@ export async function getScoreSheet(db: Db, id: string): Promise<ScoreSheet> {
       score: scores.score,
       absent: scores.absent,
       note: scores.note,
+      bonus: scores.bonus,
     })
     .from(students)
     .leftJoin(scores, and(eq(scores.studentId, students.id), eq(scores.itemId, id)))
     .where(activeIn(item.classId))
     .orderBy(students.sortOrder, students.zipgradeId)
   return {
-    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published, makeupDays: item.makeupDays, examSetId: item.examSetId },
+    item: { id: item.id, classId: item.classId, title: item.title, category: item.category, maxScore: item.maxScore, takenOn: item.takenOn, published: item.published, makeupDays: item.makeupDays, examSetId: item.examSetId, improvementBonus: item.improvementBonus },
     class: cls,
-    students: rows.map((r) => ({ ...r, score: r.score ?? null, absent: r.absent ?? false, note: r.note ?? '' })),
+    students: rows.map((r) => ({ ...r, score: r.score ?? null, absent: r.absent ?? false, note: r.note ?? '', bonus: r.bonus ?? 0 })),
+    ...(item.improvementBonus ? { bonusInfo: await bonusInfo(db, item, rows.filter((r) => r.score !== null && !r.absent).map((r) => ({ studentId: r.id, raw: r.score! - (r.bonus ?? 0) }))) } : {}),
   }
 }
 
@@ -99,11 +101,12 @@ export async function updateScoreItem(db: Db, id: string, input: ScoreItemInput)
   const r = await db.$client
     .prepare(
       `UPDATE score_items SET title = ?, category = ?, max_score = ?, taken_on = ?, makeup_days = ?, exam_set_id = iif(?, ?, exam_set_id), updated_at = ?
-       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE item_id = ? AND score > ?)`,
+       WHERE id = ? AND NOT EXISTS (SELECT 1 FROM scores WHERE item_id = ? AND score - bonus > ?)`,
     )
     .bind(input.title, input.category, input.maxScore, input.takenOn, input.makeupDays, input.examSetId === undefined ? 0 : 1, input.examSetId ?? null, now(), id, id, input.maxScore)
     .run()
   if (r.meta.changes === 0) throw apiError('scores_exceed_max', 'มีคะแนนที่กรอกแล้วเกินคะแนนเต็มใหม่ กรุณาแก้คะแนนก่อน', 409)
+  await recomputeBonus(db, id)
 }
 
 export async function setPublished(db: Db, id: string, published: boolean): Promise<void> {
@@ -132,11 +135,18 @@ export async function saveScore(db: Db, itemId: string, studentId: string, input
   if (score !== null && !validScore(score, item.maxScore)) {
     throw apiError('invalid_score', `คะแนนต้องอยู่ระหว่าง 0 ถึง ${item.maxScore} (ทศนิยมไม่เกิน 2 ตำแหน่ง)`, 400)
   }
-  const values = { score, absent: input.absent, note: input.note, updatedAt: t }
+  // บันทึกคะแนนสอบจริง แล้วค่อยคิดโบนัสพัฒนาการ (ถ้าเปิดไว้)
+  const values = { score, absent: input.absent, note: input.note, bonus: 0, updatedAt: t }
   await db
     .insert(scores)
     .values({ id: newId(), itemId, studentId, ...values })
     .onConflictDoUpdate({ target: [scores.itemId, scores.studentId], set: values })
+  if (item.improvementBonus) await recomputeBonus(db, itemId, [studentId])
+  // สอบครั้งหลัง ๆ ที่เปิดโบนัสไว้ ใช้ครั้งนี้เป็นฐาน → คิดใหม่ให้คนนี้
+  const later = await db.all<{ id: string }>(sql`
+    SELECT id FROM score_items WHERE class_id = ${item.classId} AND improvement_bonus = 1 AND id != ${item.id}
+      AND (taken_on > ${item.takenOn} OR (taken_on = ${item.takenOn} AND created_at > ${item.createdAt})) ORDER BY taken_on LIMIT 5`)
+  for (const l of later) await recomputeBonus(db, l.id, [studentId])
 }
 
 export async function scoresForStudent(db: Db, studentId: string, classId: string): Promise<StudentScore[]> {
@@ -155,6 +165,7 @@ export async function scoresForStudent(db: Db, studentId: string, classId: strin
     takenOn: i.takenOn,
     score: s?.score ?? null,
     absent: s?.absent ?? false,
+    bonus: s?.bonus ?? 0,
   }))
 }
 
@@ -220,7 +231,7 @@ export async function importScores(db: Db, itemId: string, input: ScoreImportInp
   }
   for (let i = 0; i < writes.length; i += 40) {
     const stmts = writes.slice(i, i + 40).map((w) => {
-      const values = { score: w.score, absent: w.absent, note: w.note, updatedAt: t }
+      const values = { score: w.score, absent: w.absent, note: w.note, bonus: 0, updatedAt: t }
       return db
         .insert(scores)
         .values({ id: newId(), itemId, studentId: w.studentId, ...values })
@@ -228,5 +239,64 @@ export async function importScores(db: Db, itemId: string, input: ScoreImportInp
     })
     await db.batch(stmts as [(typeof stmts)[number], ...(typeof stmts)[number][]])
   }
+  if (item.improvementBonus) await recomputeBonus(db, itemId)
   return result
+}
+
+// ---------- โบนัสพัฒนาการ ----------
+type Item = typeof scoreItems.$inferSelect
+/** คะแนนสอบจริงครั้งก่อน (%) ของแต่ละคน: รายการก่อนหน้าในห้องเดียวกัน หมวดเดียวกันก่อน แล้วค่อยหมวดอื่น (ไม่นับเกมการ์ด/อื่น ๆ) */
+async function previousPct(db: Db, item: Item, studentIds: string[]): Promise<Map<string, { title: string; pct: number }>> {
+  const out = new Map<string, { title: string; pct: number }>()
+  if (!studentIds.length) return out
+  const prev = await db.all<{ id: string; title: string; maxScore: number }>(sql`
+    SELECT id, title, max_score AS maxScore FROM score_items
+    WHERE class_id = ${item.classId} AND id != ${item.id} AND category != 'other'
+      AND (taken_on < ${item.takenOn} OR (taken_on = ${item.takenOn} AND created_at < ${item.createdAt}))
+    ORDER BY (category = ${item.category}) DESC, taken_on DESC, created_at DESC LIMIT 30`)
+  if (!prev.length) return out
+  const rows = await db.all<{ itemId: string; studentId: string; raw: number }>(sql`
+    SELECT item_id AS itemId, student_id AS studentId, score - bonus AS raw FROM scores
+    WHERE item_id IN (${sql.join(prev.map((p) => sql`${p.id}`), sql`, `)}) AND absent = 0 AND score IS NOT NULL`)
+  const want = new Set(studentIds)
+  for (const p of prev)
+    for (const r of rows)
+      if (r.itemId === p.id && want.has(r.studentId) && !out.has(r.studentId)) out.set(r.studentId, { title: p.title, pct: (r.raw / p.maxScore) * 100 })
+  return out
+}
+
+async function bonusInfo(db: Db, item: Item, people: { studentId: string; raw: number }[]): Promise<Record<string, BonusInfo>> {
+  const prev = await previousPct(db, item, people.map((p) => p.studentId))
+  const out: Record<string, BonusInfo> = {}
+  for (const p of people) {
+    const pr = prev.get(p.studentId)
+    if (pr) out[p.studentId] = { prevTitle: pr.title, prevPct: Math.round(pr.pct * 10) / 10, nowPct: Math.round((p.raw / item.maxScore) * 1000) / 10, bonus: improvementBonus(pr.pct, p.raw, item.maxScore) }
+  }
+  return out
+}
+
+/** คิดโบนัสพัฒนาการใหม่ (ทั้งรายการ หรือเฉพาะบางคน) · ปิดโบนัสอยู่ = ถอดโบนัสออกคืนคะแนนจริง */
+export async function recomputeBonus(db: Db, itemId: string, only?: string[]): Promise<void> {
+  const item = await getItem(db, itemId)
+  const rows = (await db.select({ studentId: scores.studentId, score: scores.score, bonus: scores.bonus, absent: scores.absent }).from(scores).where(eq(scores.itemId, itemId))).filter(
+    (r) => !only || only.includes(r.studentId),
+  )
+  const on = item.improvementBonus && item.category !== 'other'
+  const people = rows.filter((r) => r.score !== null && !r.absent).map((r) => ({ studentId: r.studentId, raw: r.score! - r.bonus, old: r.bonus }))
+  const prev = on ? await previousPct(db, item, people.map((p) => p.studentId)) : new Map<string, { title: string; pct: number }>()
+  const stmts = people
+    .map((p) => ({ ...p, bonus: on ? improvementBonus(prev.get(p.studentId)?.pct ?? null, p.raw, item.maxScore) : 0 }))
+    .filter((p) => p.bonus !== p.old)
+    .map((p) => db.update(scores).set({ score: Math.round((p.raw + p.bonus) * 100) / 100, bonus: p.bonus }).where(and(eq(scores.itemId, itemId), eq(scores.studentId, p.studentId))))
+  for (let i = 0; i < stmts.length; i += 40) {
+    const chunk = stmts.slice(i, i + 40)
+    await db.batch(chunk as [(typeof chunk)[number], ...(typeof chunk)[number][]])
+  }
+}
+
+export async function setImprovementBonus(db: Db, itemId: string, enabled: boolean): Promise<void> {
+  const item = await getItem(db, itemId)
+  if (enabled && item.category === 'other') throw apiError('bonus_not_allowed', 'โบนัสพัฒนาการใช้ได้กับรายการสอบเท่านั้น', 400)
+  await db.update(scoreItems).set({ improvementBonus: enabled, updatedAt: now() }).where(eq(scoreItems.id, itemId))
+  await recomputeBonus(db, itemId)
 }
