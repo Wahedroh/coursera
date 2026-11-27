@@ -18,8 +18,8 @@ it('ศึกสอบ: ข้อสอบชุดเดียวกันต�
   const a = await seedClass(db(), { name: 'ม.2/1', schoolName: 'โรงเรียนเอ' })
   const b = await seedClass(db(), { name: 'ม.2/3', schoolName: 'โรงเรียนบี' })
   const c = await seedClass(db(), { name: 'ม.2/5', schoolName: 'โรงเรียนซี' })
-  const sa = await Promise.all([0, 1, 2, 3].map((i) => seedStudent(db(), a.classId, { zipgradeId: `a${i}` })))
-  const sb = await Promise.all([0, 1, 2].map((i) => seedStudent(db(), b.classId, { zipgradeId: `b${i}` })))
+  const sa = await Promise.all([0, 1, 2, 3].map((i) => seedStudent(db(), a.classId, { zipgradeId: `a${i}`, firstName: `ชื่อจริงเอ${i}` })))
+  const sb = await Promise.all([0, 1, 2].map((i) => seedStudent(db(), b.classId, { zipgradeId: `b${i}`, firstName: `ชื่อจริงบี${i}` })))
   const sc = await Promise.all([0, 1].map((i) => seedStudent(db(), c.classId, { zipgradeId: `c${i}` })))
   // ครั้งก่อนของห้อง b (ไว้คิดพัฒนาการ)
   await exam(cookie, b.classId, 'สอบย่อยบทที่ 2', '2026-11-10', [4, 5, 6], sb.map((s) => s.id))
@@ -35,10 +35,28 @@ it('ศึกสอบ: ข้อสอบชุดเดียวกันต�
     { classId: a.classId, className: 'ม.2/1', schoolName: 'โรงเรียนเอ', n: 3, avgPct: 60, passPct: 66.7, deltaPct: null, rank: 2 },
   ])
 
-  // นักเรียนเห็นเฉพาะศึกที่ห้องตัวเองอยู่ + ห้องตัวเองถูกไฮไลต์ · ไม่มีชื่อ/คะแนนรายคน
-  const mine = await json(await getJson('/api/student/battles', await studentCookie(sa[0].id)))
+  // อันดับรายคน (ทุกห้องรวม): ชื่อเล่น + โรงเรียน เท่านั้น · คะแนนเท่ากันอันดับเดียวกัน
+  expect(all[0].players).toBe(6)
+  expect(all[0].top.map((p: { rank: number; score: number; schoolName: string }) => [p.rank, p.score, p.schoolName])).toEqual([
+    [1, 9, 'โรงเรียนบี'],
+    [2, 8, 'โรงเรียนบี'],
+    [2, 8, 'โรงเรียนเอ'],
+    [4, 7, 'โรงเรียนบี'],
+    [5, 6, 'โรงเรียนเอ'],
+    [6, 4, 'โรงเรียนเอ'],
+  ])
+  expect(all[0].top[0].nickname).toBe('ยังไม่ตั้งชื่อเล่น')
+
+  // นักเรียนเห็นเฉพาะศึกที่ห้องตัวเองอยู่ + ห้องตัวเองถูกไฮไลต์ + อันดับของตัวเอง · ไม่มีชื่อจริง/รหัส
+  const ca = await studentCookie(sa[0].id)
+  await putJson('/api/student/avatar', { nickname: 'เทพเวกเตอร์', config: { gender: 'm', skin: 0, hair: 'short', hairColor: 1, job: 'student', glasses: false } }, ca)
+  const mine = await json(await getJson('/api/student/battles', ca))
   expect(mine[0].rows.find((r: { mine: boolean }) => r.mine).classId).toBe(a.classId)
-  expect(JSON.stringify(mine)).not.toMatch(/firstName|zipgrade|"score"/)
+  expect(mine[0].me).toEqual({ rank: 2, score: 8, pct: 80 })
+  expect(mine[0].top.find((p: { mine: boolean }) => p.mine)).toMatchObject({ nickname: 'เทพเวกเตอร์', schoolName: 'โรงเรียนเอ', rank: 2 })
+  expect(JSON.stringify(mine)).not.toContain('ชื่อจริง')
+  for (const x of [...sa, ...sb]) expect(JSON.stringify(mine)).not.toContain(`"${x.zipgradeId}"`)
+  expect(JSON.stringify(mine)).not.toMatch(/studentId|firstName|zipgrade/)
   expect(await json(await getJson('/api/student/battles', await studentCookie(sc[0].id)))).toEqual([])
 
   // ครูปิดศึกสอบของห้อง b → เหลือห้องเดียว ไม่เป็นศึก

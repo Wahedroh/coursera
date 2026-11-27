@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
-import { BATTLE_MIN_SCORED, BATTLE_PASS_PCT, type BattleRow, type ExamBattle } from '../../shared/battle'
+import { BATTLE_MIN_SCORED, BATTLE_PASS_PCT, BATTLE_TOP, NO_NICKNAME, type BattleRow, type ExamBattle } from '../../shared/battle'
 import type { Db } from '../db/client'
 import { settings } from '../db/schema'
 import { termWindow } from '../terms/service'
@@ -17,7 +17,7 @@ export async function setBattle(db: Db, classId: string, enabled: boolean): Prom
 }
 
 /** ศึกสอบของเทอมนี้ (ใหม่สุดก่อน) · onlyClass = เฉพาะศึกที่ห้องนี้อยู่ (มุมนักเรียน) */
-export async function examBattles(db: Db, onlyClass?: string): Promise<ExamBattle[]> {
+export async function examBattles(db: Db, onlyClass?: string, studentId?: string): Promise<ExamBattle[]> {
   const { start } = await termWindow(db)
   // สถิติทุกรายการสอบที่เผยแพร่แล้วของเทอมนี้ (ไม่นับเกมการ์ด/อื่น ๆ · ห้องที่ไม่เก็บถาวร · ห้องที่ไม่ได้ปิดศึกสอบ)
   const items = await db.all<{ id: string; title: string; maxScore: number; takenOn: string; classId: string; className: string; schoolName: string; n: number; avg: number | null; pass: number }>(sql`
@@ -45,13 +45,30 @@ export async function examBattles(db: Db, onlyClass?: string): Promise<ExamBattl
     const key = `${it.title.trim().toLowerCase()}|${it.maxScore}`
     groups.set(key, [...(groups.get(key) ?? []), it])
   }
-  const out: ExamBattle[] = []
+  // ศึกที่มีจริง (≥ 2 ห้อง) ก่อน แล้วค่อยดึงคะแนนรายคนของรายการในศึกเหล่านั้น
+  const picked: { key: string; list: (typeof items)[number][] }[] = []
   for (const [key, xs] of groups) {
-    // ห้องเดียวกันมีชื่อซ้ำ: ใช้ครั้งล่าสุด
     const latest = new Map<string, (typeof xs)[number]>()
     for (const x of xs) if (!latest.get(x.classId) || latest.get(x.classId)!.takenOn < x.takenOn) latest.set(x.classId, x)
-    const list = [...latest.values()]
-    if (list.length < 2 || (onlyClass && !latest.has(onlyClass))) continue
+    if (latest.size >= 2 && (!onlyClass || latest.has(onlyClass))) picked.push({ key, list: [...latest.values()] })
+  }
+  const ids = picked.flatMap((p) => p.list.map((x) => x.id))
+  type P = { itemId: string; studentId: string; score: number; schoolName: string; nickname: string | null; config: string | null }
+  const people: P[] = []
+  for (let i = 0; i < ids.length; i += 80) {
+    const chunk = ids.slice(i, i + 80)
+    people.push(
+      ...(await db.all<P>(sql`
+        SELECT s.item_id AS itemId, s.student_id AS studentId, s.score, sc.name AS schoolName, a.nickname, a.config
+        FROM scores s JOIN students st ON st.id = s.student_id JOIN score_items i ON i.id = s.item_id JOIN classes c ON c.id = i.class_id JOIN schools sc ON sc.id = c.school_id
+          LEFT JOIN student_avatars a ON a.student_id = s.student_id
+        WHERE s.item_id IN (${sql.join(chunk.map((x) => sql`${x}`), sql`, `)}) AND s.absent = 0 AND s.score IS NOT NULL AND st.active = 1`)),
+    )
+  }
+
+  const out: ExamBattle[] = []
+  for (const { key, list: xs } of picked) {
+    const list = xs
     const rows: BattleRow[] = list
       .map((x) => {
         const p = prevAvg(x)
@@ -60,7 +77,33 @@ export async function examBattles(db: Db, onlyClass?: string): Promise<ExamBattl
       .sort((a, b) => b.avgPct - a.avgPct || b.passPct - a.passPct)
     rows.forEach((r, i) => (r.rank = i > 0 && r.avgPct === rows[i - 1].avgPct && r.passPct === rows[i - 1].passPct ? rows[i - 1].rank : i + 1))
     const up = rows.filter((r) => r.deltaPct !== null && r.deltaPct > 0).sort((a, b) => b.deltaPct! - a.deltaPct!)[0]
-    out.push({ key, title: list[0].title.trim(), maxScore: list[0].maxScore, takenOn: list.map((x) => x.takenOn).sort().at(-1)!, rows, mostImproved: up?.classId ?? null })
+    // อันดับรายคน: คะแนนเท่ากันได้อันดับเดียวกัน · แสดงแค่ชื่อเล่น + โรงเรียน
+    const inBattle = new Set(list.map((x) => x.id))
+    const ps = people.filter((p) => inBattle.has(p.itemId)).sort((a, b) => b.score - a.score || a.schoolName.localeCompare(b.schoolName) || (a.nickname ?? '').localeCompare(b.nickname ?? '') || a.studentId.localeCompare(b.studentId))
+    const ranked = ps.map((p, i) => ({ p, rank: 0, i }))
+    ranked.forEach((r, i) => (r.rank = i > 0 && r.p.score === ranked[i - 1].p.score ? ranked[i - 1].rank : i + 1))
+    const max = list[0].maxScore
+    const view = (r: (typeof ranked)[number]) => ({
+      rank: r.rank,
+      nickname: (r.p.nickname ?? '').trim() || NO_NICKNAME,
+      schoolName: r.p.schoolName,
+      score: r.p.score,
+      pct: r1((r.p.score * 100) / max),
+      avatar: r.p.config ? JSON.parse(r.p.config) : null,
+      ...(studentId ? { mine: r.p.studentId === studentId } : {}),
+    })
+    const meRow = studentId ? ranked.find((r) => r.p.studentId === studentId) : undefined
+    out.push({
+      key,
+      title: list[0].title.trim(),
+      maxScore: max,
+      takenOn: list.map((x) => x.takenOn).sort().at(-1)!,
+      rows,
+      mostImproved: up?.classId ?? null,
+      top: ranked.slice(0, BATTLE_TOP).map(view),
+      players: ranked.length,
+      me: meRow ? { rank: meRow.rank, score: meRow.p.score, pct: r1((meRow.p.score * 100) / max) } : null,
+    })
   }
   return out.sort((a, b) => b.takenOn.localeCompare(a.takenOn))
 }

@@ -16,6 +16,22 @@ export type BattleRow = {
   rank: number
   mine?: boolean
 }
+/** อันดับรายคนสูงสุดของศึกสอบ */
+export const BATTLE_TOP = 10
+/** ชื่อที่แสดงเมื่อนักเรียนยังไม่ตั้งชื่อเล่น (ไม่แสดงชื่อจริง) */
+export const NO_NICKNAME = 'ยังไม่ตั้งชื่อเล่น'
+/** ผู้เล่นในอันดับรายคน: แสดงเฉพาะชื่อเล่น (ชื่อในเกม) + โรงเรียน · ไม่มีชื่อจริง/ห้อง/รหัส */
+export type BattlePlayer = {
+  rank: number
+  nickname: string
+  schoolName: string
+  score: number
+  pct: number
+  /** ตัวละคร (ไว้แสดงบนโพเดียม) */
+  avatar: unknown
+  mine?: boolean
+}
+
 export type ExamBattle = {
   key: string
   title: string
@@ -25,4 +41,10 @@ export type ExamBattle = {
   rows: BattleRow[]
   /** ห้องที่พัฒนาขึ้นมากที่สุด (ต้องขึ้นจริง) */
   mostImproved: string | null
+  /** อันดับรายคน 10 อันดับแรก (ทุกห้องรวมกัน) */
+  top: BattlePlayer[]
+  /** จำนวนคนที่มีคะแนนทั้งหมด */
+  players: number
+  /** อันดับของฉัน (มุมนักเรียน) */
+  me: { rank: number; score: number; pct: number } | null
 }

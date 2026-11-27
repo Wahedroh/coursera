@@ -34,6 +34,13 @@ test('ศึกสอบ: ข้อสอบชุดเดียวกัน 2 
   await s.goto('/me/scores')
   const mine = s.getByTestId('battle-card').filter({ hasText: 'ศึกสอบบทที่ 4' })
   await expect(mine).toContainText('ห้องเราได้อันดับ 1 จาก 2 ห้อง')
+  // อันดับรายคน (ทุกโรงเรียน): ชื่อเล่น + โรงเรียน · ไม่แสดงชื่อจริง
+  await mine.getByRole('tab', { name: '🏅 อันดับรายคน' }).click()
+  const people = mine.getByTestId('battle-people')
+  await expect(people).toContainText('โรงเรียนทดสอบ')
+  await expect(people).toContainText('โรงเรียนตัวอย่าง')
+  await expect(people).not.toContainText('มานี')
+  await expect(people).not.toContainText('สมใจ')
 
   // ครูปิดศึกสอบของห้องชั้น 5 → ไม่มีคู่แข่ง ศึกนี้หายไป
   await t.getByLabel('เข้าร่วมศึกสอบ โรงเรียนตัวอย่าง ชั้น 5').uncheck()

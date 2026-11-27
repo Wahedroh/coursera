@@ -20,5 +20,5 @@ export const studentBattleRoutes = new Hono<AppEnv>()
 studentBattleRoutes.use('*', requireStudent)
 studentBattleRoutes.get('/', async (c) => {
   const s = c.get('session') as Extract<SessionInfo, { kind: 'student' }>
-  return c.json(await examBattles(getDb(c.env), s.classId))
+  return c.json(await examBattles(getDb(c.env), s.classId, s.studentId))
 })
