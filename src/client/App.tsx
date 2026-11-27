@@ -56,6 +56,7 @@ import TeacherGrades from './pages/TeacherGrades'
 import TeacherLogin from './pages/TeacherLogin'
 import TeacherMakeupExams, { TeacherMakeupExamDetail } from './pages/TeacherMakeupExams'
 import TeacherExamSets from './pages/TeacherExamSets'
+import TeacherBattles from './pages/TeacherBattles'
 import StudentMakeupExam from './pages/StudentMakeupExam'
 
 export default function App() {
@@ -92,6 +93,7 @@ export default function App() {
         <Route path="/teacher/makeup-exams" element={<TeacherMakeupExams />} />
         <Route path="/teacher/makeup-exams/:id" element={<TeacherMakeupExamDetail />} />
         <Route path="/teacher/exam-sets" element={<TeacherExamSets />} />
+        <Route path="/teacher/battles" element={<TeacherBattles />} />
         <Route path="/teacher/library" element={<TeacherLibrary />} />
         <Route path="/teacher/notifications" element={<TeacherNotifications />} />
         <Route path="/teacher/classes/:id" element={<TeacherClass />} />
