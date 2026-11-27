@@ -1,0 +1,34 @@
+import { expect, test } from '@playwright/test'
+
+const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
+
+test('หน้าแรกครู: ปฏิทินสัปดาห์นี้ · เพิ่ม “ปริ้นเอกสาร” วันนี้ → ติ๊กทำแล้ว · นัดสอบขึ้นในวันนั้น + ปุ่มเตือนปริ้น', async ({ browser }) => {
+  const t = await (await browser.newContext()).newPage()
+  await t.goto('/teacher/login')
+  await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
+  await t.getByRole('button', { name: 'เข้าสู่ระบบ' }).click()
+  await expect(t.getByRole('heading', { name: /สวัสดีครับครู/ })).toBeVisible()
+  const schools = await (await t.request.get('/api/teacher/classes')).json()
+  const cls = schools.flatMap((s: { classes: { id: string; name: string }[] }) => s.classes).find((c: { name: string }) => c.name === 'โรงเรียนทดสอบ ชั้น 1')
+  // นัดสอบพรุ่งนี้ (ถ้าพรุ่งนี้ข้ามสัปดาห์ ใช้วันนี้)
+  const d = today()
+  await t.request.post('/api/teacher/events', { data: { kind: 'exam', title: 'สอบปลายบทเวกเตอร์', date: d, period: 'คาบ 2', detail: '', classIds: [cls.id] } })
+  await t.reload()
+
+  const week = t.getByTestId('teacher-week')
+  const day = week.getByTestId(`day-${d}`)
+  await expect(day).toContainText('วันนี้')
+  await expect(day).toContainText('สอบปลายบทเวกเตอร์')
+  await expect(day.getByRole('button', { name: 'เตือนปริ้นข้อสอบ สอบปลายบทเวกเตอร์' })).toBeVisible()
+
+  await day.getByRole('button', { name: /^เพิ่มสิ่งที่ต้องทำ/ }).click()
+  await day.getByRole('button', { name: '🖨️ ปริ้นเอกสาร' }).click()
+  await day.getByLabel('สิ่งที่ต้องทำ').fill('🖨️ ปริ้นเอกสาร ใบงานที่ 3 40 แผ่น')
+  await day.getByRole('button', { name: 'เพิ่ม', exact: true }).click()
+  await expect(day).toContainText('ปริ้นเอกสาร ใบงานที่ 3 40 แผ่น')
+  await expect(week.getByText('ต้องทำ 1')).toBeVisible()
+  await day.getByRole('checkbox', { name: /ทำแล้ว .*ใบงานที่ 3/ }).check()
+  await expect(week.getByText('ต้องทำ 1')).toHaveCount(0)
+  await t.reload()
+  await expect(t.getByTestId('teacher-week').getByRole('checkbox', { name: /ทำแล้ว .*ใบงานที่ 3/ })).toBeChecked()
+})

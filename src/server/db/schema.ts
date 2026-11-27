@@ -776,3 +776,18 @@ export const makeupPhotos = sqliteTable(
   },
   (t) => [index('makeup_photos_exam_idx').on(t.examId)],
 )
+
+/** สิ่งที่ครูต้องทำ (เช่น ปริ้นเอกสาร เตรียมข้อสอบ) — แสดงในปฏิทินรายสัปดาห์หน้าแรกครู */
+export const teacherTodos = sqliteTable(
+  'teacher_todos',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    /** วันที่ต้องทำ (YYYY-MM-DD) */
+    date: text('date').notNull(),
+    classId: text('class_id'),
+    doneAt: integer('done_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('teacher_todos_date_idx').on(t.date)],
+)
