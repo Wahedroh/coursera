@@ -13,10 +13,9 @@ const dayNum = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric
 const fmt = (d: string, f: Intl.DateTimeFormat) => f.format(Date.parse(`${d}T00:00:00Z`))
 const shift = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400_000).toISOString().slice(0, 10)
 
-/** หน้าแรกครู: ปฏิทินสัปดาห์นี้ (เสาร์–ศุกร์) — นัดสอบ · สอบย้อนหลัง · กำหนดส่ง · สิ่งที่ครูต้องทำ (ปริ้นเอกสาร ฯลฯ) */
+/** หน้าแรกครู: วันนี้ (บนสุด) + อีก 3 วัน — นัดสอบ · สอบย้อนหลัง · กำหนดส่ง · สิ่งที่ครูต้องทำ (ปริ้นเอกสาร ฯลฯ) */
 export default function TeacherWeek() {
   const today = todayBangkok()
-  const [anchor, setAnchor] = useState(today)
   const [w, setW] = useState<Week | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState<string | null>(null)
@@ -25,13 +24,13 @@ export default function TeacherWeek() {
 
   const load = useCallback(() => {
     let live = true
-    api<Week>(`/api/teacher/week?date=${anchor}`)
+    api<Week>('/api/teacher/upcoming')
       .then((x) => live && setW(x))
       .catch((e) => live && setError((e as Error).message))
     return () => {
       live = false
     }
-  }, [anchor])
+  }, [])
   useEffect(load, [load])
 
   async function add(date: string, t: string, classId: string | null = null) {
@@ -71,29 +70,18 @@ export default function TeacherWeek() {
     setFlash(`เพิ่ม “ปริ้นข้อสอบ ${x.title}” ไว้วัน${fmt(date, dayName)} ${fmt(date, dayNum)} แล้ว`)
   }
 
-  const isThisWeek = w ? today >= w.from && today <= w.to : true
   const pending = w?.days.flatMap((d) => d.items).filter((x) => x.kind === 'todo' && !x.done).length ?? 0
   return (
-    <section data-testid="teacher-week" aria-label="ปฏิทินสัปดาห์นี้">
+    <section data-testid="teacher-week" aria-label="วันนี้และ 3 วันข้างหน้า">
     <Card className="p-4 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-lg font-extrabold">
-          <Icon n="calendar" /> {isThisWeek ? 'สัปดาห์นี้' : 'สัปดาห์'} {w && `${fmt(w.from, dayNum)} – ${fmt(w.to, dayNum)}`}
+          <Icon n="calendar" /> วันนี้ และ 3 วันข้างหน้า
         </h2>
         {pending > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">ต้องทำ {pending}</span>}
-        <div className="flex gap-1 text-sm">
-          <button type="button" aria-label="สัปดาห์ก่อน" onClick={() => setAnchor(shift(anchor, -7))} className="rounded-lg border-2 border-line bg-white px-2 py-0.5 font-bold">
-            ‹
-          </button>
-          {!isThisWeek && (
-            <button type="button" onClick={() => setAnchor(today)} className="rounded-lg border-2 border-line bg-white px-2 py-0.5 font-bold">
-              สัปดาห์นี้
-            </button>
-          )}
-          <button type="button" aria-label="สัปดาห์หน้า" onClick={() => setAnchor(shift(anchor, 7))} className="rounded-lg border-2 border-line bg-white px-2 py-0.5 font-bold">
-            ›
-          </button>
-        </div>
+        <Link to="/teacher/calendar" className="text-xs font-semibold text-board underline">
+          ปฏิทินทั้งเดือน
+        </Link>
       </div>
       <ErrorBox message={error} />
       {flash && (
@@ -111,6 +99,7 @@ export default function TeacherWeek() {
                 <div className="text-xs font-bold">{fmt(d.date, dayName)}</div>
                 <div className={`text-sm font-extrabold ${isToday ? 'text-board' : ''}`}>{fmt(d.date, dayNum)}</div>
                 {isToday && <div className="text-[10px] font-bold text-amber-700">วันนี้</div>}
+                {d.date === shift(today, 1) && <div className="text-[10px] font-bold text-stone-500">พรุ่งนี้</div>}
               </div>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 {d.items.map((x) => (

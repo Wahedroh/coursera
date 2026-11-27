@@ -1,7 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { todayBangkok } from '../../shared/attendance'
 import type { TeacherWeek, WeekItem } from '../../shared/teacherWeek'
-import { weekOf } from '../../shared/workload'
 import { newId, type Db } from '../db/client'
 import { classes, teacherTodos } from '../db/schema'
 import { apiError } from '../http'
@@ -47,19 +46,17 @@ export async function teacherItems(db: Db, from: string, to: string): Promise<We
 
 const ORDER: Record<WeekItem['kind'], number> = { holiday: 0, exam: 1, makeup: 2, todo: 3, activity: 4, due: 5 }
 
-/** ปฏิทินรายสัปดาห์ (เสาร์–ศุกร์) ของสัปดาห์ที่มีวันที่ date */
-export async function teacherWeek(db: Db, date: string, today: string = todayBangkok(Date.now())): Promise<TeacherWeek> {
-  const { from, to } = weekOf(date)
+/** หน้าแรกครู: วันนี้ + อีก n−1 วันข้างหน้า · สิ่งที่ต้องทำที่ยังค้างจากวันก่อน ๆ ย้ายมาแสดงที่วันนี้ (ไม่ลืม) */
+export async function teacherUpcoming(db: Db, today: string, n = 4): Promise<TeacherWeek> {
+  const from = today
+  const to = addDay(today, n - 1)
   const all = await teacherItems(db, from, to)
-  // สัปดาห์นี้: สิ่งที่ต้องทำที่ยังค้างจากสัปดาห์ก่อน ๆ ย้ายมาแสดงที่วันนี้ (ไม่ลืม)
-  if (today >= from && today <= to) {
-    const old = await db.all<{ id: string; title: string; date: string; classId: string | null; className: string | null }>(sql`
-      SELECT t.id, t.title, t.date, t.class_id AS classId, c.name AS className FROM teacher_todos t LEFT JOIN classes c ON c.id = t.class_id
-      WHERE t.done_at IS NULL AND t.date < ${from} ORDER BY t.date LIMIT 50`)
-    const th = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric', month: 'short' })
-    all.push(...old.map((t) => ({ kind: 'todo' as const, id: t.id, title: t.title, date: today, time: `ค้างจาก ${th.format(Date.parse(`${t.date}T00:00:00Z`))}`, className: t.className ?? '', classId: t.classId, url: null, done: false })))
-  }
-  const days = Array.from({ length: 7 }, (_, i) => addDay(from, i)).map((d) => ({
+  const old = await db.all<{ id: string; title: string; date: string; classId: string | null; className: string | null }>(sql`
+    SELECT t.id, t.title, t.date, t.class_id AS classId, c.name AS className FROM teacher_todos t LEFT JOIN classes c ON c.id = t.class_id
+    WHERE t.done_at IS NULL AND t.date < ${from} ORDER BY t.date LIMIT 50`)
+  const th = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric', month: 'short' })
+  all.push(...old.map((t) => ({ kind: 'todo' as const, id: t.id, title: t.title, date: today, time: `ค้างจาก ${th.format(Date.parse(`${t.date}T00:00:00Z`))}`, className: t.className ?? '', classId: t.classId, url: null, done: false })))
+  const days = Array.from({ length: n }, (_, i) => addDay(from, i)).map((d) => ({
     date: d,
     items: all.filter((x) => x.date === d).sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || Number(a.done) - Number(b.done) || a.time.localeCompare(b.time)),
   }))
