@@ -13,14 +13,13 @@ const dayNum = new Intl.DateTimeFormat('th-TH', { timeZone: 'UTC', day: 'numeric
 const fmt = (d: string, f: Intl.DateTimeFormat) => f.format(Date.parse(`${d}T00:00:00Z`))
 const shift = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * 86400_000).toISOString().slice(0, 10)
 
-/** หน้าแรกครู: วันนี้ (บนสุด) + อีก 3 วัน — นัดสอบ · สอบย้อนหลัง · กำหนดส่ง · สิ่งที่ครูต้องทำ (ปริ้นเอกสาร ฯลฯ) */
+/** หน้าแรกครู: วันนี้ (บนสุด) + อีก 4 วัน — นัดสอบ · สอบย้อนหลัง · กำหนดส่ง · สิ่งที่ครูต้องทำ (ปริ้นเอกสาร ฯลฯ) */
 export default function TeacherWeek() {
   const today = todayBangkok()
   const [w, setW] = useState<Week | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState<string | null>(null)
   const [title, setTitle] = useState('')
-  const [flash, setFlash] = useState<string | null>(null)
 
   const load = useCallback(() => {
     let live = true
@@ -63,20 +62,13 @@ export default function TeacherWeek() {
       setError((e as Error).message)
     }
   }
-  /** สอบ → เตือนปริ้นข้อสอบวันก่อนสอบ */
-  async function remindPrint(x: WeekItem) {
-    const date = x.date > today ? shift(x.date, -1) : today
-    await add(date, `🖨️ ปริ้นข้อสอบ: ${x.title}${x.className ? ` (${x.className})` : ''}`, x.classId)
-    setFlash(`เพิ่ม “ปริ้นข้อสอบ ${x.title}” ไว้วัน${fmt(date, dayName)} ${fmt(date, dayNum)} แล้ว`)
-  }
-
   const pending = w?.days.flatMap((d) => d.items).filter((x) => x.kind === 'todo' && !x.done).length ?? 0
   return (
-    <section data-testid="teacher-week" aria-label="วันนี้และ 3 วันข้างหน้า">
+    <section data-testid="teacher-week" aria-label="วันนี้และ 4 วันข้างหน้า">
     <Card className="p-4 flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-lg font-extrabold">
-          <Icon n="calendar" /> วันนี้ และ 3 วันข้างหน้า
+          <Icon n="calendar" /> วันนี้ และ 4 วันข้างหน้า
         </h2>
         {pending > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">ต้องทำ {pending}</span>}
         <Link to="/teacher/calendar" className="text-xs font-semibold text-board underline">
@@ -84,11 +76,6 @@ export default function TeacherWeek() {
         </Link>
       </div>
       <ErrorBox message={error} />
-      {flash && (
-        <p role="status" className="rounded-xl bg-board-soft px-3 py-1.5 text-sm font-semibold text-board">
-          {flash}
-        </p>
-      )}
       <ol className="flex flex-col divide-y divide-stone-100">
         {(w?.days ?? []).map((d) => {
           const isToday = d.date === today
@@ -124,11 +111,6 @@ export default function TeacherWeek() {
                       )}
                       {(x.className || x.time) && <span className="text-xs text-stone-500"> · {[x.time, x.className].filter(Boolean).join(' · ')}</span>}
                     </span>
-                    {x.kind === 'exam' && !past && (
-                      <button type="button" onClick={() => void remindPrint(x)} className="shrink-0 rounded-lg bg-stone-100 px-2 py-0.5 text-xs font-bold" aria-label={`เตือนปริ้นข้อสอบ ${x.title}`}>
-                        🖨️ เตือนปริ้น
-                      </button>
-                    )}
                     {x.kind === 'todo' && (
                       <button type="button" onClick={() => void remove(x)} className="shrink-0 text-xs text-stone-400" aria-label={`ลบ ${x.title}`}>
                         ✕
