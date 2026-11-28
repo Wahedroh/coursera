@@ -9,22 +9,22 @@ const db = () => getDb(env)
 beforeEach(resetDb)
 const at = (d: string, hhmm: string) => Date.parse(`${d}T${hhmm}:00+07:00`)
 
-it('วันนี้ + 3 วันข้างหน้า: วันสอบ · รายการสอบ · กำหนดส่ง · สิ่งที่ต้องทำ (เพิ่ม/ติ๊ก/ลบ)', async () => {
+it('วันนี้ + 4 วันข้างหน้า: วันสอบ · รายการสอบ · กำหนดส่ง · สิ่งที่ต้องทำ (เพิ่ม/ติ๊ก/ลบ)', async () => {
   const cookie = await loginTeacher()
   const { classId } = await seedClass(db(), { name: 'ม.2/1' })
-  // วันนี้ = 2026-11-24 → แสดง 24–27
+  // วันนี้ = 2026-11-24 → แสดง 24–28
   await postJson('/api/teacher/events', { kind: 'exam', title: 'สอบกลางภาค', date: '2026-11-26', period: 'คาบ 3', detail: '', classIds: [classId] }, { cookie })
   await postJson('/api/teacher/score-items', { title: 'สอบย่อยบทที่ 3', category: 'quiz', maxScore: 10, takenOn: '2026-11-24', classIds: [classId] }, { cookie })
   await postJson('/api/teacher/assignments', { title: 'ใบงานที่ 4', instructions: '', attachmentKeys: [], dueAt: at('2026-11-27', '23:59'), maxScore: 5, submitMode: 'text', classIds: [classId] }, { cookie })
-  await postJson('/api/teacher/events', { kind: 'exam', title: 'นอกสัปดาห์', date: '2026-11-28', period: '', detail: '', classIds: [classId] }, { cookie })
+  await postJson('/api/teacher/events', { kind: 'exam', title: 'นอกสัปดาห์', date: '2026-11-29', period: '', detail: '', classIds: [classId] }, { cookie })
 
   expect((await postJson('/api/teacher/todos', { title: '  ', date: '2026-11-25' }, { cookie })).status).toBe(400)
   const { id } = await json(await postJson('/api/teacher/todos', { title: '🖨️ ปริ้นข้อสอบกลางภาค 40 ชุด', date: '2026-11-25', classId }, { cookie }))
 
   const w = await teacherUpcoming(db(), '2026-11-24')
   expect(w.from).toBe('2026-11-24')
-  expect(w.to).toBe('2026-11-27')
-  expect(w.days.map((d) => d.date)).toEqual(['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27'])
+  expect(w.to).toBe('2026-11-28')
+  expect(w.days.map((d) => d.date)).toEqual(['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28'])
   const on = (d: string) => w.days.find((x) => x.date === d)!.items.map((i) => `${i.kind}:${i.title}`)
   expect(on('2026-11-24')).toEqual(['exam:สอบย่อยบทที่ 3'])
   expect(on('2026-11-25')).toEqual(['todo:🖨️ ปริ้นข้อสอบกลางภาค 40 ชุด'])
@@ -47,7 +47,7 @@ it('วันนี้ + 3 วันข้างหน้า: วันสอบ
   expect((await putJson('/api/teacher/todos/nope', { done: true }, cookie)).status).toBe(404)
   await del(`/api/teacher/todos/${id}`, cookie)
   expect((await teacherUpcoming(db(), '2026-11-24')).days[1].items).toEqual([])
-  expect((await json(await getJson('/api/teacher/upcoming', cookie))).days).toHaveLength(4)
+  expect((await json(await getJson('/api/teacher/upcoming', cookie))).days).toHaveLength(5)
   expect((await getJson('/api/teacher/upcoming')).status).toBe(401)
 })
 

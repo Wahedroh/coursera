@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 const today = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10)
 
-test('หน้าแรกครู: ปฏิทินสัปดาห์นี้ · เพิ่ม “ปริ้นเอกสาร” วันนี้ → ติ๊กทำแล้ว · นัดสอบขึ้นในวันนั้น + ปุ่มเตือนปริ้น', async ({ browser }) => {
+test('หน้าแรกครู: ปฏิทินสัปดาห์นี้ · เพิ่ม “ปริ้นเอกสาร” วันนี้ → ติ๊กทำแล้ว · นัดสอบขึ้นในวันนั้น', async ({ browser }) => {
   const t = await (await browser.newContext()).newPage()
   await t.goto('/teacher/login')
   await t.getByLabel('รหัสผ่านครู').fill('teacher-pass')
@@ -19,7 +19,8 @@ test('หน้าแรกครู: ปฏิทินสัปดาห์น
   const day = week.getByTestId(`day-${d}`)
   await expect(day).toContainText('วันนี้')
   await expect(day).toContainText('สอบปลายบทเวกเตอร์')
-  await expect(day.getByRole('button', { name: 'เตือนปริ้นข้อสอบ สอบปลายบทเวกเตอร์' })).toBeVisible()
+  await expect(day.getByRole('button', { name: /เตือนปริ้น/ })).toHaveCount(0)
+  await expect(week.locator('[data-testid^=day-]')).toHaveCount(5)
 
   await day.getByRole('button', { name: /^เพิ่มสิ่งที่ต้องทำ/ }).click()
   await day.getByRole('button', { name: '🖨️ ปริ้นเอกสาร' }).click()

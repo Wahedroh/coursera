@@ -47,7 +47,7 @@ export async function teacherItems(db: Db, from: string, to: string): Promise<We
 const ORDER: Record<WeekItem['kind'], number> = { holiday: 0, exam: 1, makeup: 2, todo: 3, activity: 4, due: 5 }
 
 /** หน้าแรกครู: วันนี้ + อีก n−1 วันข้างหน้า · สิ่งที่ต้องทำที่ยังค้างจากวันก่อน ๆ ย้ายมาแสดงที่วันนี้ (ไม่ลืม) */
-export async function teacherUpcoming(db: Db, today: string, n = 4): Promise<TeacherWeek> {
+export async function teacherUpcoming(db: Db, today: string, n = 5): Promise<TeacherWeek> {
   const from = today
   const to = addDay(today, n - 1)
   const all = await teacherItems(db, from, to)
