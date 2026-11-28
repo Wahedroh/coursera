@@ -38,5 +38,6 @@ test('ลิงก์ล็อกอินที่แอบพาไปเว�
   await page.getByRole('button', { name: 'ถัดไป' }).click()
   for (const d of '1357') await page.getByRole('button', { name: d, exact: true }).click()
   await expect(page.getByText(/สวัสดี/)).toBeVisible()
-  expect(new URL(page.url()).host).toBe('localhost:5173')
+  expect(new URL(page.url()).host).not.toContain('evil')
+  expect(new URL(page.url()).hostname).toBe('localhost')
 })

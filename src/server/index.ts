@@ -4,6 +4,7 @@ import { teacherTimetableRoutes } from './timetable/routes'
 import { teacherCopyRoutes } from './copy/routes'
 import { teacherOverviewRoutes } from './overview/routes'
 import { Hono } from 'hono'
+import { secureHeaders } from 'hono/secure-headers'
 import { sessionMiddleware } from './auth/middleware'
 import { studentAuthRoutes } from './auth/student-routes'
 import { teacherAuthRoutes } from './auth/teacher-routes'
@@ -49,6 +50,19 @@ import { apiError, onError } from './http'
 
 const app = new Hono<AppEnv>()
 app.onError(onError)
+
+// ส่วนหัวความปลอดภัยของ API (หน้าเว็บ/ไฟล์ static ใช้ src/client/public/_headers)
+// ไฟล์ที่ผู้ใช้อัปโหลด (/api/files) ตั้ง CSP sandbox ของตัวเองอยู่แล้ว
+app.use(
+  '/api/*',
+  secureHeaders({
+    strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+    xFrameOptions: 'DENY',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    crossOriginResourcePolicy: 'same-origin',
+    crossOriginOpenerPolicy: 'same-origin',
+  }),
+)
 
 app.use('/api/*', sessionMiddleware)
 app.get('/api/health', (c) => c.json({ ok: true }))
